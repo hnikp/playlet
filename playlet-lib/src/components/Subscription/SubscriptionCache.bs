@@ -1,0 +1,61 @@
+import "pkg:/source/utils/Types.bs"
+
+' A short-lived cache of the current profile's subscribed channel ids, stored on the Invidious node
+' (field "subscriptionsCache") so it is shared between jobs.
+namespace SubscriptionCache
+    const CACHE_SECONDS = 300
+
+    ' Returns true/false if the status is cached, or invalid
+    function IsSubscribed(invidiousNode as object, profile as object, ucid as string) as dynamic
+        cache = Get(invidiousNode, profile)
+        if cache = invalid
+            return invalid
+        end if
+        return cache.ucids.DoesExist(ucid)
+    end function
+
+    function Set(invidiousNode as object, profile as object, ucids as object) as void
+        invidiousNode.subscriptionsCache = {
+            key: GetProfileKey(profile)
+            timestamp: NowSeconds()
+            ucids: ucids
+        }
+    end function
+
+    ' Updates the cache after a subscribe/unsubscribe, if the cache is valid for this profile
+    function SetSubscribed(invidiousNode as object, profile as object, ucid as string, isSubscribed as boolean) as void
+        cache = Get(invidiousNode, profile)
+        if cache = invalid
+            return
+        end if
+        ucids = cache.ucids
+        if isSubscribed
+            ucids[ucid] = true
+        else
+            ucids.Delete(ucid)
+        end if
+        Set(invidiousNode, profile, ucids)
+    end function
+
+    function Get(invidiousNode as object, profile as object) as object
+        cache = invidiousNode.subscriptionsCache
+        if not IsAssociativeArray(cache) or not IsAssociativeArray(cache.ucids)
+            return invalid
+        end if
+        if cache.key <> GetProfileKey(profile)
+            return invalid
+        end if
+        if NowSeconds() - ValidInt(cache.timestamp) > CACHE_SECONDS
+            return invalid
+        end if
+        return cache
+    end function
+
+    function GetProfileKey(profile as object) as string
+        return ValidString(profile.type) + "|" + ValidString(profile.serverUrl) + "|" + ValidString(profile.username)
+    end function
+
+    function NowSeconds() as integer
+        return CreateObject("roDateTime").AsSeconds()
+    end function
+end namespace

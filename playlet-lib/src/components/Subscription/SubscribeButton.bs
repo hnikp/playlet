@@ -1,0 +1,108 @@
+import "pkg:/components/Subscription/SubscriptionUtils.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.top.visible = false
+    m.top.focusable = false
+    UpdateText()
+end function
+
+function OnNodeReady()
+    DisposableObserveFieldScoped(m.top, "buttonSelected", FuncName(OnButtonSelected))
+    DisposableObserveFieldScoped(m.profilesService, "currentProfileChanged", FuncName(OnProfileChanged))
+    DisposableObserveFieldScoped(m.invidious, "subscriptionChanged", FuncName(OnSubscriptionChanged))
+    OnProfileChanged()
+end function
+
+function OnAuthorIdChange() as void
+    m.top.isSubscribed = false
+    if m.invidious = invalid
+        ' not bound yet: OnNodeReady will fetch
+        return
+    end if
+    UpdateVisibility()
+    FetchStatus()
+end function
+
+function OnProfileChanged()
+    m.top.isSubscribed = false
+    UpdateVisibility()
+    FetchStatus()
+end function
+
+function UpdateVisibility()
+    enabled = SubscriptionUtils.IsLoggedIn(m.profilesService) and not StringUtils.IsNullOrEmpty(m.top.authorId)
+    m.top.enabled = enabled
+    m.top.visible = enabled
+    m.top.focusable = enabled
+end function
+
+function FetchStatus() as void
+    CancelJobs()
+    if not m.top.enabled
+        return
+    end if
+    m.fetchJob = SubscriptionUtils.FetchStatus(m.top, m.top.authorId, m.invidious, m.profilesService, m.jobQueue, OnFetchStatusDone)
+    m.top.loading = m.fetchJob <> invalid
+end function
+
+function OnFetchStatusDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.fetchJob = invalid
+    m.top.loading = false
+end function
+
+function OnButtonSelected() as void
+    if m.top.loading
+        return
+    end if
+    CancelJobs()
+    m.subscribeJob = SubscriptionUtils.SetSubscribed(m.top, m.top.authorId, not m.top.isSubscribed, m.invidious, m.profilesService, m.jobQueue, OnSubscribeDone)
+    m.top.loading = m.subscribeJob <> invalid
+end function
+
+function OnSubscribeDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.subscribeJob = invalid
+    m.top.loading = false
+end function
+
+' Another view (or the player menu) changed the subscription of this channel
+function OnSubscriptionChanged() as void
+    change = m.invidious.subscriptionChanged
+    if not IsAssociativeArray(change) or change.ucid <> m.top.authorId
+        return
+    end if
+    m.top.isSubscribed = change.isSubscribed = true
+end function
+
+function UpdateText()
+    if m.top.isSubscribed
+        text = Tr(Locale.Buttons.Unsubscribe)
+    else
+        text = Tr(Locale.Buttons.Subscribe)
+    end if
+    if m.top.loading
+        text += "…"
+    end if
+    m.top.text = text
+end function
+
+function CancelJobs()
+    if m.fetchJob <> invalid
+        m.fetchJob.cancel = true
+        m.fetchJob = invalid
+    end if
+    if m.subscribeJob <> invalid
+        m.subscribeJob.cancel = true
+        m.subscribeJob = invalid
+    end if
+end function
+
+function OnDispose()
+    DisposeObservers()
+    CancelJobs()
+end function

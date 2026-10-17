@@ -1,0 +1,14 @@
+<!-- A Subscribe/Unsubscribe button for a channel (set authorId). Fetches the current state, toggles on select,
+     and hides itself when no profile is logged in. Call @.BindNode() after creating it. -->
+<component name="SubscribeButton" extends="ButtonEx" includes="AutoBind,Disposable">
+    <interface>
+        <field id="authorId" type="string" onChange="OnAuthorIdChange" />
+        <field id="isSubscribed" type="boolean" onChange="UpdateText" />
+        <field id="loading" type="boolean" onChange="UpdateText" />
+        <!-- read-only: true when the button is shown (a profile is logged in and authorId is set) -->
+        <field id="enabled" type="boolean" />
+        <field id="invidious" type="node" bind="/Invidious" />
+        <field id="profilesService" type="node" bind="/ProfilesService" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+    </interface>
+</component>

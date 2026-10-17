@@ -1,0 +1,64 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+' Subscription status and toggling for any node with an "isSubscribed" boolean field
+' (SubscribeButton, the player menu...). The jobs set target.isSubscribed when done.
+namespace SubscriptionUtils
+    function IsLoggedIn(profilesService as object) as boolean
+        return profilesService <> invalid and profilesService.currentProfile <> invalid
+    end function
+
+    ' Queues a job that sets target.isSubscribed. Returns the job callback node (set .cancel = true to cancel), or invalid.
+    function FetchStatus(target as object, ucid as string, invidious as object, profilesService as object, jobQueue as object, callback = invalid as dynamic) as object
+        profile = profilesService.currentProfile
+        if profile = invalid or profile.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            return invalid
+        end if
+        if StringUtils.IsNullOrEmpty(ucid)
+            return invalid
+        end if
+
+        input = {
+            target: target
+            ucid: ucid
+            profile: profile
+            invidious: invidious
+        }
+
+        job = JobSystem.CreateCallback(callback)
+        JobSystem.QueueJob(jobQueue, Jobs.FetchSubscriptionStatusJob, input, job)
+        return job
+    end function
+
+    ' Queues a job that subscribes/unsubscribes, then sets target.isSubscribed.
+    ' Returns the job callback node, or invalid if not possible (shows a dialog if the profile needs to log in again).
+    function SetSubscribed(target as object, ucid as string, subscribe as boolean, invidious as object, profilesService as object, jobQueue as object, callback = invalid as dynamic) as object
+        profile = profilesService.currentProfile
+        if profile = invalid or StringUtils.IsNullOrEmpty(ucid)
+            return invalid
+        end if
+        if profile.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            DialogUtils.ShowDialogEx({
+                title: Tr(Locale.Dialogs.ProfileNeedsReauthTitle)
+                message: Tr(Locale.Dialogs.ProfileNeedsReauthMessage)
+            })
+            return invalid
+        end if
+
+        input = {
+            target: target
+            invidious: invidious
+            ucid: ucid
+            subscribe: subscribe
+            profile: profile
+        }
+
+        job = JobSystem.CreateCallback(callback)
+        JobSystem.QueueJob(jobQueue, Jobs.SubscribeJob, input, job)
+        return job
+    end function
+end namespace

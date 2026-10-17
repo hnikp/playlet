@@ -2,7 +2,6 @@
     <interface>
         <field id="content" type="node" onChange="OnContentSet" />
         <field id="authorId" type="string" onChange="OnAuthorIdChange" />
-        <field id="isSubscribed" type="boolean" onChange="OnSubscriptionChanged" />
         <field id="appController" type="node" bind="/AppController" />
         <field id="invidious" type="node" bind="/Invidious" />
         <field id="profilesService" type="node" bind="/ProfilesService" />
@@ -51,7 +50,7 @@
                     font="font:SmallestSystemFont" />
             </Poster>
 
-            <ButtonEx
+            <SubscribeButton
                 id="subscribeButton"
                 iconVisible="false"
                 anchor="[0.5,0.5]"

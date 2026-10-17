@@ -1,11 +1,12 @@
 import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Subscription/SubscriptionCache.bs"
 
 @job("SubscribeJob")
 function ExecuteJob() as void
     input = JobGetInput()
 
-    channelView = input.channelView
+    target = input.target
     invidiousNode = input.invidious
     ucid = input.ucid
     subscribe = input.subscribe
@@ -37,5 +38,14 @@ function ExecuteJob() as void
         return
     end if
 
-    channelView.isSubscribed = subscribe
+    SubscriptionCache.SetSubscribed(invidiousNode, profile, ucid, subscribe)
+    if target <> invalid
+        target.isSubscribed = subscribe
+    end if
+
+    ' Lets other views (channel page, video page, player menu, subscriptions feed) update.
+    invidiousNode.subscriptionChanged = {
+        ucid: ucid
+        isSubscribed: subscribe
+    }
 end function

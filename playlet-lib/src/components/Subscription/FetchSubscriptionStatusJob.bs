@@ -1,13 +1,14 @@
 import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Subscription/SubscriptionCache.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 
 @job("FetchSubscriptionStatusJob")
 function ExecuteJob() as void
     input = JobGetInput()
 
-    channelView = input.channelView
+    target = input.target
     ucid = input.ucid
     invidiousNode = input.invidious
     profile = input.profile
@@ -36,23 +37,33 @@ function ExecuteJob() as void
             JobError("Failed to fetch subscription status: " + ToString(subscriptionStatus.error))
             return
         end if
-        channelView.isSubscribed = subscriptionStatus.isSubscribed
-    else
-        service = new Invidious.InvidiousService(invidiousNode)
-        subscriptionsResponse = service.GetSubscriptions(auth, cancellation)
-        if not subscriptionsResponse.IsSuccess()
-            JobError("Failed to fetch subscriptions: " + subscriptionsResponse.ErrorMessage())
-            return
-        end if
-        subscriptions = subscriptionsResponse.Json()
-
-        isSubscribed = false
-        for each subscription in subscriptions
-            if subscription.authorId = ucid
-                isSubscribed = true
-                exit for
-            end if
-        end for
-        channelView.isSubscribed = isSubscribed
+        target.isSubscribed = subscriptionStatus.isSubscribed
+        return
     end if
+
+    ' Invidious has no per-channel status endpoint: the whole subscription list is needed,
+    ' so it is cached for a few minutes on the Invidious node.
+    cachedStatus = SubscriptionCache.IsSubscribed(invidiousNode, profile, ucid)
+    if cachedStatus <> invalid
+        target.isSubscribed = cachedStatus
+        return
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+    subscriptionsResponse = service.GetSubscriptions(auth, cancellation)
+    if not subscriptionsResponse.IsSuccess()
+        JobError("Failed to fetch subscriptions: " + subscriptionsResponse.ErrorMessage())
+        return
+    end if
+    subscriptions = subscriptionsResponse.Json()
+
+    ucids = {}
+    for each subscription in ValidArray(subscriptions)
+        if IsString(subscription.authorId)
+            ucids[subscription.authorId] = true
+        end if
+    end for
+    SubscriptionCache.Set(invidiousNode, profile, ucids)
+
+    target.isSubscribed = ucids.DoesExist(ucid)
 end function

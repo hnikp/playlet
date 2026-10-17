@@ -7,6 +7,11 @@
 
         <field id="apiDefinitions" type="assocarray" />
 
+        <!-- Subscription list cache, see SubscriptionCache.bs -->
+        <field id="subscriptionsCache" type="assocarray" />
+        <!-- Set after a successful subscribe/unsubscribe: { ucid, isSubscribed } -->
+        <field id="subscriptionChanged" type="assocarray" alwaysNotify="true" />
+
         <function name="GetInstance" />
         <function name="GetInvidiousInstance" />
     </interface>
