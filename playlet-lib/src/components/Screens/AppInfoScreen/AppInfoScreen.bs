@@ -1,3 +1,5 @@
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -29,6 +31,10 @@ function Init()
     }]
 
     m.keyValueList = m.top.findNode("KeyValueListContent")
+
+    #if DEBUG
+        CreateRtlTextTestPanel()
+    #end if
 end function
 
 function OnNodeReady()
@@ -56,4 +62,50 @@ function UpdateKeyValueList()
         contentNode = m.keyValueList.createChild("ContentNode")
         contentNode.title = value
     end for
+end function
+
+' Debug builds only: renders Persian samples three ways to check the device's text rendering.
+' Columns: system font | bundled font, raw text | bundled font, shaped + reordered (RtlText).
+function CreateRtlTextTestPanel() as void
+    samples = [
+        "سلام دنیا"
+        "ویدیو جدید iPhone 15 در سال ۱۴۰۳"
+        "(تست) «نقل" + Chr(&h200C) + "قول» می" + Chr(&h200C) + "خواهم"
+        "لا الله"
+    ]
+
+    systemFont = CreateObject("roSGNode", "Font")
+    systemFont.uri = "font:SystemFontFile"
+    systemFont.size = 22
+
+    panel = m.top.createChild("Group")
+    panel.translation = [130, 490]
+
+    for i = 0 to samples.Count() - 1
+        text = samples[i]
+        y = i * 50
+
+        label = panel.createChild("Label")
+        label.translation = [0, y]
+        label.width = 330
+        label.font = systemFont
+        label.text = text
+
+        label = panel.createChild("Label")
+        label.translation = [345, y]
+        label.width = 330
+        label.font = RtlText.GetLabelFont(22, false)
+        label.text = text
+
+        label = panel.createChild("Label")
+        label.translation = [690, y]
+        label.width = 330
+        RtlText.ApplyToLabel(label, text, systemFont)
+    end for
+
+    measureFont = RtlText.GetMeasureFont(22, false)
+    LogInfo("RtlText test panel: font families=", m.__rtlFontRegistry.GetFamilies(), " measure font valid=", measureFont <> invalid)
+    if measureFont <> invalid
+        LogInfo("RtlText test panel: width of sample 0 shaped=", measureFont.GetOneLineWidth(RtlText.Shape(samples[0]), 10000))
+    end if
 end function

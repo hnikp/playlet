@@ -1,0 +1,127 @@
+namespace Tests
+
+    @suite
+    class RtlTextTests extends Rooibos.BaseTestSuite
+
+        @describe("RtlText.ContainsArabicScript")
+
+        @it("Detects Arabic-script text")
+        @params("Hello world", false)
+        @params("", false)
+        @params(invalid, false)
+        @params("سلام", true)
+        @params("iPhone 15 جدید", true)
+        @params("۱۴۰۳", true)
+        function _(text as dynamic, expected as boolean)
+            m.assertEqual(RtlText.ContainsArabicScript(text), expected)
+        end function
+
+        @describe("RtlText.IsRtlParagraph")
+
+        @it("Uses the first strong character")
+        @params("سلام world", true)
+        @params("Hello سلام", false)
+        @params("15 سلام", true)
+        @params("123", false)
+        function _(text as dynamic, expected as boolean)
+            m.assertEqual(RtlText.IsRtlParagraph(text), expected)
+        end function
+
+        @describe("RtlText.Shape")
+
+        @it("Leaves non-Arabic text unchanged")
+        function _()
+            m.assertEqual(RtlText.Shape("Hello (world) 123"), "Hello (world) 123")
+        end function
+
+        @it("Shapes initial, medial, final and isolated forms")
+        function _()
+            ' دنیا: dal (isolated), noon (initial), farsi yeh (medial), alef (final)
+            m.assertEqual(RtlText.Shape("دنیا"), m.Cps([&hFEA9, &hFEE7, &hFBFF, &hFE8E]))
+        end function
+
+        @it("Uses the lam-alef ligature")
+        function _()
+            ' سلام: seen (initial), lam-alef (final), meem (isolated: alef doesn't join to the left)
+            m.assertEqual(RtlText.Shape("سلام"), m.Cps([&hFEB3, &hFEFC, &hFEE1]))
+            ' لا alone: isolated ligature
+            m.assertEqual(RtlText.Shape("لا"), m.Cps([&hFEFB]))
+        end function
+
+        @it("Shapes Persian letters")
+        function _()
+            ' پژ: peh (initial), jeh (final; right-joining)
+            m.assertEqual(RtlText.Shape("پژ"), m.Cps([&hFB58, &hFB8B]))
+            ' گک: gaf (initial), keheh (final)
+            m.assertEqual(RtlText.Shape("گک"), m.Cps([&hFB94, &hFB8F]))
+        end function
+
+        @it("Breaks joining at ZWNJ and removes it")
+        function _()
+            ' می‌خواهم: meem (initial), yeh (final) | ZWNJ | khah (initial), waw (final), alef (isolated), heh (initial), meem (final)
+            text = "می" + Chr(&h200C) + "خواهم"
+            expected = m.Cps([&hFEE3, &hFBFD, &hFEA7, &hFEEE, &hFE8D, &hFEEB, &hFEE2])
+            m.assertEqual(RtlText.Shape(text), expected)
+        end function
+
+        @it("Skips transparent marks when joining")
+        function _()
+            ' بَب: beh (initial), fatha, beh (final)
+            text = m.Cps([&h0628, &h064E, &h0628])
+            m.assertEqual(RtlText.Shape(text), m.Cps([&hFE91, &h064E, &hFE90]))
+        end function
+
+        @describe("RtlText.ToVisualLine")
+
+        @it("Leaves left-to-right text unchanged")
+        function _()
+            m.assertEqual(RtlText.ToVisualLine("Hello (world) 123"), "Hello (world) 123")
+        end function
+
+        @it("Reverses right-to-left text")
+        function _()
+            m.assertEqual(RtlText.ToVisualLine(m.Cps([&h0627, &h0628, &h062A])), m.Cps([&h062A, &h0628, &h0627]))
+        end function
+
+        @it("Keeps embedded English and numbers in order")
+        function _()
+            ' "<a b> iPhone 15" in a right-to-left paragraph -> "iPhone 15 <b a>"
+            text = m.Cps([&h0627, &h0628]) + " iPhone 15"
+            m.assertEqual(RtlText.ToVisualLine(text), "iPhone 15 " + m.Cps([&h0628, &h0627]))
+        end function
+
+        @it("Keeps Persian digit order")
+        function _()
+            ' "<a b> ۱۴۰۳" -> "۱۴۰۳ <b a>"
+            digits = m.Cps([&h06F1, &h06F4, &h06F0, &h06F3])
+            text = m.Cps([&h0627, &h0628]) + " " + digits
+            m.assertEqual(RtlText.ToVisualLine(text), digits + " " + m.Cps([&h0628, &h0627]))
+        end function
+
+        @it("Keeps number separators inside numbers")
+        function _()
+            text = m.Cps([&h0627]) + " 12:30"
+            m.assertEqual(RtlText.ToVisualLine(text), "12:30 " + m.Cps([&h0627]))
+        end function
+
+        @it("Mirrors brackets in right-to-left runs")
+        function _()
+            ' "(<a b>)" -> "(<b a>)" after mirroring
+            text = "(" + m.Cps([&h0627, &h0628]) + ")"
+            m.assertEqual(RtlText.ToVisualLine(text), "(" + m.Cps([&h0628, &h0627]) + ")")
+        end function
+
+        @it("Reorders right-to-left words inside left-to-right text")
+        function _()
+            text = "Hi " + m.Cps([&h0627, &h0628]) + " " + m.Cps([&h062A, &h062B]) + " end"
+            expected = "Hi " + m.Cps([&h062B, &h062A]) + " " + m.Cps([&h0628, &h0627]) + " end"
+            m.assertEqual(RtlText.ToVisualLine(text), expected)
+        end function
+
+        function Cps(cps as object) as string
+            return RtlText.FromCodePoints(cps)
+        end function
+
+    end class
+
+end namespace

@@ -1,0 +1,600 @@
+import "pkg:/source/utils/Types.bs"
+
+' Arabic-script (Persian/Arabic) text support for SceneGraph labels.
+' Roku labels render code points as-is: no contextual shaping and no bidi reordering. This module:
+'   1. Shape: replaces Arabic letters with their contextual presentation forms (U+FB50-FEFF)
+'   2. ToVisual: reorders a line into visual (left-to-right drawing) order, a simplified Unicode Bidi Algorithm
+'   3. Wrap: breaks logical text into lines before reordering, so multi-line labels keep the right line order
+' The bundled Vazirmatn font covers the presentation forms needed by Persian and Arabic.
+namespace RtlText
+    const FONT_REGULAR_URI = "pkg:/fonts/Vazirmatn-Regular.ttf"
+    const FONT_BOLD_URI = "pkg:/fonts/Vazirmatn-Bold.ttf"
+    const FONT_REGULAR_FILE = "libpkg:/fonts/Vazirmatn-Regular.ttf"
+    const FONT_BOLD_FILE = "libpkg:/fonts/Vazirmatn-Bold.ttf"
+    const FONT_FAMILY = "Vazirmatn"
+
+    const ZWNJ = &h200C
+    const ZWJ = &h200D
+    const TATWEEL = &h0640
+    const LAM = &h0644
+    const ELLIPSIS = "…"
+
+    function ContainsArabicScript(text as dynamic) as boolean
+        if not IsString(text)
+            return false
+        end if
+        length = Len(text)
+        for i = 1 to length
+            if IsArabicScriptCodePoint(Asc(Mid(text, i, 1)))
+                return true
+            end if
+        end for
+        return false
+    end function
+
+    function IsArabicScriptCodePoint(c as integer) as boolean
+        return (c >= &h0600 and c <= &h06FF) or (c >= &h0750 and c <= &h077F) or (c >= &h08A0 and c <= &h08FF) or (c >= &hFB50 and c <= &hFDFF) or (c >= &hFE70 and c <= &hFEFF)
+    end function
+
+    ' True if the first strong character of the text is right-to-left.
+    function IsRtlParagraph(text as dynamic) as boolean
+        if not IsString(text)
+            return false
+        end if
+        length = Len(text)
+        for i = 1 to length
+            t = BidiClass(Asc(Mid(text, i, 1)))
+            if t = "R"
+                return true
+            else if t = "L"
+                return false
+            end if
+        end for
+        return false
+    end function
+
+    ' Replaces Arabic-script letters with their contextual presentation forms (logical order is kept).
+    ' ZWNJ/ZWJ are consumed: they only affect joining.
+    function Shape(text as dynamic) as string
+        if not ContainsArabicScript(text)
+            return ValidString(text)
+        end if
+
+        forms = GetFormsTable()
+        cps = ToCodePoints(text)
+        n = cps.Count()
+        types = []
+        for each c in cps
+            types.Push(JoiningType(c, forms))
+        end for
+
+        out = []
+        i = 0
+        while i < n
+            c = cps[i]
+            t = types[i]
+            if c = ZWNJ or c = ZWJ
+                i += 1
+                continue while
+            end if
+
+            letterForms = forms[StrI(c)]
+            if letterForms = invalid
+                out.Push(c)
+                i += 1
+                continue while
+            end if
+
+            prevIndex = PrevJoiningIndex(types, i)
+            nextIndex = NextJoiningIndex(types, i)
+            joinsPrev = prevIndex >= 0 and (types[prevIndex] = "D" or types[prevIndex] = "C")
+
+            if c = LAM and nextIndex >= 0
+                ligature = LamAlefLigature(cps[nextIndex])
+                if ligature <> 0
+                    if joinsPrev
+                        out.Push(ligature + 1)
+                    else
+                        out.Push(ligature)
+                    end if
+                    ' keep marks between the lam and the alef
+                    for j = i + 1 to nextIndex - 1
+                        out.Push(cps[j])
+                    end for
+                    i = nextIndex + 1
+                    continue while
+                end if
+            end if
+
+            joinsNext = (t = "D") and nextIndex >= 0 and (types[nextIndex] = "D" or types[nextIndex] = "R" or types[nextIndex] = "C")
+
+            if t = "D"
+                if joinsPrev and joinsNext
+                    out.Push(letterForms[3])
+                else if joinsNext
+                    out.Push(letterForms[2])
+                else if joinsPrev
+                    out.Push(letterForms[1])
+                else
+                    out.Push(letterForms[0])
+                end if
+            else if t = "R" and joinsPrev
+                out.Push(letterForms[1])
+            else
+                out.Push(letterForms[0])
+            end if
+            i += 1
+        end while
+
+        return FromCodePoints(out)
+    end function
+
+    ' Reorders text into visual order, line by line (lines are separated by "\n").
+    function ToVisual(text as dynamic) as string
+        if not IsString(text) or text = ""
+            return ValidString(text)
+        end if
+        lines = text.Split(Chr(10))
+        result = []
+        for each line in lines
+            result.Push(ToVisualLine(line))
+        end for
+        return result.Join(Chr(10))
+    end function
+
+    ' Simplified UBA for a single line: resolve weak/neutral types, assign embedding levels, reverse (rule L2)
+    ' and mirror brackets at odd levels.
+    function ToVisualLine(line as string) as string
+        cps = ToCodePoints(line)
+        n = cps.Count()
+        if n = 0
+            return line
+        end if
+
+        types = []
+        paragraphLevel = -1
+        hasRtl = false
+        for each c in cps
+            t = BidiClass(c)
+            types.Push(t)
+            if t = "R"
+                hasRtl = true
+            end if
+            if paragraphLevel = -1
+                if t = "R"
+                    paragraphLevel = 1
+                else if t = "L"
+                    paragraphLevel = 0
+                end if
+            end if
+        end for
+        if not hasRtl
+            ' no right-to-left character: nothing to reorder
+            return line
+        end if
+        if paragraphLevel = -1
+            paragraphLevel = 0
+        end if
+        paragraphDir = "L"
+        if paragraphLevel = 1
+            paragraphDir = "R"
+        end if
+
+        ' W7: European numbers preceded by left-to-right text behave as left-to-right
+        lastStrong = paragraphDir
+        for i = 0 to n - 1
+            if types[i] = "R" or types[i] = "L"
+                lastStrong = types[i]
+            else if types[i] = "EN" and lastStrong = "L"
+                types[i] = "L"
+            end if
+        end for
+
+        ' W4: a single separator between two numbers joins them (1,000 / 12:30 / 1.5)
+        for i = 1 to n - 2
+            if types[i] = "N" and IsNumberSeparator(cps[i]) and types[i - 1] = "EN" and types[i + 1] = "EN"
+                types[i] = "EN"
+            end if
+        end for
+
+        ' N1/N2: neutrals take the surrounding direction if both sides agree, else the paragraph direction
+        i = 0
+        while i < n
+            if types[i] <> "N"
+                i += 1
+                continue while
+            end if
+            runStart = i
+            while i < n and types[i] = "N"
+                i += 1
+            end while
+            runEnd = i - 1
+
+            leftDir = paragraphDir
+            if runStart > 0
+                leftDir = StrongDirection(types[runStart - 1])
+            end if
+            rightDir = paragraphDir
+            if runEnd < n - 1
+                rightDir = StrongDirection(types[runEnd + 1])
+            end if
+
+            resolved = paragraphDir
+            if leftDir = rightDir
+                resolved = leftDir
+            end if
+            for j = runStart to runEnd
+                types[j] = resolved
+            end for
+        end while
+
+        ' I1/I2: embedding levels. Even paragraph level: R -> 1, EN -> 2, L -> 0.
+        ' Odd paragraph level: R -> 1, L and EN -> 2.
+        levels = []
+        maxLevel = 1
+        for i = 0 to n - 1
+            t = types[i]
+            if t = "R"
+                level = 1
+            else if t = "EN" or paragraphLevel = 1
+                level = 2
+            else
+                level = 0
+            end if
+            levels.Push(level)
+            if level > maxLevel
+                maxLevel = level
+            end if
+        end for
+
+        ' L2: from the highest level down to the lowest odd level, reverse every run at or above that level
+        for level = maxLevel to 1 step -1
+            i = 0
+            while i < n
+                if levels[i] < level
+                    i += 1
+                    continue while
+                end if
+                runStart = i
+                while i < n and levels[i] >= level
+                    i += 1
+                end while
+                ReverseRange(cps, runStart, i - 1)
+                ReverseRange(levels, runStart, i - 1)
+            end while
+        end for
+
+        ' L4: mirrored characters at odd (right-to-left) levels
+        mirrors = GetMirrorTable()
+        for i = 0 to n - 1
+            if levels[i] mod 2 = 1
+                mirrored = mirrors[StrI(cps[i])]
+                if mirrored <> invalid
+                    cps[i] = mirrored
+                end if
+            end if
+        end for
+
+        return FromCodePoints(cps)
+    end function
+
+    ' Breaks (shaped, logical-order) text into at most maxLines lines that fit maxWidth,
+    ' adding an ellipsis when truncated. font is an roFont.
+    function Wrap(text as string, font as object, maxWidth as integer, maxLines as integer) as object
+        if font = invalid or maxWidth <= 0 or maxLines <= 0
+            return [text]
+        end if
+
+        words = text.Split(" ")
+        lines = []
+        current = ""
+        wordIndex = 0
+        wordCount = words.Count()
+        while wordIndex < wordCount
+            word = words[wordIndex]
+            if current = ""
+                candidate = word
+            else
+                candidate = current + " " + word
+            end if
+
+            if current = "" or font.GetOneLineWidth(candidate, 100000) <= maxWidth
+                current = candidate
+                wordIndex += 1
+                continue while
+            end if
+
+            if lines.Count() = maxLines - 1
+                exit while
+            end if
+            lines.Push(current)
+            current = ""
+        end while
+
+        truncated = wordIndex < wordCount
+        if truncated or font.GetOneLineWidth(current, 100000) > maxWidth
+            while Len(current) > 0 and font.GetOneLineWidth(current + ELLIPSIS, 100000) > maxWidth
+                current = Left(current, Len(current) - 1)
+            end while
+            current = current.Trim() + ELLIPSIS
+        end if
+        lines.Push(current)
+        return lines
+    end function
+
+    ' Shapes + wraps + reorders text for display. Returns { text, isRtl } ready to assign to a label.
+    ' font (an roFont, see GetMeasureFont) is optional: without it the text is not wrapped.
+    function Prepare(text as dynamic, font = invalid as object, maxWidth = 0 as integer, maxLines = 1 as integer) as object
+        text = ValidString(text)
+        if not ContainsArabicScript(text)
+            return { text: text, isRtl: false }
+        end if
+
+        shaped = Shape(text)
+        lines = [shaped]
+        if font <> invalid and maxWidth > 0
+            lines = Wrap(shaped, font, maxWidth, maxLines)
+        end if
+
+        visualLines = []
+        for each line in lines
+            visualLines.Push(ToVisualLine(line))
+        end for
+
+        return { text: visualLines.Join(Chr(10)), isRtl: IsRtlParagraph(text) }
+    end function
+
+    ' Sets text on a Label, switching to the Persian-capable font for Arabic-script text and back to
+    ' defaultFont otherwise. The label's width and maxLines are honored.
+    function ApplyToLabel(label as object, text as dynamic, defaultFont as object, bold = false as boolean) as void
+        if label = invalid
+            return
+        end if
+        text = ValidString(text)
+        if not ContainsArabicScript(text)
+            if defaultFont <> invalid
+                label.font = defaultFont
+            end if
+            label.horizAlign = "left"
+            label.text = text
+            return
+        end if
+
+        size = 24
+        if defaultFont <> invalid and IsNode(defaultFont) and defaultFont.size > 0
+            size = defaultFont.size
+        end if
+
+        maxLines = 1
+        if label.wrap
+            maxLines = label.maxLines
+            if maxLines <= 0
+                maxLines = 50
+            end if
+        end if
+
+        ' a little slack: SceneGraph and roFont measurements can differ by a few pixels, and an overflowing
+        ' line would be re-wrapped by the label in the wrong order.
+        maxWidth = Int(label.width * 0.95)
+        prepared = Prepare(text, GetMeasureFont(size, bold), maxWidth, maxLines)
+
+        label.font = GetLabelFont(size, bold)
+        if prepared.isRtl
+            label.horizAlign = "right"
+        else
+            label.horizAlign = "left"
+        end if
+        label.text = prepared.text
+    end function
+
+    ' A SceneGraph Font node for the bundled font, cached per thread.
+    function GetLabelFont(size as integer, bold as boolean) as object
+        cache = m.__rtlLabelFonts
+        if cache = invalid
+            cache = {}
+            m.__rtlLabelFonts = cache
+        end if
+        key = `${size}_${bold}`
+        font = cache[key]
+        if font = invalid
+            font = CreateObject("roSGNode", "Font")
+            if bold
+                font.uri = FONT_BOLD_URI
+            else
+                font.uri = FONT_REGULAR_URI
+            end if
+            font.size = size
+            cache[key] = font
+        end if
+        return font
+    end function
+
+    ' An roFont for measuring text width, cached per thread.
+    function GetMeasureFont(size as integer, bold as boolean) as object
+        cache = m.__rtlMeasureFonts
+        if cache = invalid
+            cache = {}
+            m.__rtlMeasureFonts = cache
+        end if
+        key = `${size}_${bold}`
+        font = cache[key]
+        if font = invalid
+            registry = m.__rtlFontRegistry
+            if registry = invalid
+                registry = CreateObject("roFontRegistry")
+                registry.Register(FONT_REGULAR_FILE)
+                registry.Register(FONT_BOLD_FILE)
+                m.__rtlFontRegistry = registry
+            end if
+            font = registry.GetFont(FONT_FAMILY, size, bold, false)
+            if font = invalid
+                return invalid
+            end if
+            cache[key] = font
+        end if
+        return font
+    end function
+
+    function ToCodePoints(text as string) as object
+        cps = []
+        length = Len(text)
+        for i = 1 to length
+            cps.Push(Asc(Mid(text, i, 1)))
+        end for
+        return cps
+    end function
+
+    function FromCodePoints(cps as object) as string
+        chars = []
+        for each c in cps
+            chars.Push(Chr(c))
+        end for
+        return chars.Join("")
+    end function
+
+    function ReverseRange(arr as object, startIndex as integer, endIndex as integer) as void
+        while startIndex < endIndex
+            tmp = arr[startIndex]
+            arr[startIndex] = arr[endIndex]
+            arr[endIndex] = tmp
+            startIndex += 1
+            endIndex -= 1
+        end while
+    end function
+
+    ' Bidi class, simplified to: "R" (right-to-left), "L" (left-to-right), "EN" (number), "N" (neutral)
+    function BidiClass(c as integer) as string
+        if (c >= &h30 and c <= &h39) or (c >= &h06F0 and c <= &h06F9) or (c >= &h0660 and c <= &h0669)
+            return "EN"
+        end if
+        if (c >= &h0590 and c <= &h08FF) or (c >= &hFB1D and c <= &hFDFF) or (c >= &hFE70 and c <= &hFEFF)
+            return "R"
+        end if
+        if c < &h41 or (c >= &h5B and c <= &h60) or (c >= &h7B and c <= &hBF) or c = &hD7 or c = &hF7
+            return "N"
+        end if
+        if (c >= &h2000 and c <= &h2BFF) or (c >= &h3000 and c <= &h303F) or (c >= &hFE30 and c <= &hFE4F) or c >= &h1F000
+            return "N"
+        end if
+        return "L"
+    end function
+
+    ' N1: numbers count as right-to-left when resolving neutrals
+    function StrongDirection(t as string) as string
+        if t = "L"
+            return "L"
+        end if
+        return "R"
+    end function
+
+    function IsNumberSeparator(c as integer) as boolean
+        return c = &h2C or c = &h2E or c = &h3A or c = &h2F or c = &h066B or c = &h066C
+    end function
+
+    ' Joining type: "D" dual, "R" right, "C" join-causing, "T" transparent, "U" non-joining
+    function JoiningType(c as integer, forms as object) as string
+        letterForms = forms[StrI(c)]
+        if letterForms <> invalid
+            if letterForms.Count() = 4
+                return "D"
+            else if letterForms.Count() = 2
+                return "R"
+            end if
+            return "U"
+        end if
+        if c = TATWEEL or c = ZWJ
+            return "C"
+        end if
+        if (c >= &h064B and c <= &h065F) or c = &h0670 or (c >= &h06D6 and c <= &h06DC) or (c >= &h06DF and c <= &h06E4) or c = &h06E7 or c = &h06E8 or (c >= &h06EA and c <= &h06ED)
+            return "T"
+        end if
+        return "U"
+    end function
+
+    function PrevJoiningIndex(types as object, index as integer) as integer
+        i = index - 1
+        while i >= 0 and types[i] = "T"
+            i -= 1
+        end while
+        return i
+    end function
+
+    function NextJoiningIndex(types as object, index as integer) as integer
+        i = index + 1
+        n = types.Count()
+        while i < n and types[i] = "T"
+            i += 1
+        end while
+        if i >= n
+            return -1
+        end if
+        return i
+    end function
+
+    ' Isolated lam-alef ligature for the given alef (final form is +1), or 0
+    function LamAlefLigature(alef as integer) as integer
+        if alef = &h0622
+            return &hFEF5
+        else if alef = &h0623
+            return &hFEF7
+        else if alef = &h0625
+            return &hFEF9
+        else if alef = &h0627
+            return &hFEFB
+        end if
+        return 0
+    end function
+
+    ' code point -> [isolated, final, initial, medial] (dual-joining) or [isolated, final] (right-joining)
+    function GetFormsTable() as object
+        if m.__rtlFormsTable <> invalid
+            return m.__rtlFormsTable
+        end if
+
+        table = {}
+        ' Arabic letters U+0621-U+064A map to consecutive runs in Presentation Forms-B, starting at U+FE80
+        letters = [
+            [&h0621, 1], [&h0622, 2], [&h0623, 2], [&h0624, 2], [&h0625, 2], [&h0626, 4], [&h0627, 2], [&h0628, 4],
+            [&h0629, 2], [&h062A, 4], [&h062B, 4], [&h062C, 4], [&h062D, 4], [&h062E, 4], [&h062F, 2], [&h0630, 2],
+            [&h0631, 2], [&h0632, 2], [&h0633, 4], [&h0634, 4], [&h0635, 4], [&h0636, 4], [&h0637, 4], [&h0638, 4],
+            [&h0639, 4], [&h063A, 4], [&h0641, 4], [&h0642, 4], [&h0643, 4], [&h0644, 4], [&h0645, 4], [&h0646, 4],
+            [&h0647, 4], [&h0648, 2], [&h0649, 2], [&h064A, 4]
+        ]
+        nextForm = &hFE80
+        for each letter in letters
+            forms = []
+            for i = 0 to letter[1] - 1
+                forms.Push(nextForm + i)
+            end for
+            table[StrI(letter[0])] = forms
+            nextForm += letter[1]
+        end for
+
+        ' Persian and other letters in Presentation Forms-A
+        table[StrI(&h0671)] = [&hFB50, &hFB51] ' alef wasla
+        table[StrI(&h067E)] = [&hFB56, &hFB57, &hFB58, &hFB59] ' peh
+        table[StrI(&h0686)] = [&hFB7A, &hFB7B, &hFB7C, &hFB7D] ' tcheh
+        table[StrI(&h0698)] = [&hFB8A, &hFB8B] ' jeh
+        table[StrI(&h06A9)] = [&hFB8E, &hFB8F, &hFB90, &hFB91] ' keheh
+        table[StrI(&h06AF)] = [&hFB92, &hFB93, &hFB94, &hFB95] ' gaf
+        table[StrI(&h06C0)] = [&hFBA4, &hFBA5] ' heh with yeh above
+        table[StrI(&h06CC)] = [&hFBFC, &hFBFD, &hFBFE, &hFBFF] ' farsi yeh
+
+        m.__rtlFormsTable = table
+        return table
+    end function
+
+    function GetMirrorTable() as object
+        if m.__rtlMirrorTable <> invalid
+            return m.__rtlMirrorTable
+        end if
+        pairs = [[&h28, &h29], [&h5B, &h5D], [&h7B, &h7D], [&h3C, &h3E], [&hAB, &hBB], [&h2039, &h203A]]
+        table = {}
+        for each pair in pairs
+            table[StrI(pair[0])] = pair[1]
+            table[StrI(pair[1])] = pair[0]
+        end for
+        m.__rtlMirrorTable = table
+        return table
+    end function
+end namespace
