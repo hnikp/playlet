@@ -123,7 +123,7 @@ function OnDetailsJobDone(event as object) as void
     m.busySpinner.control = "stop"
 
     info = event.getInfo()
-    if info.error <> invalid
+    if not info.success and not info.cancel
         LogWarn("Video details:", info.error)
     end if
 end function

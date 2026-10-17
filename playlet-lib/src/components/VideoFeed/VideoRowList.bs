@@ -480,7 +480,7 @@ function OnPreviewJobDone(event as object) as void
         m.previewJob = invalid
     end if
     info = event.getInfo()
-    if info.error <> invalid
+    if not info.success and not info.cancel
         LogDebug("No thumbnail preview:", info.error)
     end if
 end function

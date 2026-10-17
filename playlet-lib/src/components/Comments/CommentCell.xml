@@ -27,7 +27,7 @@
             id="contentLabel"
             translation="[62,34]"
             width="440"
-            maxLines="4"
+            maxLines="3"
             wrap="true"
             color="#EBEBEBFF" />
         <Label

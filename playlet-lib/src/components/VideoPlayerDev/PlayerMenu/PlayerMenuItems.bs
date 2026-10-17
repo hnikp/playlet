@@ -16,11 +16,8 @@ namespace PlayerMenuItems
 
         authorId = ValidString(state.authorId)
         if authorId <> ""
-            title = Tr(Locale.PlayerMenu.GoToChannel)
-            if ValidString(state.author) <> ""
-                title += ": " + state.author
-            end if
-            items.Push({ id: "channel", title: title })
+            ' (no channel name: on some videos "author" also carries the view count and date)
+            items.Push({ id: "channel", title: Tr(Locale.PlayerMenu.GoToChannel) })
 
             if state.loggedIn = true
                 if state.isSubscribed = invalid

@@ -115,7 +115,8 @@ function OnPageLoaded(event as object) as void
     end if
 
     data = info.data
-    if info.error <> invalid or not IsAssociativeArray(data) or data.error <> invalid
+    ' info.error is a string field ("" on success): check info.success
+    if not info.success or not IsAssociativeArray(data) or data.error <> invalid
         state.hasMore = false
         if data <> invalid and data.error <> invalid
             LogWarn("Failed to load comments:", data.error)

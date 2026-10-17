@@ -68,7 +68,7 @@ function ToCommentContentNode(comment as object, instance as string) as object
         author += " • " + node.publishedText
     end if
     node.authorPrepared = RtlText.PrepareForLabel(author, 18, true, 440, 1)
-    node.contentPrepared = RtlText.PrepareForLabel(node.content, 18, false, 440, 4)
+    node.contentPrepared = RtlText.PrepareForLabel(node.content, 18, false, 440, 3)
 
     return node
 end function

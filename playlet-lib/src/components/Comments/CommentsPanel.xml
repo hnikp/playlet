@@ -14,7 +14,7 @@
         <Rectangle
             width="560"
             height="720"
-            color="#141414F2">
+            color="#141414FF">
 
             <Label
                 id="titleLabel"

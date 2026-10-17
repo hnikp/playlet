@@ -145,7 +145,12 @@ function OnPlayerMenuAction() as void
         ClosePlayerMenu(false)
         OpenPlayerComments()
     else if id = "queue"
-        ClosePlayerMenu(true)
+        ' The queue is a screen: under a fullscreen video it would be invisible yet take the remote's focus
+        ' (OK would play a queue item, Back would never reach the player). Shrink to picture-in-picture first.
+        ClosePlayerMenu(false)
+        if m.container.fullscreen
+            VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+        end if
         VideoQueueViewUtils.Open(m.videoQueue, m.top.appController)
     else if id = "pip"
         ClosePlayerMenu(false)
