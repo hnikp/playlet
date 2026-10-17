@@ -46,6 +46,7 @@
         <field id="maxRect" type="rect2D" value="[0,0,1280,720]" />
         <field id="close" type="boolean" alwaysNotify="true" />
         <field id="setSeek" type="float" alwaysNotify="true" />
+        <field id="showMenu" type="boolean" alwaysNotify="true" />
         <!-- test-only probe: how many times the coordinator pulsed ButtonRow.nudge (TestSetup observes it). -->
         <field id="nudgeCount" type="integer" />
         <!-- test-only probe: how many SponsorBlock viewed-segment reports the coordinator queued. -->

@@ -23,13 +23,14 @@ namespace SubscriptionCache
     end function
 
     ' Updates the cache after a subscribe/unsubscribe, if the cache is valid for this profile
-    function SetSubscribed(invidiousNode as object, profile as object, ucid as string, isSubscribed as boolean) as void
+    ' (the parameter isn't named isSubscribed: it would resolve to the IsSubscribed function in this namespace)
+    function SetSubscribed(invidiousNode as object, profile as object, ucid as string, subscribed as boolean) as void
         cache = Get(invidiousNode, profile)
         if cache = invalid
             return
         end if
         ucids = cache.ucids
-        if isSubscribed
+        if subscribed
             ucids[ucid] = true
         else
             ucids.Delete(ucid)

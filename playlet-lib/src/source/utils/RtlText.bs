@@ -484,16 +484,16 @@ namespace RtlText
     ' The characters of a string. Split("") does it in one pass (Mid() in a loop is quadratic on long
     ' descriptions); falls back to Mid() if Split("") doesn't split into characters.
     function Chars(text as string) as object
-        chars = text.Split("")
+        characters = text.Split("")
         length = Len(text)
-        if chars.Count() = length
-            return chars
+        if characters.Count() = length
+            return characters
         end if
-        chars = []
+        characters = []
         for i = 1 to length
-            chars.Push(Mid(text, i, 1))
+            characters.Push(Mid(text, i, 1))
         end for
-        return chars
+        return characters
     end function
 
     function ToCodePoints(text as string) as object
@@ -505,11 +505,11 @@ namespace RtlText
     end function
 
     function FromCodePoints(cps as object) as string
-        chars = []
+        characters = []
         for each c in cps
-            chars.Push(Chr(c))
+            characters.Push(Chr(c))
         end for
-        return chars.Join("")
+        return characters.Join("")
     end function
 
     function ReverseRange(arr as object, startIndex as integer, endIndex as integer) as void

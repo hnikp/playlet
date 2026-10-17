@@ -16,10 +16,11 @@ namespace Tests
     @suite
     class VideoPlayerDevMockParityTests extends Rooibos.BaseTestSuite
 
-        ' ids of REAL children the mock intentionally omits (currently none — the mock mirrors everything,
-        ' including the PiP minimize animation, so OnFullScreenChange is runnable at the seam).
+        ' ids of REAL children the mock intentionally omits. The mock mirrors everything (including the PiP minimize
+        ' animation, so OnFullScreenChange is runnable at the seam) except the PlayerMenu: it binds app services the
+        ' test scene doesn't have, and the coordinator guards every menu path on m.playerMenu being invalid.
         function MockOmissions() as object
-            return {}
+            return { playerMenu: true }
         end function
 
         ' Parse a component XML from pkg and index its <children> subtree: id -> { duration } ("" if absent).

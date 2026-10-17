@@ -607,8 +607,9 @@ namespace Tests
 
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight the menu button
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
-            m.assertEqual(m.Snap().focusedButton, 1)
+            m.assertEqual(m.Snap().focusedButton, 2)
 
             m.top.callFunc("TestKey", RemoteKeys.Ok, true)
             after = m.Snap()
@@ -896,10 +897,11 @@ namespace Tests
             m.assertEqual(snap.focusedButton, 0)
             ' highlight minimize, drop to the bar, come back up: still minimize.
             m.top.callFunc("TestKey", RemoteKeys.Right, true)
-            m.assertEqual(m.Snap().focusedButton, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true)
+            m.assertEqual(m.Snap().focusedButton, 2)
             m.top.callFunc("TestKey", RemoteKeys.Down, true)
             m.top.callFunc("TestKey", RemoteKeys.Up, true)
-            m.assertEqual(m.Snap().focusedButton, 1, "the highlight survives the round-trip")
+            m.assertEqual(m.Snap().focusedButton, 2, "the highlight survives the round-trip")
             ' hide the chrome (scrub from the bar tier, then commit) -> the NEXT reveal starts at play/pause.
             m.top.callFunc("TestKey", RemoteKeys.Down, true)
             m.top.callFunc("TestKey", RemoteKeys.Left, true)
@@ -932,10 +934,10 @@ namespace Tests
         function _()
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> minimize
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> menu
             m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons
-            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' minimize -> play/pause
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' menu -> play/pause
             m.assertEqual(m.Snap().nudgeCount, 0, "every press moved focus; none may pulse")
         end function
 
@@ -946,11 +948,12 @@ namespace Tests
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause (leftmost)
             m.top.callFunc("TestKey", RemoteKeys.Left, true) ' clamped at the left end
             m.assertEqual(m.Snap().nudgeCount, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> menu
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> minimize (rightmost)
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' clamped at the right end
             snap = m.Snap()
             m.assertEqual(snap.nudgeCount, 2)
-            m.assertEqual(snap.focusedButton, 1, "the clamp held the highlight at the end")
+            m.assertEqual(snap.focusedButton, 2, "the clamp held the highlight at the end")
         end function
 
         ' Down at the bar tier (the bottom, and the default on reveal) is a no-op: consumed, no nudge.
@@ -1005,12 +1008,13 @@ namespace Tests
         function _()
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight the menu button
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
-            m.assertEqual(m.Snap().focusedButton, 1)
+            m.assertEqual(m.Snap().focusedButton, 2)
             m.top.callFunc("TestKey", RemoteKeys.Play, true) ' must pause, not minimize
             snap = m.Snap()
             m.assertEqual(snap.control, VideoControl.Pause, "Play paused the (playing) video")
-            m.assertEqual(snap.focusedButton, 1, "the highlight is untouched")
+            m.assertEqual(snap.focusedButton, 2, "the highlight is untouched")
         end function
 
         ' Each arm is asserted: a state that silently failed to arm makes every row that follows vacuous.
@@ -1083,7 +1087,7 @@ namespace Tests
                 classified[name] = "controller"
             end for
             ' cached child nodes / timers / animations / reusable helpers (structure, not state).
-            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime"]
+            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime", "titleFont", "secondaryTitleFont", "playerMenu"]
                 classified[name] = "node"
             end for
             ' in-flight job handles.
@@ -1095,7 +1099,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "loadingSetSeekMs", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "loadingSetSeekMs", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "playerComments", "qualityOverride"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden

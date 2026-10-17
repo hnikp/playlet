@@ -33,16 +33,10 @@ function GetPlayletLibUrls() as object
             return [debug]
         #end if
     #else
-        savedUrls = Registry.GetPlayletLibUrlsFromRegistry()
-        if savedUrls <> invalid
-            m.shouldClearRegistryOnLoadFail = true
-            return savedUrls
-        end if
-
-        githubSquashFs = { type: "github-squashfs", link: Manifest.ReadValue("playlet_lib_squashfs_remote_url") }
-        githubZip = { type: "github-zip", link: Manifest.ReadValue("playlet_lib_zip_remote_url") }
+        ' Fork: always use the lib embedded in this package. Upstream also downloads the lib from its GitHub
+        ' releases (and from urls saved by the lib version setting), which would replace this fork's code.
         embedded = { type: "embedded-zip", link: Manifest.ReadValue("playlet_lib_zip_embedded_url") }
-        return [githubSquashFs, githubZip, embedded]
+        return [embedded]
     #end if
 end function
 
