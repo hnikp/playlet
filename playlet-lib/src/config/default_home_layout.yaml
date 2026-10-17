@@ -14,25 +14,55 @@
       apiType: Invidious
       endpoint: auth_recommended
 
-- title: Trending - Live
+- title: Music
+  id: category_music
+  feedSources:
+    - id: inv_category_music
+      title: Music
+      apiType: Invidious
+      endpoint: category_feed
+      queryParams:
+        type: Music
+
+- title: Live
   id: trending_livestreams
   feedSources:
     - id: inv_trending_livestreams
-      title: Trending - Live
+      title: Live
       apiType: Invidious
-      endpoint: trending
+      endpoint: category_feed
       queryParams:
         type: Livestreams
 
-- title: Trending - Gaming
+- title: News
+  id: category_news
+  feedSources:
+    - id: inv_category_news
+      title: News
+      apiType: Invidious
+      endpoint: category_feed
+      queryParams:
+        type: News
+
+- title: Gaming
   id: trending_gaming
   feedSources:
     - id: inv_trending_gaming
-      title: Trending - Gaming
+      title: Gaming
       apiType: Invidious
-      endpoint: trending
+      endpoint: category_feed
       queryParams:
         type: Gaming
+
+- title: Movies
+  id: category_movies
+  feedSources:
+    - id: inv_category_movies
+      title: Movies
+      apiType: Invidious
+      endpoint: category_feed
+      queryParams:
+        type: Movies
 
 - title: Popular
   id: popular

@@ -270,13 +270,32 @@ namespace Http
                 return true
             end if
 
-            response.Json(ValidArray(result.feeds[0].items))
+            ' Category pages (Music, News, Movies...) are split into several shelves: merge them into one feed.
+            response.Json(m.MergeFeedItems(result.feeds, 100))
 
             if result.DoesExist("cache-control")
                 response.headers["cache-control"] = result["cache-control"]
             end if
 
             return true
+        end function
+
+        function MergeFeedItems(feeds as object, maxItems as integer) as object
+            items = []
+            seen = {}
+            for each feed in feeds
+                for each item in ValidArray(feed.items)
+                    key = ValidString(item.videoId) + ValidString(item.playlistId) + ValidString(item.authorId)
+                    if key = "" or not seen.DoesExist(key)
+                        seen[key] = true
+                        items.Push(item)
+                        if items.Count() >= maxItems
+                            return items
+                        end if
+                    end if
+                end for
+            end for
+            return items
         end function
 
         @get("/playlet-invidious-backend/api/v1/popular")

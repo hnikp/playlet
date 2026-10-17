@@ -11,6 +11,26 @@ trending:
       type: "#ISO3166"
       default: GetUserCountryCode
 
+# Category feeds (Music, Live, News, Gaming, Movies). Tries /api/v1/trending?type=, and falls back
+# to a search when the instance doesn't support the type (or trending is unavailable).
+# See InvidiousService.CategoryFeedHandler
+category_feed:
+  title: Trending
+  url: /api/v1/trending
+  cacheSeconds: 3600 # 1 hour
+  responseHandler: CategoryFeedHandler
+  queryParams:
+    type:
+      type:
+        - Music
+        - Livestreams
+        - News
+        - Gaming
+        - Movies
+    region:
+      type: "#ISO3166"
+      default: GetUserCountryCode
+
 popular:
   title: Popular
   url: /api/v1/popular

@@ -300,15 +300,29 @@ namespace InnertubeService
         disableShorts = OptionUtils.GetOrDefault(options, "disableShorts", false)
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
+        ' YouTube "destination" channels for each category
         if trendingType = "gaming"
             browseId = "UCOpNcN46UbXVtpKMrmU4Abg" ' Gaming
             params = "Egh0cmVuZGluZw%3D%3D"
+        else if trendingType = "music"
+            browseId = "UC-9-kyTW8ZkZNDHQJ6FgpwQ" ' Music
+            params = invalid
+        else if trendingType = "news"
+            browseId = "UCYfdidRxbB8Qhf0Nx7ioOYw" ' News
+            params = invalid
+        else if trendingType = "movies"
+            browseId = "UClgRkhTL3_hImCAmdLfDE4g" ' Movies & TV
+            params = invalid
         else
             browseId = "UC4R8DWoMoI7CAwX8_LjQHig" ' Livestreams (default)
             params = "EgdsaXZldGFikgEDCKEK"
         end if
 
-        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.Web, { params: params })
+        browseOptions = {}
+        if params <> invalid
+            browseOptions.params = params
+        end if
+        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.Web, browseOptions)
         request.Cancellation(cancellation)
 
         if raw

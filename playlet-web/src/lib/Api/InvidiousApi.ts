@@ -23,6 +23,7 @@ export class InvidiousApi {
             "ChannelInfoHandler": (requestData, response) => this.ChannelInfoHandler(requestData, response),
             "ChannelVideosHandler": (requestData, response) => this.ChannelVideosHandler(requestData, response),
             "ChannelPlaylistsHandler": (requestData, response) => this.ChannelPlaylistsHandler(requestData, response),
+            "CategoryFeedHandler": (requestData, response) => this.CategoryFeedHandler(requestData, response),
         }
     }
 
@@ -220,6 +221,34 @@ export class InvidiousApi {
             responseJson = { items: responseJson };
         }
         return responseJson;
+    }
+
+    // Mirrors InvidiousService.CategoryFeedHandler: fall back to a search when trending
+    // doesn't support the category (or is unavailable on the instance).
+    private async CategoryFeedHandler(feedSource, responseJson) {
+        if (Array.isArray(responseJson) && responseJson.length > 0) {
+            return { items: responseJson };
+        }
+
+        const searchParams = {
+            music: { q: "music", date: "week" },
+            livestreams: { q: "live", features: "live" },
+            news: { q: "news", date: "today" },
+            gaming: { q: "gaming", date: "week" },
+            movies: { q: "full movie", duration: "long" },
+        }[(feedSource.queryParams?.type ?? "").toLowerCase()];
+
+        if (!searchParams) {
+            return { items: [] };
+        }
+
+        const url = this.makeUrl(`${this.instance}/api/v1/search`, {
+            ...searchParams,
+            type: "video",
+            region: this.userCountryCode,
+        });
+        const searchJson = await this.cachedFetch(url, 3600);
+        return { items: Array.isArray(searchJson) ? searchJson : [] };
     }
 
     private async PlaylistHandler(feedSource, responseJson) {

@@ -28,6 +28,7 @@ namespace Invidious
     const HISTORY_ENDPOINT = "/api/v1/auth/history"
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
+    const SEARCH_ENDPOINT = "/api/v1/search"
 
     const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/*,:history*,:subscriptions*"
 
@@ -370,6 +371,7 @@ namespace Invidious
                 feedSource: feedSource
                 response: response
                 profile: profile
+                options: options
             })
 
             if result <> invalid
@@ -625,6 +627,54 @@ namespace Invidious
             end if
 
             return result
+        end function
+
+        ' Category feeds use /api/v1/trending?type=. Invidious instances only support some types (and
+        ' trending is unavailable on many instances since YouTube retired its Trending page), so an empty or
+        ' failed response falls back to a search for the category.
+        function CategoryFeedHandler(context as object) as object
+            result = m.DefaultHandler(context)
+            if result <> invalid and IsArray(result.items) and result.items.Count() > 0
+                return result
+            end if
+
+            categoryType = ""
+            if context.feedSource.queryParams <> invalid
+                categoryType = LCase(ValidString(context.feedSource.queryParams.type))
+            end if
+
+            queryParams = m.GetCategorySearchQueryParams(categoryType)
+            if queryParams = invalid
+                return result
+            end if
+
+            LogInfo("Category feed", categoryType, "fell back to search")
+            request = HttpClient.Get(m.GetInstance() + SEARCH_ENDPOINT)
+            request.QueryParams(queryParams)
+            request.QueryParam("type", "video")
+            request.QueryParam("region", m.GetUserCountryCode())
+            request.CacheForSeconds(3600)
+            request.Cancellation(OptionUtils.Get(context.options, "cancellation"))
+
+            searchResponse = m.SendRequest(request, OptionUtils.Get(context.options, "httpServer"))
+            return m.DefaultHandler({
+                response: searchResponse
+            })
+        end function
+
+        function GetCategorySearchQueryParams(categoryType as string) as object
+            if categoryType = "music"
+                return { q: "music", date: "week" }
+            else if categoryType = "livestreams"
+                return { q: "live", features: "live" }
+            else if categoryType = "news"
+                return { q: "news", date: "today" }
+            else if categoryType = "gaming"
+                return { q: "gaming", date: "week" }
+            else if categoryType = "movies"
+                return { q: "full movie", duration: "long" }
+            end if
+            return invalid
         end function
 
         function WatchHistoryHandler(context as object) as object

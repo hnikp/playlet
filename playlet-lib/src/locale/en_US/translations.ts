@@ -97,6 +97,22 @@
         <translation>Trending - Gaming</translation>
     </message>
     <message>
+        <source>Music</source>
+        <translation>Music</translation>
+    </message>
+    <message>
+        <source>News</source>
+        <translation>News</translation>
+    </message>
+    <message>
+        <source>Gaming</source>
+        <translation>Gaming</translation>
+    </message>
+    <message>
+        <source>Movies</source>
+        <translation>Movies</translation>
+    </message>
+    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>
