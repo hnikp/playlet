@@ -104,7 +104,7 @@ function CreateRtlTextTestPanel() as void
     end for
 
     measureFont = RtlText.GetMeasureFont(22, false)
-    LogInfo("RtlText test panel: font families=", m.__rtlFontRegistry.GetFamilies(), " measure font valid=", measureFont <> invalid)
+    LogInfo("RtlText test panel: render thread=", RtlText.IsRenderThread(), " measure font valid=", measureFont <> invalid)
     if measureFont <> invalid
         LogInfo("RtlText test panel: width of sample 0 shaped=", measureFont.GetOneLineWidth(RtlText.Shape(samples[0]), 10000))
     end if
