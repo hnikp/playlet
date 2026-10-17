@@ -1,0 +1,40 @@
+<!-- A comment in CommentsPanel's list -->
+<component name="CommentCell" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="OnContentSet" />
+        <field id="focusPercent" type="float" onChange="OnFocusPercent" />
+    </interface>
+    <children>
+        <Font id="regularFont" uri="font:SystemFontFile" size="18" />
+        <Font id="boldFont" uri="font:BoldSystemFontFile" size="18" />
+        <Rectangle
+            id="highlight"
+            width="512"
+            height="150"
+            color="#3A3A3AFF"
+            opacity="0" />
+        <CirclePoster
+            id="authorThumbnail"
+            translation="[10,12]"
+            width="40"
+            height="40"
+            failedBitmapUri="pkg:/images/icons/user-200.png" />
+        <Label
+            id="authorLabel"
+            translation="[62,8]"
+            width="440" />
+        <Label
+            id="contentLabel"
+            translation="[62,34]"
+            width="440"
+            maxLines="4"
+            wrap="true"
+            color="#EBEBEBFF" />
+        <Label
+            id="footerLabel"
+            translation="[62,122]"
+            width="440"
+            color="#AAAAAAFF"
+            font="font:SmallestSystemFont" />
+    </children>
+</component>

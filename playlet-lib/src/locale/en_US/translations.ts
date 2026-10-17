@@ -1444,5 +1444,49 @@
         <source>Related videos</source>
         <translation>Related videos</translation>
     </message>
+    <message>
+        <source>Top comments</source>
+        <translation>Top comments</translation>
+    </message>
+    <message>
+        <source>Newest first</source>
+        <translation>Newest first</translation>
+    </message>
+    <message>
+        <source>Press Options (*) to sort</source>
+        <translation>Press Options (*) to sort</translation>
+    </message>
+    <message>
+        <source>%1 likes</source>
+        <translation>%1 likes</translation>
+    </message>
+    <message>
+        <source>%1 replies</source>
+        <translation>%1 replies</translation>
+    </message>
+    <message>
+        <source>1 reply</source>
+        <translation>1 reply</translation>
+    </message>
+    <message>
+        <source>Pinned</source>
+        <translation>Pinned</translation>
+    </message>
+    <message>
+        <source>Replies</source>
+        <translation>Replies</translation>
+    </message>
+    <message>
+        <source>No comments</source>
+        <translation>No comments</translation>
+    </message>
+    <message>
+        <source>No replies</source>
+        <translation>No replies</translation>
+    </message>
+    <message>
+        <source>Comments are unavailable for this video</source>
+        <translation>Comments are unavailable for this video</translation>
+    </message>
 </context>
 </TS>

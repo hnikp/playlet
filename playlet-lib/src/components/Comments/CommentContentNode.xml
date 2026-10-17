@@ -1,0 +1,17 @@
+<component name="CommentContentNode" extends="ContentNode">
+    <interface>
+        <field id="author" type="string" />
+        <field id="authorId" type="string" />
+        <field id="authorThumbnail" type="uri" />
+        <field id="authorIsChannelOwner" type="boolean" />
+        <field id="publishedText" type="string" />
+        <field id="content" type="string" />
+        <field id="likeCountText" type="string" />
+        <field id="replyCount" type="integer" />
+        <field id="repliesContinuation" type="string" />
+        <field id="isPinned" type="boolean" />
+        <!-- Text prepared for display in a task thread (see RtlText.PrepareForLabel) -->
+        <field id="authorPrepared" type="assocarray" />
+        <field id="contentPrepared" type="assocarray" />
+    </interface>
+</component>

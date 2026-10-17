@@ -1,0 +1,351 @@
+namespace Tests
+
+    @SGNode("InnertubeTestNode")
+    @suite
+    class CommentsTests extends Rooibos.BaseTestSuite
+
+        @describe("Innertube comments")
+
+        @it("Parses a comments page into the Invidious shape")
+        function _()
+            result = m.top@.Innertube_ParseCommentsResponse(m.GetCommentsPageFixture(), "jNQXAC9IVRw")
+
+            m.assertEqual(result.videoId, "jNQXAC9IVRw")
+            m.assertEqual(result.continuation, "NEXT_PAGE_TOKEN")
+            m.assertEqual(result.comments.Count(), 3)
+
+            pinned = result.comments[0]
+            m.assertEqual(pinned.commentId, "UgzuC3zzpRZkjc5Qzsd4AaABAg")
+            m.assertEqual(pinned.author, "@SanDiegoZoo")
+            m.assertEqual(pinned.authorId, "UCC5NfQ6Mf0dq_eEwv4P_hWA")
+            m.assertEqual(pinned.content, "We're so honored that the first ever YouTube video was filmed here!")
+            m.assertEqual(pinned.publishedText, "6 years ago")
+            m.assertTrue(pinned.isPinned)
+            m.assertFalse(pinned.isEdited)
+            m.assertEqual(pinned.likeCountText, "4.8M")
+            m.assertEqual(pinned.likeCount, 4800000)
+            m.assertNotInvalid(pinned.creatorHeart)
+            m.assertEqual(pinned.replies.replyCount, 985)
+            m.assertEqual(pinned.replies.continuation, "REPLIES_TOKEN_0")
+            m.assertEqual(pinned.authorThumbnails.Count(), 1)
+
+            unhearted = result.comments[2]
+            m.assertFalse(unhearted.isPinned)
+            m.assertInvalid(unhearted.creatorHeart)
+        end function
+
+        @it("Parses a replies page")
+        function _()
+            result = m.top@.Innertube_ParseCommentsResponse(m.GetRepliesPageFixture(), "jNQXAC9IVRw")
+
+            m.assertEqual(result.comments.Count(), 1)
+            m.assertEqual(result.continuation, "MORE_REPLIES_TOKEN")
+
+            reply = result.comments[0]
+            m.assertEqual(reply.author, "@TheGreekPianist")
+            m.assertTrue(reply.isEdited)
+            m.assertInvalid(reply.replies)
+        end function
+
+        @it("Handles an invalid payload")
+        function _()
+            result = m.top@.Innertube_ParseCommentsResponse(invalid, "abc")
+            m.assertEqual(result.comments.Count(), 0)
+            m.assertInvalid(result.continuation)
+        end function
+
+        @it("Parses abbreviated counts")
+        @params("985", 985)
+        @params("1,234", 1234)
+        @params("304K", 304000)
+        @params("4.8M", 4800000)
+        @params("", 0)
+        @params(invalid, 0)
+        function _(text as dynamic, expected as integer)
+            m.assertEqual(m.top@.Innertube_ParseAbbreviatedCount(text), expected)
+        end function
+
+        function GetCommentsPageFixture() as object
+            return {
+                "onResponseReceivedEndpoints": [
+                    {
+                        "reloadContinuationItemsCommand": {
+                            "continuationItems": [
+                                {
+                                    "commentThreadRenderer": {
+                                        "commentViewModel": {
+                                            "commentViewModel": {
+                                                "commentKey": "EhpVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZyAoKAE%3D"
+                                                "toolbarStateKey": "EhpVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZyAsKAE%3D"
+                                                "commentId": "UgzuC3zzpRZkjc5Qzsd4AaABAg"
+                                                "pinnedText": "Pinned by @jawed"
+                                            }
+                                        }
+                                        "replies": {
+                                            "commentRepliesRenderer": {
+                                                "contents": [
+                                                    {
+                                                        "continuationItemRenderer": {
+                                                            "continuationEndpoint": {
+                                                                "continuationCommand": {
+                                                                    "token": "REPLIES_TOKEN_0"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                                {
+                                    "commentThreadRenderer": {
+                                        "commentViewModel": {
+                                            "commentViewModel": {
+                                                "commentKey": "EhpVZ3hucDl3czBkZXhqRTlMNVVCNEFhQUJBZyAoKAE%3D"
+                                                "toolbarStateKey": "EhpVZ3hucDl3czBkZXhqRTlMNVVCNEFhQUJBZyAsKAE%3D"
+                                                "commentId": "Ugxnp9ws0dexjE9L5UB4AaABAg"
+                                            }
+                                        }
+                                        "replies": {
+                                            "commentRepliesRenderer": {
+                                                "contents": [
+                                                    {
+                                                        "continuationItemRenderer": {
+                                                            "continuationEndpoint": {
+                                                                "continuationCommand": {
+                                                                    "token": "REPLIES_TOKEN_1"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                                {
+                                    "commentThreadRenderer": {
+                                        "commentViewModel": {
+                                            "commentViewModel": {
+                                                "commentKey": "EhpVZ3hCWktNRlVMcmRJVmsxbld0NEFhQUJBZyAoKAE%3D"
+                                                "toolbarStateKey": "EhpVZ3hCWktNRlVMcmRJVmsxbld0NEFhQUJBZyAsKAE%3D"
+                                                "commentId": "UgxBZKMFULrdIVk1nWt4AaABAg"
+                                            }
+                                        }
+                                        "replies": {
+                                            "commentRepliesRenderer": {
+                                                "contents": [
+                                                    {
+                                                        "continuationItemRenderer": {
+                                                            "continuationEndpoint": {
+                                                                "continuationCommand": {
+                                                                    "token": "REPLIES_TOKEN_2"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                                {
+                                    "continuationItemRenderer": {
+                                        "continuationEndpoint": {
+                                            "continuationCommand": {
+                                                "token": "NEXT_PAGE_TOKEN"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+                "frameworkUpdates": {
+                    "entityBatchUpdate": {
+                        "mutations": [
+                            {
+                                "payload": {
+                                    "commentEntityPayload": {
+                                        "key": "EhpVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZyAoKAE%3D"
+                                        "properties": {
+                                            "commentId": "UgzuC3zzpRZkjc5Qzsd4AaABAg"
+                                            "content": {
+                                                "content": "We're so honored that the first ever YouTube video was filmed here!"
+                                            }
+                                            "publishedTime": "6 years ago"
+                                        }
+                                        "author": {
+                                            "channelId": "UCC5NfQ6Mf0dq_eEwv4P_hWA"
+                                            "displayName": "@SanDiegoZoo"
+                                            "avatarThumbnailUrl": "https://yt3.ggpht.com/i8RqA9tYqbbnOi4mlnYEY7IR3kXAoDqQbM_5Sfzw7OjTubiGsOaTdlrIZmj-I0q0Vup68eqs=s88-c-k-c0x00ffffff-no-rj"
+                                            "isCreator": false
+                                        }
+                                        "toolbar": {
+                                            "likeCountNotliked": "4.8M"
+                                            "replyCount": "985"
+                                            "heartActiveTooltip": "❤ by @jawed"
+                                            "creatorThumbnailUrl": "https://yt3.ggpht.com/uI3VE4PVqvCy0xnWLqMJnEzyBUm3T8VHOCp4ee-1RxdHqKXCdUE_qXYQnpf9AfuEoIPactVyDhM=s88-c-k-c0x00ffffff-no-rj"
+                                        }
+                                    }
+                                }
+                            }
+                            {
+                                "payload": {
+                                    "engagementToolbarStateEntityPayload": {
+                                        "key": "EhpVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZyAsKAE%3D"
+                                        "heartState": "TOOLBAR_HEART_STATE_HEARTED"
+                                    }
+                                }
+                            }
+                            {
+                                "payload": {
+                                    "commentEntityPayload": {
+                                        "key": "EhpVZ3hucDl3czBkZXhqRTlMNVVCNEFhQUJBZyAoKAE%3D"
+                                        "properties": {
+                                            "commentId": "Ugxnp9ws0dexjE9L5UB4AaABAg"
+                                            "content": {
+                                                "content": "Hello"
+                                            }
+                                            "publishedTime": "5 months ago"
+                                        }
+                                        "author": {
+                                            "channelId": "UC4QobU6STFB0P71PMvOGN5A"
+                                            "displayName": "@jawed"
+                                            "avatarThumbnailUrl": "https://yt3.ggpht.com/uI3VE4PVqvCy0xnWLqMJnEzyBUm3T8VHOCp4ee-1RxdHqKXCdUE_qXYQnpf9AfuEoIPactVyDhM=s88-c-k-c0x00ffffff-no-rj"
+                                            "isCreator": true
+                                        }
+                                        "toolbar": {
+                                            "likeCountNotliked": "304K"
+                                            "replyCount": "995"
+                                            "heartActiveTooltip": "❤ by @jawed"
+                                            "creatorThumbnailUrl": "https://yt3.ggpht.com/uI3VE4PVqvCy0xnWLqMJnEzyBUm3T8VHOCp4ee-1RxdHqKXCdUE_qXYQnpf9AfuEoIPactVyDhM=s88-c-k-c0x00ffffff-no-rj"
+                                        }
+                                    }
+                                }
+                            }
+                            {
+                                "payload": {
+                                    "engagementToolbarStateEntityPayload": {
+                                        "key": "EhpVZ3hucDl3czBkZXhqRTlMNVVCNEFhQUJBZyAsKAE%3D"
+                                        "heartState": "TOOLBAR_HEART_STATE_HEARTED"
+                                    }
+                                }
+                            }
+                            {
+                                "payload": {
+                                    "commentEntityPayload": {
+                                        "key": "EhpVZ3hCWktNRlVMcmRJVmsxbld0NEFhQUJBZyAoKAE%3D"
+                                        "properties": {
+                                            "commentId": "UgxBZKMFULrdIVk1nWt4AaABAg"
+                                            "content": {
+                                                "content": "This started it all...... bruh 😳"
+                                            }
+                                            "publishedTime": "7 years ago"
+                                        }
+                                        "author": {
+                                            "channelId": "UCtA9NW3AJMEfNE1QCO2IPrw"
+                                            "displayName": "@DaquanWiltshire1"
+                                            "avatarThumbnailUrl": "https://yt3.ggpht.com/ytc/AIdro_lZksvRqxcLzmlRWLlixC53uB0vbZkrwMRce0yo-G01JQ0=s88-c-k-c0x00ffffff-no-rj"
+                                            "isCreator": false
+                                        }
+                                        "toolbar": {
+                                            "likeCountNotliked": "248K"
+                                            "replyCount": "733"
+                                            "heartActiveTooltip": "❤ by @jawed"
+                                        }
+                                    }
+                                }
+                            }
+                            {
+                                "payload": {
+                                    "engagementToolbarStateEntityPayload": {
+                                        "key": "EhpVZ3hCWktNRlVMcmRJVmsxbld0NEFhQUJBZyAsKAE%3D"
+                                        "heartState": "TOOLBAR_HEART_STATE_UNHEARTED"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        end function
+
+        function GetRepliesPageFixture() as object
+            return {
+                "onResponseReceivedEndpoints": [
+                    {
+                        "appendContinuationItemsAction": {
+                            "continuationItems": [
+                                {
+                                    "commentViewModel": {
+                                        "commentKey": "EjFVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZy45NTh4YVFzaDYzRDk1OHlOMS1IRGFLICgoAQ%3D%3D"
+                                        "toolbarStateKey": "EjFVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZy45NTh4YVFzaDYzRDk1OHlOMS1IRGFLICwoAQ%3D%3D"
+                                        "commentId": "UgzuC3zzpRZkjc5Qzsd4AaABAg.958xaQsh63D958yN1-HDaK"
+                                    }
+                                }
+                                {
+                                    "continuationItemRenderer": {
+                                        "button": {
+                                            "buttonRenderer": {
+                                                "command": {
+                                                    "continuationCommand": {
+                                                        "token": "MORE_REPLIES_TOKEN"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+                "frameworkUpdates": {
+                    "entityBatchUpdate": {
+                        "mutations": [
+                            {
+                                "payload": {
+                                    "commentEntityPayload": {
+                                        "key": "EjFVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZy45NTh4YVFzaDYzRDk1OHlOMS1IRGFLICgoAQ%3D%3D"
+                                        "properties": {
+                                            "commentId": "UgzuC3zzpRZkjc5Qzsd4AaABAg.958xaQsh63D958yN1-HDaK"
+                                            "content": {
+                                                "content": "San Diego Zoo That’s so awesome! I’m so glad the first YouTube video featured cute animals in it! 😊🐘"
+                                            }
+                                            "publishedTime": "6 years ago (edited)"
+                                        }
+                                        "author": {
+                                            "channelId": "UC8h3BHk1Pk1_-VH9PRIxtgg"
+                                            "displayName": "@TheGreekPianist"
+                                            "avatarThumbnailUrl": "https://yt3.ggpht.com/_1g5ojtlLhI7DNw4LVNHLdcKlc3epv6-liZsICtcWvLg0CiJvI2LGm-qSIJiJsaX-qCR0ycQ=s88-c-k-c0x00ffffff-no-rj"
+                                            "isCreator": false
+                                        }
+                                        "toolbar": {
+                                            "likeCountNotliked": "206K"
+                                            "replyCount": ""
+                                            "heartActiveTooltip": "❤ by @jawed"
+                                        }
+                                    }
+                                }
+                            }
+                            {
+                                "payload": {
+                                    "engagementToolbarStateEntityPayload": {
+                                        "key": "EjFVZ3p1QzN6enBSWmtqYzVRenNkNEFhQUJBZy45NTh4YVFzaDYzRDk1OHlOMS1IRGFLICwoAQ%3D%3D"
+                                        "heartState": "TOOLBAR_HEART_STATE_UNHEARTED"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        end function
+
+
+    end class
+
+end namespace

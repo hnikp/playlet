@@ -1,0 +1,74 @@
+<!-- Read-only comments for a video: a panel on the right side of the screen, usable over the video page or the
+     player. Set videoId, append it, call @.BindNode() and focus it; it sets "closed" when the user presses Back.
+     OK on a comment shows its full text and replies; Options (*) switches between top and newest comments. -->
+<component name="CommentsPanel" extends="Group" includes="AutoBind,Focus,Disposable">
+    <interface>
+        <field id="videoId" type="string" onChange="OnVideoIdSet" />
+        <field id="closed" type="boolean" alwaysNotify="true" />
+        <field id="invidious" type="node" bind="/Invidious" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+    </interface>
+    <children>
+        <Font id="regularFont" uri="font:SystemFontFile" size="18" />
+        <Font id="boldFont" uri="font:BoldSystemFontFile" size="18" />
+        <Rectangle
+            width="560"
+            height="720"
+            color="#141414F2">
+
+            <Label
+                id="titleLabel"
+                translation="[24,24]"
+                width="512"
+                font="font:MediumBoldSystemFont" />
+            <Label
+                id="subtitleLabel"
+                translation="[24,62]"
+                width="512"
+                color="#AAAAAAFF"
+                font="font:SmallestSystemFont" />
+
+            <!-- the selected comment, in full, above its replies -->
+            <Group
+                id="detail"
+                translation="[24,96]"
+                visible="false">
+                <Label
+                    id="detailAuthorLabel"
+                    width="512" />
+                <Label
+                    id="detailContentLabel"
+                    translation="[0,28]"
+                    width="512"
+                    maxLines="9"
+                    wrap="true"
+                    color="#EBEBEBFF" />
+            </Group>
+
+            <MarkupList
+                id="list"
+                translation="[24,96]"
+                itemComponentName="CommentCell"
+                itemSize="[512,150]"
+                itemSpacing="[0,8]"
+                numRows="4"
+                drawFocusFeedback="false"
+                vertFocusAnimationStyle="floatingFocus" />
+
+            <Label
+                id="messageLabel"
+                translation="[24,320]"
+                width="512"
+                horizAlign="center"
+                wrap="true"
+                visible="false"
+                font="font:SmallestSystemFont" />
+
+            <BusySpinner
+                id="busySpinner"
+                spinInterval="1"
+                translation="[250,600]"
+                visible="false" />
+        </Rectangle>
+    </children>
+</component>

@@ -1,0 +1,96 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RtlText.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Loads a page of comments (or replies, with a replies continuation) and appends CommentContentNodes
+' to input.content. Returns { continuation, count, commentCount } or { error }.
+@job("CommentsJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    service = new Invidious.InvidiousService(input.invidious)
+    result = service.GetComments(input.videoId, ValidString(input.sortBy), ValidString(input.continuation), JobGetCancellation())
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if result.error <> invalid
+        JobSuccessData({ error: ToString(result.error) })
+        return
+    end if
+
+    instance = service.GetInstance()
+    nodes = []
+    for each comment in ValidArray(result.comments)
+        nodes.Push(ToCommentContentNode(comment, instance))
+    end for
+    input.content.appendChildren(nodes)
+
+    JobSuccessData({
+        continuation: ValidString(result.continuation)
+        count: nodes.Count()
+        commentCount: ValidInt(result.commentCount)
+    })
+end function
+
+function ToCommentContentNode(comment as object, instance as string) as object
+    node = CreateObject("roSGNode", "CommentContentNode")
+    node.author = ValidString(comment.author)
+    node.authorId = ValidString(comment.authorId)
+    node.authorThumbnail = GetAuthorThumbnail(comment.authorThumbnails, instance)
+    node.authorIsChannelOwner = comment.authorIsChannelOwner = true
+    node.publishedText = ValidString(comment.publishedText)
+    node.content = ValidString(comment.content)
+    node.isPinned = comment.isPinned = true
+
+    if IsString(comment.likeCountText)
+        node.likeCountText = comment.likeCountText
+    else
+        node.likeCountText = ValidInt(comment.likeCount).ToStr()
+    end if
+
+    if IsAssociativeArray(comment.replies)
+        node.replyCount = ValidInt(comment.replies.replyCount)
+        node.repliesContinuation = ValidString(comment.replies.continuation)
+    end if
+
+    ' Sizes match CommentCell's labels
+    author = node.author
+    if node.publishedText <> ""
+        author += " • " + node.publishedText
+    end if
+    node.authorPrepared = RtlText.PrepareForLabel(author, 18, true, 440, 1)
+    node.contentPrepared = RtlText.PrepareForLabel(node.content, 18, false, 440, 4)
+
+    return node
+end function
+
+function GetAuthorThumbnail(thumbnails as dynamic, instance as string) as string
+    if not IsArray(thumbnails) or thumbnails.Count() = 0
+        return ""
+    end if
+    ' Invidious lists several sizes: pick a small one (the avatar is 40px)
+    url = ""
+    for each thumbnail in thumbnails
+        if IsString(thumbnail.url)
+            url = thumbnail.url
+            if ValidInt(thumbnail.width) >= 48
+                exit for
+            end if
+        end if
+    end for
+    if url.StartsWith("//")
+        url = "https:" + url
+    else if url.StartsWith("/")
+        url = instance + url
+    end if
+    return url
+end function

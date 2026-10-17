@@ -44,9 +44,6 @@ function Init()
     m.queueButton.text = Tr(Locale.Buttons.AddToQueue)
     m.channelButton.text = Tr(Locale.SearchFilters.Channel)
     m.commentsButton.text = Tr(Locale.Buttons.Comments)
-    ' TODO: shown once the comments panel exists
-    m.commentsButton.visible = false
-    m.commentsButton.focusable = false
 
     m.rowList = m.top.findNode("rowList")
     m.rowList.screen = m.top
@@ -71,6 +68,10 @@ function OnFocusChange() as void
         return
     end if
 
+    if m.commentsPanel <> invalid
+        NodeSetFocus(m.commentsPanel, true)
+        return
+    end if
     if m.rowList.isInFocusChain()
         NodeSetFocus(m.rowList, true)
         return
@@ -187,8 +188,33 @@ function GetContextMenuOptionsForItem(_item as object) as object
     return []
 end function
 
-function OnCommentsButtonSelected()
-    LogInfo("Comments not implemented yet")
+function OnCommentsButtonSelected() as void
+    videoId = ValidString(m.top.content.videoId)
+    if videoId = "" or m.commentsPanel <> invalid
+        return
+    end if
+
+    m.commentsPanel = m.top.createChild("CommentsPanel")
+    m.commentsPanel.translation = [720, 0]
+    m.commentsPanel@.BindNode()
+    m.commentsPanel.videoId = videoId
+    m.commentsPanel.ObserveFieldScoped("closed", FuncName(OnCommentsPanelClosed))
+    NodeSetFocus(m.commentsPanel, true)
+end function
+
+function OnCommentsPanelClosed()
+    CloseCommentsPanel()
+    FocusButton(m.commentsButton)
+end function
+
+function CloseCommentsPanel() as void
+    if m.commentsPanel = invalid
+        return
+    end if
+    m.commentsPanel.UnobserveFieldScoped("closed")
+    m.commentsPanel.dispose = true
+    m.top.removeChild(m.commentsPanel)
+    m.commentsPanel = invalid
 end function
 
 function OnSubscribeButtonEnabledChange()
@@ -307,6 +333,7 @@ function CancelDetailsJob()
 end function
 
 function OnDispose()
+    CloseCommentsPanel()
     CancelDetailsJob()
     DisposeObservers()
     m.rowList.dispose = true

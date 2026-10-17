@@ -331,10 +331,18 @@ namespace RtlText
         end if
 
         shaped = Shape(text)
-        lines = [shaped]
-        if font <> invalid and maxWidth > 0
-            lines = Wrap(shaped, font, maxWidth, maxLines)
-        end if
+        lines = []
+        for each paragraph in shaped.Split(Chr(10))
+            remaining = maxLines - lines.Count()
+            if remaining <= 0
+                exit for
+            end if
+            if font <> invalid and maxWidth > 0
+                lines.Append(Wrap(paragraph, font, maxWidth, remaining))
+            else
+                lines.Push(paragraph)
+            end if
+        end for
 
         visualLines = []
         for each line in lines
@@ -342,6 +350,20 @@ namespace RtlText
         end for
 
         return { text: visualLines.Join(Chr(10)), isRtl: IsRtlParagraph(text) }
+    end function
+
+    ' For text prepared in a task thread and shown later in a label: returns
+    ' { text, isRtl, hasArabicScript }. When hasArabicScript is true, the label should use
+    ' GetLabelFont(size, bold) and horizAlign "right" if isRtl.
+    function PrepareForLabel(text as dynamic, size as integer, bold as boolean, width as integer, maxLines as integer) as object
+        text = ValidString(text)
+        if not ContainsArabicScript(text)
+            return { text: text, isRtl: false, hasArabicScript: false }
+        end if
+        ' see ApplyToLabel for the slack
+        prepared = Prepare(text, GetMeasureFont(size, bold), Int(width * 0.95), maxLines)
+        prepared.hasArabicScript = true
+        return prepared
     end function
 
     ' Sets text on a Label, switching to the Persian-capable font for Arabic-script text and back to

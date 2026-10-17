@@ -1,0 +1,263 @@
+import "pkg:/components/Services/Innertube/NextEndpoint.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
+import "pkg:/source/utils/OptionUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Comments for a video, in the shape of the Invidious /api/v1/comments/:id response.
+' The first page comes from the comments panel of the /next response (with Top/Newest sort tokens);
+' later pages and replies are fetched with a continuation token.
+namespace Innertube
+
+    function GetComments(videoId as string, options = invalid as object) as object
+        cancellation = OptionUtils.Get(options, "cancellation")
+        continuation = OptionUtils.GetOrDefault(options, "continuation", "")
+        sortBy = OptionUtils.GetOrDefault(options, "sortBy", "top")
+
+        if StringUtils.IsNullOrEmpty(continuation)
+            request = Innertube.CreateNextRequest({ "videoId": videoId })
+            request.Cancellation(cancellation)
+            response = request.Await()
+            if not response.IsSuccess()
+                return { error: response.ErrorMessage() }
+            end if
+
+            continuation = FindCommentsContinuation(response.Json(), sortBy)
+            if StringUtils.IsNullOrEmpty(continuation)
+                ' Comments are turned off (or not available) for this video
+                return {
+                    videoId: videoId
+                    commentCount: 0
+                    comments: []
+                }
+            end if
+        end if
+
+        request = Innertube.CreateNextRequest({ "continuation": continuation })
+        request.Cancellation(cancellation)
+        response = request.Await()
+        if not response.IsSuccess()
+            return { error: response.ErrorMessage() }
+        end if
+
+        return ParseCommentsResponse(response.Json(), videoId)
+    end function
+
+    ' The continuation token of the comments panel, for "top" or "new" sorting
+    function FindCommentsContinuation(payload as object, sortBy as string) as string
+        for each panel in ValidArray(ObjectUtils.Dig(payload, ["engagementPanels"]))
+            renderer = panel["engagementPanelSectionListRenderer"]
+            if IsAssociativeArray(renderer) and renderer["panelIdentifier"] = "engagement-panel-comments-section"
+                subMenuItems = ObjectUtils.Dig(renderer, ["header", "engagementPanelTitleHeaderRenderer", "menu", "sortFilterSubMenuRenderer", "subMenuItems"])
+                if IsArray(subMenuItems) and subMenuItems.Count() > 0
+                    ' [0] = Top comments, [1] = Newest first
+                    index = 0
+                    if sortBy = "new" and subMenuItems.Count() > 1
+                        index = 1
+                    end if
+                    token = ObjectUtils.Dig(subMenuItems[index], ["serviceEndpoint", "continuationCommand", "token"])
+                    if IsString(token)
+                        return token
+                    end if
+                end if
+
+                contents = ObjectUtils.Dig(renderer, ["content", "sectionListRenderer", "contents"])
+                for each content in ValidArray(contents)
+                    for each item in ValidArray(ObjectUtils.Dig(content, ["itemSectionRenderer", "contents"]))
+                        token = GetContinuationItemToken(item["continuationItemRenderer"])
+                        if token <> ""
+                            return token
+                        end if
+                    end for
+                end for
+            end if
+        end for
+
+        ' Fallback: the comments section below the video
+        contents = ObjectUtils.Dig(payload, ["contents", "twoColumnWatchNextResults", "results", "results", "contents"])
+        for each content in ValidArray(contents)
+            itemSection = content["itemSectionRenderer"]
+            if IsAssociativeArray(itemSection) and itemSection["sectionIdentifier"] = "comment-item-section"
+                for each item in ValidArray(itemSection["contents"])
+                    token = GetContinuationItemToken(item["continuationItemRenderer"])
+                    if token <> ""
+                        return token
+                    end if
+                end for
+            end if
+        end for
+
+        return ""
+    end function
+
+    function ParseCommentsResponse(payload as object, videoId as string) as object
+        result = {
+            videoId: videoId
+            comments: []
+        }
+        if not IsAssociativeArray(payload)
+            return result
+        end if
+
+        ' Comment data lives in entity payloads, referenced by key from the view models
+        entities = {}
+        toolbarStates = {}
+        for each mutation in ValidArray(ObjectUtils.Dig(payload, ["frameworkUpdates", "entityBatchUpdate", "mutations"]))
+            entity = ObjectUtils.Dig(mutation, ["payload", "commentEntityPayload"])
+            if IsAssociativeArray(entity) and IsString(entity["key"])
+                entities[entity["key"]] = entity
+            end if
+            toolbarState = ObjectUtils.Dig(mutation, ["payload", "engagementToolbarStateEntityPayload"])
+            if IsAssociativeArray(toolbarState) and IsString(toolbarState["key"])
+                toolbarStates[toolbarState["key"]] = toolbarState
+            end if
+        end for
+
+        for each endpoint in ValidArray(payload["onResponseReceivedEndpoints"])
+            items = ObjectUtils.Dig(endpoint, ["reloadContinuationItemsCommand", "continuationItems"])
+            if items = invalid
+                items = ObjectUtils.Dig(endpoint, ["appendContinuationItemsAction", "continuationItems"])
+            end if
+
+            for each item in ValidArray(items)
+                viewModel = invalid
+                repliesContinuation = ""
+
+                thread = item["commentThreadRenderer"]
+                if IsAssociativeArray(thread)
+                    viewModel = ObjectUtils.Dig(thread, ["commentViewModel", "commentViewModel"])
+                    repliesItems = ObjectUtils.Dig(thread, ["replies", "commentRepliesRenderer", "contents"])
+                    for each repliesItem in ValidArray(repliesItems)
+                        repliesContinuation = GetContinuationItemToken(repliesItem["continuationItemRenderer"])
+                        if repliesContinuation <> ""
+                            exit for
+                        end if
+                    end for
+                else if IsAssociativeArray(item["commentViewModel"])
+                    ' replies are view models without a thread
+                    viewModel = item["commentViewModel"]
+                else if IsAssociativeArray(item["continuationItemRenderer"])
+                    token = GetContinuationItemToken(item["continuationItemRenderer"])
+                    if token <> ""
+                        result.continuation = token
+                    end if
+                else if IsAssociativeArray(item["commentsHeaderRenderer"])
+                    count = ParseCommentCount(item["commentsHeaderRenderer"])
+                    if count >= 0
+                        result.commentCount = count
+                    end if
+                end if
+
+                if IsAssociativeArray(viewModel)
+                    entity = entities[ValidString(viewModel["commentKey"])]
+                    toolbarState = toolbarStates[ValidString(viewModel["toolbarStateKey"])]
+                    comment = ToInvidiousComment(entity, toolbarState, viewModel, repliesContinuation)
+                    if comment <> invalid
+                        result.comments.Push(comment)
+                    end if
+                end if
+            end for
+        end for
+
+        return result
+    end function
+
+    function ToInvidiousComment(entity as object, toolbarState as object, viewModel as object, repliesContinuation as string) as object
+        if not IsAssociativeArray(entity)
+            return invalid
+        end if
+
+        properties = ValidAssociativeArray(entity["properties"])
+        author = ValidAssociativeArray(entity["author"])
+        toolbar = ValidAssociativeArray(entity["toolbar"])
+
+        publishedText = ValidString(properties["publishedTime"])
+
+        comment = {
+            "author": ValidString(author["displayName"])
+            "authorId": ValidString(author["channelId"])
+            "authorThumbnails": []
+            "authorIsChannelOwner": author["isCreator"] = true
+            "content": ValidString(ObjectUtils.Dig(properties, ["content", "content"]))
+            "publishedText": publishedText
+            "isEdited": publishedText.InStr("(edited)") <> -1
+            "isPinned": not StringUtils.IsNullOrEmpty(viewModel["pinnedText"])
+            "commentId": ValidString(properties["commentId"])
+            ' YouTube only gives an abbreviated count ("4.8M"): likeCountText is a Playlet extension
+            "likeCount": ParseAbbreviatedCount(toolbar["likeCountNotliked"])
+            "likeCountText": ValidString(toolbar["likeCountNotliked"])
+        }
+
+        avatar = author["avatarThumbnailUrl"]
+        if IsString(avatar) and avatar <> ""
+            comment["authorThumbnails"].Push({ "url": avatar, "width": 88, "height": 88 })
+        end if
+
+        ' heartActiveTooltip is present on every comment: the toolbar state says if the creator hearted it
+        if IsAssociativeArray(toolbarState) and toolbarState["heartState"] = "TOOLBAR_HEART_STATE_HEARTED"
+            comment["creatorHeart"] = {
+                "creatorThumbnail": ValidString(toolbar["creatorThumbnailUrl"])
+                "creatorName": ValidString(toolbar["heartActiveTooltip"])
+            }
+        end if
+
+        if repliesContinuation <> ""
+            comment["replies"] = {
+                "replyCount": ParseAbbreviatedCount(toolbar["replyCount"])
+                "continuation": repliesContinuation
+            }
+        end if
+
+        return comment
+    end function
+
+    function GetContinuationItemToken(continuationItemRenderer as object) as string
+        if not IsAssociativeArray(continuationItemRenderer)
+            return ""
+        end if
+        token = ObjectUtils.Dig(continuationItemRenderer, ["continuationEndpoint", "continuationCommand", "token"])
+        if IsString(token)
+            return token
+        end if
+        ' "Show more replies" button
+        token = ObjectUtils.Dig(continuationItemRenderer, ["button", "buttonRenderer", "command", "continuationCommand", "token"])
+        if IsString(token)
+            return token
+        end if
+        return ""
+    end function
+
+    function ParseCommentCount(header as object) as integer
+        runs = ObjectUtils.Dig(header, ["countText", "runs"])
+        if not IsArray(runs) or runs.Count() = 0
+            return -1
+        end if
+        return ParseAbbreviatedCount(ValidString(runs[0]["text"]))
+    end function
+
+    ' "985" -> 985, "1,234" -> 1234, "4.8M" -> 4800000, "12K" -> 12000
+    function ParseAbbreviatedCount(text as dynamic) as integer
+        if not IsString(text)
+            return 0
+        end if
+        text = text.Trim().Replace(",", "")
+        if text = ""
+            return 0
+        end if
+        multiplier = 1
+        suffix = UCase(Right(text, 1))
+        if suffix = "K"
+            multiplier = 1000
+        else if suffix = "M"
+            multiplier = 1000000
+        else if suffix = "B"
+            multiplier = 1000000000
+        end if
+        if multiplier > 1
+            text = Left(text, Len(text) - 1)
+        end if
+        ' round: Val returns a single-precision float ("2.3" * 1000000 = 2299999.95)
+        return Int(Val(text) * multiplier + 0.5)
+    end function
+
+end namespace

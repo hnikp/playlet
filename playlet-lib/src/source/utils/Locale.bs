@@ -475,4 +475,19 @@ namespace Locale
         ViewCount = "View count"
         Rating = "Rating"
     end enum
+
+    @locale
+    enum Comments
+        TopComments = "Top comments"
+        NewestFirst = "Newest first"
+        PressOptionsToSort = "Press Options (*) to sort"
+        NLikes = "%1 likes"
+        NReplies = "%1 replies"
+        OneReply = "1 reply"
+        Pinned = "Pinned"
+        Replies = "Replies"
+        NoComments = "No comments"
+        NoReplies = "No replies"
+        CommentsUnavailable = "Comments are unavailable for this video"
+    end enum
 end namespace

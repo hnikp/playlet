@@ -1,0 +1,317 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
+import "pkg:/source/utils/Types.bs"
+
+const LIST_TOP = 96
+const LIST_BOTTOM = 700
+const ROW_HEIGHT = 158 ' itemSize + itemSpacing
+' load the next page when focus gets this close to the end of the list
+const LOAD_MORE_THRESHOLD = 3
+
+function Init()
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.subtitleLabel = m.top.findNode("subtitleLabel")
+    m.detail = m.top.findNode("detail")
+    m.detailAuthorLabel = m.top.findNode("detailAuthorLabel")
+    m.detailContentLabel = m.top.findNode("detailContentLabel")
+    m.list = m.top.findNode("list")
+    m.messageLabel = m.top.findNode("messageLabel")
+    m.regularFont = m.top.findNode("regularFont")
+    m.boldFont = m.top.findNode("boldFont")
+
+    m.busySpinner = m.top.findNode("busySpinner")
+    m.busySpinner.poster.width = 60
+    m.busySpinner.poster.height = 60
+    m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+
+    m.sortBy = "top"
+    m.showingReplies = false
+    m.pendingJobs = {}
+    m.comments = NewListState("")
+    m.replies = invalid
+end function
+
+function OnNodeReady()
+    DisposableObserveField(m.list, "itemFocused", FuncName(OnItemFocused))
+    DisposableObserveField(m.list, "itemSelected", FuncName(OnItemSelected))
+    if m.top.videoId <> ""
+        LoadComments()
+    end if
+end function
+
+function OnVideoIdSet() as void
+    if m.jobQueue = invalid
+        ' not bound yet: OnNodeReady loads
+        return
+    end if
+    LoadComments()
+end function
+
+function OnFocusChange() as void
+    if m.top.focus
+        NodeSetFocus(m.list, true)
+    end if
+end function
+
+function NewListState(continuation as string) as object
+    return {
+        content: CreateObject("roSGNode", "ContentNode")
+        continuation: continuation
+        hasMore: true
+        loading: false
+    }
+end function
+
+function LoadComments()
+    CancelJobs()
+    ShowCommentsList()
+    m.comments = NewListState("")
+    m.list.content = m.comments.content
+    UpdateHeader()
+    LoadMore(m.comments)
+end function
+
+function LoadMore(state as object) as void
+    if state.loading or not state.hasMore
+        return
+    end if
+    state.loading = true
+    SetBusy(true)
+
+    callback = JobSystem.CreateCallback(OnPageLoaded)
+    m.pendingJobs[callback.id] = { callback: callback, state: state }
+    JobSystem.QueueJob(m.jobQueue, Jobs.CommentsJob, {
+        invidious: m.invidious
+        videoId: m.top.videoId
+        sortBy: m.sortBy
+        continuation: state.continuation
+        content: state.content
+    }, callback)
+end function
+
+function OnPageLoaded(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    pending = m.pendingJobs[event.getNode()]
+    m.pendingJobs.Delete(event.getNode())
+    if m.pendingJobs.Count() = 0
+        SetBusy(false)
+    end if
+    if pending = invalid
+        return
+    end if
+
+    state = pending.state
+    state.loading = false
+
+    info = event.getInfo()
+    if info.cancel
+        return
+    end if
+
+    data = info.data
+    if info.error <> invalid or not IsAssociativeArray(data) or data.error <> invalid
+        state.hasMore = false
+        if data <> invalid and data.error <> invalid
+            LogWarn("Failed to load comments:", data.error)
+        else
+            LogWarn("Failed to load comments:", info.error)
+        end if
+        if state.content.getChildCount() = 0
+            ShowMessage(Tr(Locale.Comments.CommentsUnavailable))
+        end if
+        return
+    end if
+
+    state.continuation = ValidString(data.continuation)
+    state.hasMore = state.continuation <> ""
+
+    if state.content.getChildCount() = 0
+        if m.showingReplies
+            ShowMessage(Tr(Locale.Comments.NoReplies))
+        else
+            ShowMessage(Tr(Locale.Comments.NoComments))
+        end if
+        return
+    end if
+
+    ' The page may be short (e.g. filtered): keep loading if focus is already near the end
+    OnItemFocused()
+end function
+
+function OnItemFocused() as void
+    state = GetCurrentState()
+    if state = invalid
+        return
+    end if
+    if m.list.itemFocused >= state.content.getChildCount() - LOAD_MORE_THRESHOLD
+        LoadMore(state)
+    end if
+end function
+
+function OnItemSelected() as void
+    state = GetCurrentState()
+    if state = invalid
+        return
+    end if
+    comment = state.content.getChild(m.list.itemSelected)
+    if comment = invalid
+        return
+    end if
+
+    if m.showingReplies
+        ' show the selected reply in full
+        ShowDetail(comment)
+        return
+    end if
+    ShowReplies(comment)
+end function
+
+function ShowReplies(comment as object)
+    m.savedFocus = m.list.itemFocused
+    m.showingReplies = true
+    HideMessage()
+    UpdateHeader()
+    ShowDetail(comment)
+
+    m.replies = NewListState(comment.repliesContinuation)
+    m.replies.hasMore = comment.repliesContinuation <> ""
+    m.list.content = m.replies.content
+    if m.replies.hasMore
+        LoadMore(m.replies)
+    else
+        ShowMessage(Tr(Locale.Comments.NoReplies))
+    end if
+end function
+
+' Shows the comment in full above the list, and fits the list below it
+function ShowDetail(comment as object)
+    author = comment.author
+    if comment.publishedText <> ""
+        author += " • " + comment.publishedText
+    end if
+    RtlText.ApplyToLabel(m.detailAuthorLabel, author, m.boldFont, true)
+    RtlText.ApplyToLabel(m.detailContentLabel, comment.content, m.regularFont)
+    m.detail.visible = true
+
+    detailHeight = m.detailContentLabel.boundingRect().height + 28
+    listTop = LIST_TOP + detailHeight + 24
+    numRows = Int((LIST_BOTTOM - listTop) / ROW_HEIGHT)
+    if numRows < 1
+        numRows = 1
+    end if
+    m.list.translation = [24, listTop]
+    m.list.numRows = numRows
+    m.messageLabel.translation = [24, listTop + 20]
+end function
+
+function ShowCommentsList()
+    m.showingReplies = false
+    m.detail.visible = false
+    m.list.translation = [24, LIST_TOP]
+    m.list.numRows = 4
+    m.messageLabel.translation = [24, 320]
+    HideMessage()
+end function
+
+function BackToComments()
+    CancelJobs()
+    m.replies = invalid
+    ShowCommentsList()
+    UpdateHeader()
+    m.list.content = m.comments.content
+    if m.savedFocus <> invalid and m.savedFocus < m.comments.content.getChildCount()
+        m.list.jumpToItem = m.savedFocus
+    end if
+    if m.comments.content.getChildCount() = 0
+        ShowMessage(Tr(Locale.Comments.NoComments))
+    end if
+end function
+
+function ToggleSort()
+    if m.sortBy = "top"
+        m.sortBy = "new"
+    else
+        m.sortBy = "top"
+    end if
+    LoadComments()
+end function
+
+function UpdateHeader() as void
+    if m.showingReplies
+        m.titleLabel.text = Tr(Locale.Comments.Replies)
+        m.subtitleLabel.text = ""
+        return
+    end if
+    m.titleLabel.text = Tr(Locale.Buttons.Comments)
+    if m.sortBy = "new"
+        sortText = Tr(Locale.Comments.NewestFirst)
+    else
+        sortText = Tr(Locale.Comments.TopComments)
+    end if
+    m.subtitleLabel.text = sortText + " • " + Tr(Locale.Comments.PressOptionsToSort)
+end function
+
+function GetCurrentState() as object
+    if m.showingReplies
+        return m.replies
+    end if
+    return m.comments
+end function
+
+function ShowMessage(text as string)
+    m.messageLabel.text = text
+    m.messageLabel.visible = true
+end function
+
+function HideMessage()
+    m.messageLabel.visible = false
+end function
+
+function SetBusy(busy as boolean)
+    m.busySpinner.visible = busy
+    if busy
+        m.busySpinner.control = "start"
+    else
+        m.busySpinner.control = "stop"
+    end if
+end function
+
+function CancelJobs()
+    for each id in m.pendingJobs
+        m.pendingJobs[id].callback.cancel = true
+    end for
+    m.pendingJobs = {}
+    SetBusy(false)
+end function
+
+' The panel is modal: it consumes every key (including releases, so Options doesn't reach the app's
+' picture-in-picture toggle), except the playback keys which keep controlling the video.
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
+        return false
+    end if
+
+    if press
+        if key = RemoteKeys.Back
+            if m.showingReplies
+                BackToComments()
+            else
+                m.top.closed = true
+            end if
+        else if key = RemoteKeys.Options and not m.showingReplies
+            ToggleSort()
+        end if
+    end if
+    return true
+end function
+
+function OnDispose()
+    CancelJobs()
+    DisposeObservers()
+end function

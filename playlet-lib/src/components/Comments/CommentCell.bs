@@ -1,0 +1,70 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/RtlText.bs"
+import "pkg:/source/utils/Types.bs"
+
+const FONT_SIZE = 18
+
+function Init()
+    m.highlight = m.top.findNode("highlight")
+    m.authorThumbnail = m.top.findNode("authorThumbnail")
+    m.authorLabel = m.top.findNode("authorLabel")
+    m.contentLabel = m.top.findNode("contentLabel")
+    m.footerLabel = m.top.findNode("footerLabel")
+    m.regularFont = m.top.findNode("regularFont")
+    m.boldFont = m.top.findNode("boldFont")
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+    if content = invalid
+        return
+    end if
+
+    m.authorThumbnail.uri = content.authorThumbnail
+
+    author = content.author
+    if content.publishedText <> ""
+        author += " • " + content.publishedText
+    end if
+    SetPreparedText(m.authorLabel, author, content.authorPrepared, m.boldFont, true)
+    SetPreparedText(m.contentLabel, content.content, content.contentPrepared, m.regularFont, false)
+
+    m.footerLabel.text = CommentsFooterText(content)
+end function
+
+' Arabic-script text is prepared (shaped, wrapped, reordered) in the job: use it with the Persian-capable font
+function SetPreparedText(label as object, text as string, prepared as object, defaultFont as object, bold as boolean) as void
+    if IsAssociativeArray(prepared) and prepared.hasArabicScript = true
+        label.font = RtlText.GetLabelFont(FONT_SIZE, bold)
+        if prepared.isRtl
+            label.horizAlign = "right"
+        else
+            label.horizAlign = "left"
+        end if
+        label.text = prepared.text
+        return
+    end if
+    label.font = defaultFont
+    label.horizAlign = "left"
+    label.text = text
+end function
+
+function CommentsFooterText(content as object) as string
+    parts = []
+    if content.isPinned
+        parts.Push(Tr(Locale.Comments.Pinned))
+    end if
+    if content.likeCountText <> "" and content.likeCountText <> "0"
+        parts.Push(Tr(Locale.Comments.NLikes).Replace("%1", content.likeCountText))
+    end if
+    if content.replyCount = 1
+        parts.Push(Tr(Locale.Comments.OneReply))
+    else if content.replyCount > 1
+        parts.Push(Tr(Locale.Comments.NReplies).Replace("%1", content.replyCount.ToStr()))
+    end if
+    return parts.Join(" • ")
+end function
+
+function OnFocusPercent()
+    m.highlight.opacity = m.top.focusPercent
+end function
