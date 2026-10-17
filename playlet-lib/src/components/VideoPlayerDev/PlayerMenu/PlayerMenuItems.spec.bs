@@ -1,0 +1,135 @@
+namespace Tests
+
+    @SGNode("PlayerMenu")
+    @suite
+    class PlayerMenuItemsTests extends Rooibos.BaseTestSuite
+
+        @describe("PlayerMenuItems.RootItems")
+
+        @it("Shows every item for a logged-in VOD with qualities, speed and captions")
+        function _()
+            ids = m.Ids(PlayerMenuItems.RootItems(m.FullState()))
+            m.assertEqual(ids, ["channel", "subscribe", "quality", "speed", "captions", "comments", "queue", "autoplay", "sponsorblock", "pip"])
+        end function
+
+        @it("Hides subscribe when logged out, and channel items without an author id")
+        function _()
+            state = m.FullState()
+            state.loggedIn = false
+            m.assertArrayNotContains(m.Ids(PlayerMenuItems.RootItems(state)), "subscribe")
+
+            state.authorId = ""
+            ids = m.Ids(PlayerMenuItems.RootItems(state))
+            m.assertArrayNotContains(ids, "channel")
+            m.assertArrayNotContains(ids, "subscribe")
+        end function
+
+        @it("Hides speed and comments for live streams, and empty quality/caption pages")
+        function _()
+            state = m.FullState()
+            state.isLive = true
+            state.qualities = []
+            state.captions = []
+            ids = m.Ids(PlayerMenuItems.RootItems(state))
+            m.assertArrayNotContains(ids, "speed")
+            m.assertArrayNotContains(ids, "comments")
+            m.assertArrayNotContains(ids, "quality")
+            m.assertArrayNotContains(ids, "captions")
+        end function
+
+        @it("Shows the subscription state")
+        function _()
+            state = m.FullState()
+            state.isSubscribed = true
+            items = PlayerMenuItems.RootItems(state)
+            m.assertEqual(items[1].title, Tr(Locale.Buttons.Unsubscribe))
+
+            state.isSubscribed = invalid
+            items = PlayerMenuItems.RootItems(state)
+            m.assertEqual(items[1].title, Tr(Locale.Buttons.Subscribe) + "…")
+        end function
+
+        @describe("PlayerMenuItems sub pages")
+
+        @it("Marks the current quality")
+        function _()
+            state = m.FullState()
+            state.quality = "720p"
+            items = PlayerMenuItems.QualityItems(state)
+            m.assertEqual(items.Count(), 3)
+            m.assertEqual(items[0].value, "auto")
+            m.assertFalse(items[0].selected)
+            m.assertEqual(items[2].value, "720p")
+            m.assertTrue(items[2].selected)
+        end function
+
+        @it("Marks the current speed")
+        function _()
+            state = m.FullState()
+            state.speed = 1.5
+            selected = []
+            for each item in PlayerMenuItems.SpeedItems(state)
+                if item.selected
+                    selected.Push(item.value)
+                end if
+            end for
+            m.assertEqual(selected.Count(), 1)
+            m.assertEqual(selected[0], 1.5)
+        end function
+
+        @it("Has an Off caption option")
+        function _()
+            items = PlayerMenuItems.CaptionItems(m.FullState())
+            m.assertEqual(items.Count(), 2)
+            m.assertEqual(items[0].value, "")
+            m.assertTrue(items[0].selected)
+            m.assertEqual(items[1].value, "http://captions/en")
+        end function
+
+        @describe("PlayerMenuItems.GetQualities")
+
+        @it("Lists distinct video heights, highest first")
+        function _()
+            metadata = {
+                adaptiveFormats: [
+                    { type: "audio/mp4", qualityLabel: invalid }
+                    { type: "video/mp4; codecs=avc1", qualityLabel: "720p" }
+                    { type: "video/mp4; codecs=av01", qualityLabel: "720p60" }
+                    { type: "video/mp4; codecs=avc1", qualityLabel: "1080p" }
+                    { type: "video/webm", resolution: "360p" }
+                ]
+            }
+            m.assertEqual(PlayerMenuItems.GetQualities(metadata), ["1080p", "720p", "360p"])
+            m.assertEqual(PlayerMenuItems.GetQualities(invalid), [])
+        end function
+
+        function FullState() as object
+            return {
+                title: "Video"
+                author: "Channel"
+                authorId: "UC123"
+                isLive: false
+                loggedIn: true
+                isSubscribed: false
+                qualities: ["1080p", "720p"]
+                quality: "auto"
+                supportsSpeed: true
+                speed: 1.0
+                captions: [{ description: "English", trackName: "http://captions/en" }]
+                captionTrack: ""
+                autoplay: true
+                sponsorblock: false
+            }
+        end function
+
+        function Ids(items as object) as object
+            ids = []
+            for each item in items
+                ids.Push(item.id)
+            end for
+            return ids
+        end function
+
+    end class
+
+end namespace

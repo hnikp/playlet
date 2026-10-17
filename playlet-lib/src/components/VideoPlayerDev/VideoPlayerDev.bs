@@ -7,6 +7,7 @@ import "pkg:/components/VideoPlayer/Lounge.bs"
 import "pkg:/components/VideoPlayerDev/ErrorDialogController.bs"
 import "pkg:/components/VideoPlayerDev/PlaybackTelemetry.bs"
 import "pkg:/components/VideoPlayerDev/PlayerCoordinatorLogic.bs"
+import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerMenuController.bs"
 import "pkg:/components/VideoPlayerDev/SponsorBlockController.bs"
 import "pkg:/components/VideoPlayerDev/TransportController.bs"
 import "pkg:/components/VideoPlayerDev/VideoNode.bs"
@@ -123,6 +124,8 @@ function Initialize()
 
     httpAgent = m.top.getHttpAgent()
     httpAgent.AddHeader("User-Agent", VIDEO_PLAYER_USER_AGENT)
+
+    InitializePlayerMenu()
 end function
 
 ' Called by AutoBind once the bound interface fields (container, jobQueue, services, ...) resolve.
@@ -138,6 +141,8 @@ function OnNodeReady()
 
     ' enableUI=false: the OS draws no chrome; we draw it all from the renderers.
     m.top.enableUI = false
+
+    BindPlayerMenu()
 
     minRect = m.top.minRect
     if m.container.fullscreen
@@ -548,6 +553,9 @@ end function
 function ActivateButton(index as integer) as void
     if index = PlayerCoordinatorLogic.PlayerButton.PlayPause
         TogglePlayPause()
+    else if index = PlayerCoordinatorLogic.PlayerButton.Menu
+        OpenPlayerMenu()
+        return
     else if index = PlayerCoordinatorLogic.PlayerButton.Minimize
         MinimizeReset()
         VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
@@ -999,6 +1007,9 @@ function OnFullScreenChange() as void
     ' stays as-is) and hide chrome/spinner/pause now. Fires for the minimize button, external minimize, and a
     ' video that starts minimized.
     if not fullscreen
+        ' the menu and comments overlay are fullscreen-only
+        ClosePlayerMenu(false)
+        ClosePlayerComments(false)
         if m.transport.transportMode <> TransportController.Mode.Idle
             m.transport.ResetTransport()
             ApplyTransport()
@@ -1487,6 +1498,7 @@ function OnClose() as void
     end if
     m.onCloseCalled = true
     m.top.previousPlayer = invalid
+    ClosePlayerComments(false)
     m.playbackTelemetry.SendSummary()
 
     ' A closed player must not react to anything anymore. The onCloseCalled guards already make the handlers

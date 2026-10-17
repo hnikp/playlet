@@ -1,0 +1,182 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Pure functions building the player menu pages from the player state, so they can be unit tested.
+' Each item is { id, title, value? }. The state (built by the player, see VideoPlayerDev.GetPlayerMenuState):
+'   author, authorId, isLive, loggedIn, isSubscribed (true/false, or invalid while unknown),
+'   qualities (["1080p", "720p", ...]), quality ("auto" or "720p"),
+'   supportsSpeed, speed (float), captions ([{ description, trackName }]), captionTrack ("" when off),
+'   autoplay, sponsorblock, liveChat
+namespace PlayerMenuItems
+    const SELECTED_MARK = "• "
+    const SPEEDS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+
+    function RootItems(state as object) as object
+        items = []
+
+        authorId = ValidString(state.authorId)
+        if authorId <> ""
+            title = Tr(Locale.PlayerMenu.GoToChannel)
+            if ValidString(state.author) <> ""
+                title += ": " + state.author
+            end if
+            items.Push({ id: "channel", title: title })
+
+            if state.loggedIn = true
+                if state.isSubscribed = invalid
+                    title = Tr(Locale.Buttons.Subscribe) + "…"
+                else if state.isSubscribed = true
+                    title = Tr(Locale.Buttons.Unsubscribe)
+                else
+                    title = Tr(Locale.Buttons.Subscribe)
+                end if
+                items.Push({ id: "subscribe", title: title })
+            end if
+        end if
+
+        qualities = ValidArray(state.qualities)
+        if qualities.Count() > 0
+            items.Push({ id: "quality", title: Tr(Locale.PlayerMenu.Quality) + ": " + QualityTitle(state.quality) })
+        end if
+
+        if state.supportsSpeed = true and state.isLive <> true
+            items.Push({ id: "speed", title: Tr(Locale.PlayerMenu.PlaybackSpeed) + ": " + SpeedTitle(state.speed) })
+        end if
+
+        captions = ValidArray(state.captions)
+        if captions.Count() > 0
+            items.Push({ id: "captions", title: Tr(Locale.PlayerMenu.Captions) + ": " + CaptionTitle(captions, ValidString(state.captionTrack)) })
+        end if
+
+        if state.isLive <> true
+            items.Push({ id: "comments", title: Tr(Locale.Buttons.Comments) })
+        else if state.liveChat = true
+            items.Push({ id: "livechat", title: Tr(Locale.PlayerMenu.LiveChat) })
+        end if
+
+        items.Push({ id: "queue", title: Tr(Locale.PlayerMenu.VideoQueue) })
+        items.Push({ id: "autoplay", title: Tr(Locale.Settings.Autoplay) + ": " + OnOffTitle(state.autoplay = true) })
+        items.Push({ id: "sponsorblock", title: Tr(Locale.Settings.SponsorBlock) + ": " + OnOffTitle(state.sponsorblock = true) })
+        items.Push({ id: "pip", title: Tr(Locale.PlayerMenu.PictureInPicture) })
+
+        return items
+    end function
+
+    function QualityItems(state as object) as object
+        current = ValidString(state.quality)
+        if current = ""
+            current = "auto"
+        end if
+        items = [SelectableItem("quality", "auto", Tr(Locale.Settings.AutoQuality), current = "auto")]
+        for each quality in ValidArray(state.qualities)
+            items.Push(SelectableItem("quality", quality, quality, current = quality))
+        end for
+        return items
+    end function
+
+    function SpeedItems(state as object) as object
+        current = ValidFloat(state.speed)
+        if current <= 0
+            current = 1.0
+        end if
+        items = []
+        for each speed in SPEEDS
+            items.Push(SelectableItem("speed", speed, SpeedTitle(speed), Abs(speed - current) < 0.01))
+        end for
+        return items
+    end function
+
+    function CaptionItems(state as object) as object
+        current = ValidString(state.captionTrack)
+        items = [SelectableItem("captions", "", Tr(Locale.PlayerMenu.CaptionsOff), current = "")]
+        for each caption in ValidArray(state.captions)
+            items.Push(SelectableItem("captions", caption.trackName, ValidString(caption.description), current = caption.trackName))
+        end for
+        return items
+    end function
+
+    ' The sub-page items for a root item id, or invalid if the item is an action
+    function SubItems(id as string, state as object) as dynamic
+        if id = "quality"
+            return QualityItems(state)
+        else if id = "speed"
+            return SpeedItems(state)
+        else if id = "captions"
+            return CaptionItems(state)
+        end if
+        return invalid
+    end function
+
+    function SelectableItem(id as string, value as dynamic, title as string, selected as boolean) as object
+        if selected
+            title = SELECTED_MARK + title
+        end if
+        return { id: id, value: value, title: title, selected: selected }
+    end function
+
+    ' Distinct video heights in the adaptive formats, highest first: ["1080p", "720p", ...]
+    function GetQualities(metadata as object) as object
+        heights = {}
+        for each format in ValidArray(ValidAssociativeArray(metadata).adaptiveFormats)
+            if not IsString(format.type) or not format.type.StartsWith("video")
+                continue for
+            end if
+            height = 0
+            if IsString(format.qualityLabel) and format.qualityLabel.InStr("p") > 0
+                height = format.qualityLabel.Left(format.qualityLabel.InStr("p")).ToInt()
+            else if IsString(format.resolution) and format.resolution.InStr("p") > 0
+                height = format.resolution.Left(format.resolution.InStr("p")).ToInt()
+            else
+                height = ValidInt(format.height)
+            end if
+            if height > 0
+                heights[height.ToStr()] = height
+            end if
+        end for
+
+        sorted = []
+        for each key in heights
+            sorted.Push(heights[key])
+        end for
+        sorted.Sort("r")
+
+        qualities = []
+        for each height in sorted
+            qualities.Push(height.ToStr() + "p")
+        end for
+        return qualities
+    end function
+
+    function QualityTitle(quality as dynamic) as string
+        if not IsString(quality) or quality = "" or quality = "auto"
+            return Tr(Locale.Settings.AutoQuality)
+        end if
+        return quality
+    end function
+
+    function SpeedTitle(speed as dynamic) as string
+        speed = ValidFloat(speed)
+        if speed <= 0
+            speed = 1.0
+        end if
+        return Str(speed).Trim() + "x"
+    end function
+
+    function CaptionTitle(captions as object, trackName as string) as string
+        if trackName <> ""
+            for each caption in captions
+                if caption.trackName = trackName
+                    return ValidString(caption.description)
+                end if
+            end for
+        end if
+        return Tr(Locale.PlayerMenu.CaptionsOff)
+    end function
+
+    function OnOffTitle(isOn as boolean) as string
+        if isOn
+            return Tr(Locale.PlayerMenu.On)
+        end if
+        return Tr(Locale.PlayerMenu.CaptionsOff)
+    end function
+end namespace

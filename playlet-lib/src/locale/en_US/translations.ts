@@ -1488,5 +1488,41 @@
         <source>Comments are unavailable for this video</source>
         <translation>Comments are unavailable for this video</translation>
     </message>
+    <message>
+        <source>Go to channel</source>
+        <translation>Go to channel</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Quality</translation>
+    </message>
+    <message>
+        <source>Playback speed</source>
+        <translation>Playback speed</translation>
+    </message>
+    <message>
+        <source>Captions</source>
+        <translation>Captions</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>On</translation>
+    </message>
+    <message>
+        <source>Video queue</source>
+        <translation>Video queue</translation>
+    </message>
+    <message>
+        <source>Picture-in-picture</source>
+        <translation>Picture-in-picture</translation>
+    </message>
+    <message>
+        <source>Live chat</source>
+        <translation>Live chat</translation>
+    </message>
 </context>
 </TS>

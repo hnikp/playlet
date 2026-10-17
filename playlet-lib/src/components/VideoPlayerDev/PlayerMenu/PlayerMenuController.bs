@@ -1,0 +1,280 @@
+import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerMenuItems.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
+import "pkg:/components/VideoQueue/VideoQueueViewUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Player-side handling of the player menu (PlayerMenu) and the comments overlay, in the VideoPlayerDev scope.
+' Everything is guarded on m.playerMenu: the test mock (tests/VideoPlayerDevMock) has no menu.
+
+function InitializePlayerMenu() as void
+    m.playerMenu = m.top.findNode("playerMenu")
+    m.playerComments = invalid
+    m.qualityOverride = ""
+    if m.playerMenu = invalid
+        return
+    end if
+    m.playerMenu.ObserveField("action", FuncName(OnPlayerMenuAction))
+    m.playerMenu.ObserveField("closed", FuncName(OnPlayerMenuClosed))
+    m.top.ObserveField("showMenu", FuncName(OnShowMenuRequested))
+end function
+
+function BindPlayerMenu() as void
+    if m.playerMenu <> invalid
+        m.playerMenu@.BindNode()
+    end if
+end function
+
+function IsPlayerMenuOpen() as boolean
+    return m.playerMenu <> invalid and m.playerMenu.visible
+end function
+
+' Options (*) in the fullscreen player (from AppController): toggle the menu
+function OnShowMenuRequested() as void
+    if IsPlayerMenuOpen()
+        ClosePlayerMenu(true)
+    else
+        OpenPlayerMenu()
+    end if
+end function
+
+function OpenPlayerMenu() as void
+    if m.playerMenu = invalid or not m.container.fullscreen or m.playerComments <> invalid
+        return
+    end if
+    ' the menu replaces the chrome (and any scrub) while it's open
+    MinimizeReset()
+    HideChromeNow()
+
+    m.playerMenu.state = GetPlayerMenuState()
+    m.playerMenu.visible = true
+    m.playerMenu.open = true
+    NodeSetFocus(m.playerMenu, true)
+end function
+
+function ClosePlayerMenu(refocus as boolean) as void
+    if not IsPlayerMenuOpen()
+        return
+    end if
+    m.playerMenu.visible = false
+    if refocus and m.container.fullscreen
+        NodeSetFocus(m.top, true)
+    end if
+end function
+
+function OnPlayerMenuClosed()
+    ClosePlayerMenu(true)
+end function
+
+function RefreshPlayerMenuState()
+    if IsPlayerMenuOpen()
+        m.playerMenu.state = GetPlayerMenuState()
+    end if
+end function
+
+function GetPlayerMenuState() as object
+    content = m.top.content
+    metadata = {}
+    if content <> invalid and IsAssociativeArray(content.metadata)
+        metadata = content.metadata
+    end if
+
+    title = ""
+    author = ""
+    isLive = false
+    if content <> invalid
+        title = ValidString(content.title)
+        author = ValidString(content.secondaryTitle)
+        isLive = content.Live = true
+    end if
+    if ValidString(metadata.author) <> ""
+        author = metadata.author
+    end if
+
+    captions = []
+    captionTrack = ""
+    if content <> invalid and IsArray(content.SubtitleTracks)
+        for each track in content.SubtitleTracks
+            captions.Push({ description: ValidString(track.Description), trackName: ValidString(track.TrackName) })
+        end for
+        if m.top.globalCaptionMode = "On"
+            captionTrack = ValidString(m.top.subtitleTrack)
+        end if
+    end if
+
+    quality = m.qualityOverride
+    if quality = ""
+        quality = "auto"
+    end if
+
+    preferences = m.top.preferences
+    return {
+        title: title
+        author: author
+        authorId: ValidString(metadata.authorId)
+        isLive: isLive
+        loggedIn: m.top.profilesService <> invalid and m.top.profilesService.currentProfile <> invalid
+        qualities: PlayerMenuItems.GetQualities(metadata)
+        quality: quality
+        supportsSpeed: m.top.hasField("playbackSpeed")
+        speed: ValidFloat(m.top.playbackSpeed)
+        captions: captions
+        captionTrack: captionTrack
+        autoplay: preferences["playback.autoplay"] = true
+        sponsorblock: preferences["sponsorblock.enabled"] = true
+        liveChat: false
+    }
+end function
+
+function OnPlayerMenuAction() as void
+    action = m.playerMenu.action
+    if not IsAssociativeArray(action)
+        return
+    end if
+    id = action.id
+    LogInfo("Player menu action:", id, action.value)
+
+    if id = "channel"
+        ClosePlayerMenu(false)
+        OpenChannelFromPlayer()
+    else if id = "comments"
+        ClosePlayerMenu(false)
+        OpenPlayerComments()
+    else if id = "queue"
+        ClosePlayerMenu(true)
+        VideoQueueViewUtils.Open(m.videoQueue, m.top.appController)
+    else if id = "pip"
+        ClosePlayerMenu(false)
+        VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+    else if id = "autoplay"
+        m.top.preferences["playback.autoplay"] = not (m.top.preferences["playback.autoplay"] = true)
+        RefreshPlayerMenuState()
+    else if id = "sponsorblock"
+        ' applies from the next video
+        m.top.preferences["sponsorblock.enabled"] = not (m.top.preferences["sponsorblock.enabled"] = true)
+        RefreshPlayerMenuState()
+    else if id = "quality"
+        ClosePlayerMenu(true)
+        SwitchQuality(ValidString(action.value))
+    else if id = "speed"
+        SetPlaybackSpeed(ValidFloat(action.value))
+        RefreshPlayerMenuState()
+    else if id = "captions"
+        SetCaptionTrack(ValidString(action.value))
+        RefreshPlayerMenuState()
+    end if
+end function
+
+' Shrinks the player to picture-in-picture and opens the channel page
+function OpenChannelFromPlayer() as void
+    content = m.top.content
+    if content = invalid or not IsAssociativeArray(content.metadata)
+        return
+    end if
+    authorId = ValidString(content.metadata.authorId)
+    if authorId = ""
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, {
+        authorId: authorId
+        author: ValidString(content.metadata.author)
+    })
+    if m.container.fullscreen
+        VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+    end if
+    ChannelUtils.Open(channel, m.top.appController)
+end function
+
+' The video keeps playing under the comments panel
+function OpenPlayerComments() as void
+    content = m.top.content
+    if content = invalid or m.playerComments <> invalid
+        return
+    end if
+    videoId = ValidString(content.videoId)
+    if videoId = ""
+        return
+    end if
+    m.playerComments = m.top.createChild("CommentsPanel")
+    m.playerComments.translation = [720, 0]
+    m.playerComments@.BindNode()
+    m.playerComments.videoId = videoId
+    m.playerComments.ObserveField("closed", FuncName(OnPlayerCommentsClosed))
+    NodeSetFocus(m.playerComments, true)
+end function
+
+function OnPlayerCommentsClosed()
+    ClosePlayerComments(true)
+end function
+
+function ClosePlayerComments(refocus as boolean) as void
+    if m.playerComments = invalid
+        return
+    end if
+    m.playerComments.unobserveField("closed")
+    m.playerComments.dispose = true
+    m.top.removeChild(m.playerComments)
+    m.playerComments = invalid
+    if refocus and m.container.fullscreen
+        NodeSetFocus(m.top, true)
+    end if
+end function
+
+' Restarts the stream at the current position with a quality filter (for this video only)
+function SwitchQuality(quality as string) as void
+    content = m.top.content
+    if content = invalid or StringUtils.IsNullOrEmpty(content.videoId)
+        return
+    end if
+    if quality = "auto"
+        quality = ""
+    end if
+    if quality = m.qualityOverride
+        return
+    end if
+    m.qualityOverride = quality
+
+    position = Int(m.top.position)
+    newContent = CreateObject("roSGNode", "ContentNode")
+    newContent.AddFields({
+        videoId: content.videoId
+        timestamp: position
+        qualityOverride: quality
+    })
+    newContent.title = content.title
+    newContent.secondaryTitle = content.secondaryTitle
+
+    content.unobserveField("title")
+    content.unobserveField("secondaryTitle")
+    m.top.control = "stop"
+    StartVideoContentJob(newContent)
+end function
+
+' Most devices only apply a new playbackSpeed after a pause/resume (see LoungeApi.HandleSetPlaybackSpeed)
+function SetPlaybackSpeed(speed as float) as void
+    if not m.top.hasField("playbackSpeed") or speed <= 0
+        return
+    end if
+    wasPlaying = m.top.state = "playing"
+    if wasPlaying
+        m.top.control = "pause"
+    end if
+    m.top.playbackSpeed = speed
+    if wasPlaying
+        m.top.control = "resume"
+    end if
+end function
+
+' trackName "" turns captions off. Note: globalCaptionMode is the device-wide captions setting.
+function SetCaptionTrack(trackName as string) as void
+    if trackName = ""
+        m.top.globalCaptionMode = "Off"
+        return
+    end if
+    m.top.subtitleTrack = trackName
+    m.top.globalCaptionMode = "On"
+end function

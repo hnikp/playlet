@@ -99,6 +99,12 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     end if
 
     if key = RemoteKeys.Options and not press
+        ' fullscreen player: Options opens the player menu (picture-in-picture is in the menu and the ⋮ row)
+        player = m.top.videoQueue.player
+        if player <> invalid and VideoQueueUtils.IsVideoPlayerFullScreen(m.top.videoQueue) and player.hasField("showMenu")
+            player.showMenu = true
+            return true
+        end if
         if VideoQueueUtils.ToggleVideoPictureInPicture(m.top.videoQueue)
             return true
         end if

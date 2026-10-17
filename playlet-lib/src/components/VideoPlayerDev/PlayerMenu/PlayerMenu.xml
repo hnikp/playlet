@@ -1,0 +1,36 @@
+<!-- The in-player menu (Options (*) or the ⋮ button): channel, subscribe, quality, speed, captions, comments and
+     a few playback settings. A side panel over the video; the player sets `state` (see PlayerMenuItems.bs) and
+     `open`, and handles `action` ({ id, value }). Subscribing is handled here. Sets `closed` on Back. -->
+<component name="PlayerMenu" extends="Group" includes="AutoBind,Focus">
+    <interface>
+        <field id="state" type="assocarray" onChange="Render" />
+        <field id="open" type="boolean" alwaysNotify="true" onChange="OnOpen" />
+        <field id="action" type="assocarray" alwaysNotify="true" />
+        <field id="closed" type="boolean" alwaysNotify="true" />
+        <!-- SubscriptionUtils target -->
+        <field id="isSubscribed" type="boolean" alwaysNotify="true" onChange="OnSubscriptionStatus" />
+        <field id="invidious" type="node" bind="/Invidious" />
+        <field id="profilesService" type="node" bind="/ProfilesService" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+    </interface>
+    <children>
+        <Rectangle
+            translation="[800,0]"
+            width="480"
+            height="720"
+            color="#141414F2">
+            <Label
+                id="titleLabel"
+                translation="[30,30]"
+                width="420"
+                font="font:MediumBoldSystemFont" />
+            <MarkupList
+                id="list"
+                translation="[30,90]"
+                itemSize="[420,50]"
+                itemComponentName="ContextMenuRow"
+                vertFocusAnimationStyle="floatingFocus"
+                numRows="11" />
+        </Rectangle>
+    </children>
+</component>

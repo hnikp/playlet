@@ -1,0 +1,11 @@
+{
+  inputHash: '800f85a0170f9a7a411b38ca9fd24752',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/more.png',
+      outputHash: '0990cfdc276cd5cf3bdf52c2ef6b9ab0',
+      width: 63,
+      height: 63,
+    },
+  ],
+}

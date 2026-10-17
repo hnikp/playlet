@@ -490,4 +490,17 @@ namespace Locale
         NoReplies = "No replies"
         CommentsUnavailable = "Comments are unavailable for this video"
     end enum
+
+    @locale
+    enum PlayerMenu
+        GoToChannel = "Go to channel"
+        Quality = "Quality"
+        PlaybackSpeed = "Playback speed"
+        Captions = "Captions"
+        CaptionsOff = "Off"
+        On = "On"
+        VideoQueue = "Video queue"
+        PictureInPicture = "Picture-in-picture"
+        LiveChat = "Live chat"
+    end enum
 end namespace

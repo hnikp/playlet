@@ -29,8 +29,10 @@
                 iconUri="pkg:/images/icons/player/play.png"
                 iconUri2="pkg:/images/icons/player/pause.png" />
         </Group>
-        <!-- minimize, right-aligned to the trackbar's right edge (x=1212). -->
+        <!-- player menu + minimize, right-aligned to the trackbar's right edge (x=1212). -->
         <Group id="RightCluster">
+            <VideoPlayerButton id="MenuButton"
+                iconUri="pkg:/images/icons/player/more.png" />
             <VideoPlayerButton id="MinimizeButton"
                 iconUri="pkg:/images/icons/player/minimize.png" />
         </Group>

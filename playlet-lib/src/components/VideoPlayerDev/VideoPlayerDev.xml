@@ -31,6 +31,8 @@
         <field id="maxRect" type="rect2D" value="[0,0,1280,720]" />
         <field id="close" type="boolean" alwaysNotify="true" />
         <field id="setSeek" type="float" alwaysNotify="true" />
+        <!-- set by AppController on Options (*): toggles the player menu -->
+        <field id="showMenu" type="boolean" alwaysNotify="true" />
         <function name="PlayWithContent" />
     </interface>
     <!-- Init() lives in its own file so VideoPlayerDev.bs (the coordinator logic) has no Init and is importable by
@@ -120,6 +122,9 @@
         <!-- ===================== LargePause (explicit-pause poster; OUTSIDE Chrome) ===================== -->
         <!-- Coordinator pulses `trigger` only on an explicit pause-from-playing, `cancel` on resume. Not chrome-gated. -->
         <LargePause id="largePause" />
+
+        <!-- ===================== PlayerMenu (OUTSIDE Chrome, takes real focus while open) ===================== -->
+        <PlayerMenu id="playerMenu" visible="false" />
 
     </children>
 </component>
