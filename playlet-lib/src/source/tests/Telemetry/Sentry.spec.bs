@@ -85,7 +85,8 @@ namespace Tests
         end function
 
         function FallbackHits() as integer
-            return Tests.HttpTestServerHits(m.server, `${m.fallbackPath}?sentry_key=a16c510299b23ccc63bdc84f751c9950`)
+            ' the fallback url's query (its sentry_key) is kept
+            return Tests.HttpTestServerHits(m.server, m.fallbackPath + "?" + SENTRY_FALLBACK_ENVELOPE_URL.Split("?")[1])
         end function
 
         function Messages(lines as string[], level as string) as string[]

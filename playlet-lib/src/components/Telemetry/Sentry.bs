@@ -1,10 +1,15 @@
 import "pkg:/source/services/HttpClient.bs"
 
-const SUPPORT_SERVER_ENVELOPE_URL = "https://playlet-v8556.ondigitalocean.app/envelope"
-' A fallback is needed to investigate https://github.com/iBicha/playlet/issues/906
-const SENTRY_FALLBACK_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4512194184544256/envelope/?sentry_key=a16c510299b23ccc63bdc84f751c9950"
+' Fork: diagnostics go to this fork's own Sentry project, not upstream's support server / Sentry project.
+' Until the envelope urls below are set (see Sentry.IsConfigured), nothing is sent.
+const SUPPORT_SERVER_ENVELOPE_URL = "https://SENTRY_NOT_CONFIGURED/primary/envelope"
+const SENTRY_FALLBACK_ENVELOPE_URL = "https://SENTRY_NOT_CONFIGURED/fallback/envelope/?sentry_key=none"
 
 namespace Sentry
+
+    function IsConfigured() as boolean
+        return SUPPORT_SERVER_ENVELOPE_URL.InStr("SENTRY_NOT_CONFIGURED") = -1
+    end function
 
     class Delivery
         private events as object

@@ -30,7 +30,7 @@ function OnNodeReady() as void
 end function
 
 function OnPreferencesChanged(event as object) as void
-    m.top.enabled = event.getData()
+    m.top.enabled = event.getData() and Sentry.IsConfigured()
 end function
 
 function OnEnabledChanged(event as object) as void
