@@ -4,16 +4,25 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
+const THUMBNAIL_WIDTH = 350
+const THUMBNAIL_HEIGHT = 196
+
 function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
     m.smallestSystemFont = m.top.FindNode("smallestSystemFont")
     m.smallestBoldSystemFont = m.top.FindNode("smallestBoldSystemFont")
     m.progressRect = m.top.FindNode("progressRect")
+    m.previewPoster = m.top.FindNode("previewPoster")
+    m.previewTimer = m.top.FindNode("previewTimer")
+    m.previewTimer.ObserveField("fire", FuncName(OnPreviewTimerFire))
+    m.previewPoster.ObserveField("loadStatus", FuncName(OnPreviewLoadStatus))
+    m.previewContent = invalid
 end function
 
 function OnContentSet() as void
     content = m.top.itemContent
+    ObservePreview(content)
 
     if content = invalid
         return
@@ -92,6 +101,79 @@ function SetDurationLabel(text as string, bgColor as string, bgOpacity as float,
     rect.translation = [rectParent.width - rect.width, rect.translation[1]]
     rect.color = bgColor
     rect.opacity = bgOpacity
+end function
+
+' Cells are recycled: follow the preview field of the current content node only
+function ObservePreview(content as object) as void
+    if m.previewContent <> invalid
+        if content <> invalid and m.previewContent.isSameNode(content)
+            return
+        end if
+        m.previewContent.unobserveFieldScoped("previewStoryboard")
+    end if
+    m.previewContent = content
+    if content <> invalid and content.hasField("previewStoryboard")
+        content.observeFieldScoped("previewStoryboard", FuncName(OnPreviewChange))
+    end if
+    OnPreviewChange()
+end function
+
+function OnPreviewChange() as void
+    m.previewTimer.control = "stop"
+    m.previewPoster.visible = false
+    m.previewFrames = invalid
+
+    content = m.previewContent
+    if content = invalid or not content.hasField("previewStoryboard")
+        m.previewPoster.uri = ""
+        return
+    end if
+    preview = content.previewStoryboard
+    if not IsAssociativeArray(preview) or not IsArray(preview.frames) or preview.frames.Count() = 0
+        ' release the sheet bitmap
+        m.previewPoster.uri = ""
+        return
+    end if
+
+    m.previewFrames = preview.frames
+    m.previewFrameIndex = 0
+    ShowPreviewFrame()
+    m.previewTimer.control = "start"
+end function
+
+function OnPreviewTimerFire() as void
+    if m.previewFrames = invalid
+        return
+    end if
+    m.previewFrameIndex = (m.previewFrameIndex + 1) mod m.previewFrames.Count()
+    ShowPreviewFrame()
+end function
+
+' The sheet is scaled so one tile = the thumbnail size; translation + clippingRect select the tile
+function ShowPreviewFrame() as void
+    frame = m.previewFrames[m.previewFrameIndex]
+    cellX = frame.col * THUMBNAIL_WIDTH
+    cellY = frame.row * THUMBNAIL_HEIGHT
+    m.previewPoster.width = frame.cols * THUMBNAIL_WIDTH
+    m.previewPoster.height = frame.rows * THUMBNAIL_HEIGHT
+    m.previewPoster.translation = [-cellX, -cellY]
+    m.previewPoster.clippingRect = [cellX, cellY, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT]
+    if m.previewPoster.uri <> frame.url
+        ' hidden until the new sheet loads (OnPreviewLoadStatus)
+        m.previewPoster.visible = false
+        m.previewPoster.uri = frame.url
+        return
+    end if
+    ' a frame from an already loaded sheet shows right away; a new sheet shows once loaded
+    if m.previewPoster.loadStatus = "ready"
+        m.previewPoster.visible = true
+    end if
+end function
+
+function OnPreviewLoadStatus() as void
+    if m.previewFrames <> invalid and m.previewPoster.loadStatus = "ready"
+        m.previewPoster.visible = true
+    end if
 end function
 
 function OnPercentDurationWatched() as void

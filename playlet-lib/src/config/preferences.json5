@@ -310,6 +310,13 @@
         type: "boolean",
         defaultValue: true,
       },
+      {
+        displayText: "Thumbnail preview",
+        key: "misc.thumbnail_preview",
+        description: "Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds",
+        type: "boolean",
+        defaultValue: true,
+      },
     ],
   },
   {

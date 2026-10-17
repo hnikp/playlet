@@ -1524,5 +1524,13 @@
         <source>Live chat</source>
         <translation>Live chat</translation>
     </message>
+    <message>
+        <source>Thumbnail preview</source>
+        <translation>Thumbnail preview</translation>
+    </message>
+    <message>
+        <source>Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds</source>
+        <translation>Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds</translation>
+    </message>
 </context>
 </TS>

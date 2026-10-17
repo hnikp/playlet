@@ -1,0 +1,49 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/StoryboardUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Fetches the storyboards of a video and sets the thumbnail preview frames on its content node
+' (VideoContentNode.previewStoryboard), which VideoRowCell animates.
+@job("StoryboardPreviewJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+    node = input.node
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    service = new Invidious.InvidiousService(input.invidious)
+    instance = service.GetInstance()
+    ' fields= keeps the Invidious response small (the built-in backend ignores it)
+    request = HttpClient.Get(`${instance}${Invidious.VIDEOS_ENDPOINT}/${input.videoId}`)
+    request.QueryParam("fields", "storyboards")
+    request.CacheForSeconds(3600)
+    request.Cancellation(JobGetCancellation())
+    response = request.Await()
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if not response.IsSuccess()
+        JobError("Failed to load storyboards: " + response.ErrorMessage())
+        return
+    end if
+
+    json = response.Json()
+    if not IsAssociativeArray(json)
+        JobError("Invalid storyboards response")
+        return
+    end if
+
+    preview = StoryboardUtils.GetPreviewFrames(json.storyboards, instance, 8, 160)
+    if preview = invalid
+        JobError("No usable storyboard")
+        return
+    end if
+    node.previewStoryboard = preview
+end function

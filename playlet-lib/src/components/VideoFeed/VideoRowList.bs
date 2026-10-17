@@ -6,6 +6,7 @@ import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/components/VideoView/VideoViewUtils.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
@@ -15,8 +16,13 @@ import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 add the option to remove a row if it does not have any content
 ' E.g. Subscriptions, Watch History and Playlists can be empty
+' Thumbnail preview: after focus stays on a video this long, its storyboard frames are loaded and animated
+const PREVIEW_DELAY_SECONDS = 2
+
 function Init()
     m.pendingLoadJobs = {}
+    m.previewNode = invalid
+    m.previewJob = invalid
 end function
 
 function OnNodeReady()
@@ -34,12 +40,16 @@ end function
 function OnFocusedChildChange() as void
     if m.top.hasFocus()
         LoadRowsIfNeeded()
+    else
+        StopPreview()
     end if
 end function
 
 function OnVisibilityChange()
     if m.top.visible = true
         LoadRowsIfNeeded()
+    else
+        StopPreview()
     end if
 end function
 
@@ -62,6 +72,11 @@ function OnRowItemFocused(event as object) as void
     rowItemIndex = index[1]
 
     row = m.top.content.GetChild(rowIndex)
+    if row = invalid
+        return
+    end if
+    SchedulePreview(row.GetChild(rowItemIndex))
+
     if not row.loadState = FeedLoadState.LoadedPage
         return
     end if
@@ -421,7 +436,72 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
+' Restarts the preview delay for the newly focused item (only videos with a known duration: not live/upcoming)
+function SchedulePreview(item as object) as void
+    StopPreview()
+    if item = invalid or item.type <> "video" or item.liveNow or item.isUpcoming or ValidInt(item.lengthSeconds) <= 0
+        return
+    end if
+    if m.preferences["misc.thumbnail_preview"] <> true
+        return
+    end if
+
+    m.previewNode = item
+    if m.previewTimer = invalid
+        m.previewTimer = CreateObject("roSGNode", "Timer")
+        m.previewTimer.duration = PREVIEW_DELAY_SECONDS
+        m.previewTimer.repeat = false
+        m.previewTimer.ObserveFieldScoped("fire", FuncName(OnPreviewTimerFire))
+    end if
+    m.previewTimer.control = "start"
+end function
+
+function OnPreviewTimerFire() as void
+    item = m.previewNode
+    if item = invalid or not m.top.hasFocus() or not m.top.visible
+        return
+    end if
+    ' no previews over a fullscreen video (the list isn't visible anyway)
+    if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue) and VideoQueueUtils.IsVideoPlayerFullScreen(m.videoQueue)
+        return
+    end if
+
+    m.previewJob = JobSystem.CreateCallback(OnPreviewJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.StoryboardPreviewJob, {
+        invidious: m.invidious
+        videoId: item.videoId
+        node: item
+    }, m.previewJob)
+end function
+
+function OnPreviewJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    if m.previewJob <> invalid and m.previewJob.isSameNode(event.getRoSGNode())
+        m.previewJob = invalid
+    end if
+    info = event.getInfo()
+    if info.error <> invalid
+        LogDebug("No thumbnail preview:", info.error)
+    end if
+end function
+
+' Stops the preview of the previously focused item and frees its frames (VideoRowCell stops animating)
+function StopPreview() as void
+    if m.previewTimer <> invalid
+        m.previewTimer.control = "stop"
+    end if
+    if m.previewJob <> invalid
+        m.previewJob.cancel = true
+        m.previewJob = invalid
+    end if
+    if m.previewNode <> invalid
+        m.previewNode.previewStoryboard = {}
+        m.previewNode = invalid
+    end if
+end function
+
 function OnDispose()
+    StopPreview()
     CancelCurrentJobs()
     DisposeObservers()
     m.top.screen = invalid

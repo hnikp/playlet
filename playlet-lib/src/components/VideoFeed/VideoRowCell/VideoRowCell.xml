@@ -22,6 +22,11 @@
                 width="350"
                 height="196"
                 failedBitmapUri="pkg:/images/thumbnail-missing.jpg">
+                <!-- thumbnail preview: one storyboard sheet scaled so a tile covers the thumbnail, clipped to
+                     the current tile (see ShowPreviewFrame) -->
+                <Poster
+                    id="previewPoster"
+                    visible="false" />
                 <Rectangle
                     id="durationRect"
                     width="60"
@@ -63,5 +68,6 @@
                 height="25"
                 font="font:SmallestSystemFont" />
         </LayoutGroup>
+        <Timer id="previewTimer" duration="0.8" repeat="true" />
     </children>
 </component>

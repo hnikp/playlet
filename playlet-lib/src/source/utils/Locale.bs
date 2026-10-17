@@ -312,6 +312,8 @@ namespace Locale
         QueueNotificationsDescription = "Show a notification when a video is added to the queue"
         OpenVideoDetails = "Open video page on select"
         OpenVideoDetailsDescription = "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away"
+        ThumbnailPreview = "Thumbnail preview"
+        ThumbnailPreviewDescription = "Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"

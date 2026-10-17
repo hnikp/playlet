@@ -1,0 +1,54 @@
+namespace Tests
+
+    @suite
+    class StoryboardUtilsTests extends Rooibos.BaseTestSuite
+
+        @describe("StoryboardUtils")
+
+        @it("Picks the smallest level with tiles wide enough")
+        function _()
+            storyboards = m.GetStoryboards()
+            m.assertEqual(StoryboardUtils.SelectLevel(storyboards, 100).width, 160)
+            m.assertEqual(StoryboardUtils.SelectLevel(storyboards, 50).width, 80)
+            ' none wide enough: the largest
+            m.assertEqual(StoryboardUtils.SelectLevel(storyboards, 1000).width, 160)
+        end function
+
+        @it("Ignores live storyboards (no tile count)")
+        function _()
+            live = [{ templateUrl: "https://i.ytimg.com/sb/x/M$M.jpg", width: 160, height: 90, count: -1, storyboardWidth: 5, storyboardHeight: 5 }]
+            m.assertInvalid(StoryboardUtils.GetPreviewFrames(live, "", 8, 160))
+            m.assertInvalid(StoryboardUtils.GetPreviewFrames(invalid, "", 8, 160))
+        end function
+
+        @it("Spreads frames over the video and locates their tiles")
+        function _()
+            ' 60 tiles, 5x5 per page -> pages of 25, 25, 10 (the last page has 2 rows)
+            result = StoryboardUtils.GetPreviewFrames(m.GetStoryboards(), "https://invidious.example", 4, 160)
+            frames = result.frames
+            m.assertEqual(frames.Count(), 4)
+
+            ' frame 0: tile int(0.5 * 60 / 4) = 7 -> page 0, col 2, row 1
+            m.assertEqual(frames[0].url, "https://invidious.example/sb/abc/M0.jpg")
+            m.assertEqual(frames[0].col, 2)
+            m.assertEqual(frames[0].row, 1)
+            m.assertEqual(frames[0].rows, 5)
+
+            ' frame 3: tile int(3.5 * 60 / 4) = 52 -> page 2, within 2 -> col 2, row 0, page rows 2
+            m.assertEqual(frames[3].url, "https://invidious.example/sb/abc/M2.jpg")
+            m.assertEqual(frames[3].col, 2)
+            m.assertEqual(frames[3].row, 0)
+            m.assertEqual(frames[3].rows, 2)
+        end function
+
+        function GetStoryboards() as object
+            return [
+                { templateUrl: "/sb/abc/L0/M$M.jpg", width: 48, height: 27, count: 60, storyboardWidth: 10, storyboardHeight: 10, storyboardCount: 1 }
+                { templateUrl: "/sb/abc/L1/M$M.jpg", width: 80, height: 45, count: 60, storyboardWidth: 10, storyboardHeight: 10, storyboardCount: 1 }
+                { templateUrl: "/sb/abc/M$M.jpg", width: 160, height: 90, count: 60, storyboardWidth: 5, storyboardHeight: 5, storyboardCount: 3 }
+            ]
+        end function
+
+    end class
+
+end namespace

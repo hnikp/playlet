@@ -27,5 +27,7 @@
         <!-- videoInfo is from web client -->
         <field id="videoInfo" type="string" />
         <field id="percentDurationWatched" type="float" />
+        <!-- thumbnail preview frames, set while the item has focus (see StoryboardPreviewJob, VideoRowCell) -->
+        <field id="previewStoryboard" type="assocarray" />
     </interface>
 </component>

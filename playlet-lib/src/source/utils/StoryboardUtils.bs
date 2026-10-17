@@ -1,0 +1,85 @@
+import "pkg:/source/utils/Types.bs"
+
+' Storyboards are sprite sheets of video frames (YouTube "storyboards", in the Invidious /api/v1/videos shape:
+' templateUrl with $M = page index, width/height = tile size, count = total tiles, storyboardWidth/Height =
+' tiles per row/column on a page, storyboardCount = pages). Used for the thumbnail preview.
+namespace StoryboardUtils
+
+    ' Picks frameCount frames spread over the video, from the smallest level with tiles at least minTileWidth
+    ' wide. Returns { frames: [{ url, col, row, cols, rows }] } (rows = the rows of that frame's page), or
+    ' invalid if there is no usable storyboard (e.g. live streams).
+    function GetPreviewFrames(storyboards as dynamic, instance as string, frameCount as integer, minTileWidth as integer) as object
+        storyboard = SelectLevel(storyboards, minTileWidth)
+        if storyboard = invalid
+            return invalid
+        end if
+
+        cols = ValidInt(storyboard.storyboardWidth)
+        rows = ValidInt(storyboard.storyboardHeight)
+        count = ValidInt(storyboard.count)
+        perPage = cols * rows
+
+        templateUrl = storyboard.templateUrl
+        if templateUrl.StartsWith("/")
+            templateUrl = instance + templateUrl
+        end if
+
+        frames = []
+        for i = 0 to frameCount - 1
+            tile = Int((i + 0.5) * count / frameCount)
+            page = tile \ perPage
+            within = tile mod perPage
+
+            ' the last page can be shorter: its image only has the rows it needs
+            pageTiles = count - page * perPage
+            if pageTiles > perPage
+                pageTiles = perPage
+            end if
+            pageRows = pageTiles \ cols
+            if pageTiles mod cols > 0
+                pageRows += 1
+            end if
+
+            frames.Push({
+                url: templateUrl.Replace("$M", page.ToStr())
+                col: within mod cols
+                row: within \ cols
+                cols: cols
+                rows: pageRows
+            })
+        end for
+
+        return { frames: frames }
+    end function
+
+    function SelectLevel(storyboards as dynamic, minTileWidth as integer) as object
+        best = invalid
+        largest = invalid
+        for each storyboard in ValidArray(storyboards)
+            if not IsValidStoryboard(storyboard)
+                continue for
+            end if
+            if largest = invalid or storyboard.width > largest.width
+                largest = storyboard
+            end if
+            if storyboard.width >= minTileWidth and (best = invalid or storyboard.width < best.width)
+                best = storyboard
+            end if
+        end for
+        if best = invalid
+            return largest
+        end if
+        return best
+    end function
+
+    function IsValidStoryboard(storyboard as dynamic) as boolean
+        if not IsAssociativeArray(storyboard) or not IsString(storyboard.templateUrl)
+            return false
+        end if
+        if storyboard.templateUrl.InStr("$M") = -1
+            return false
+        end if
+        return ValidInt(storyboard.count) > 0 and ValidInt(storyboard.width) > 0 and ValidInt(storyboard.storyboardWidth) > 0 and ValidInt(storyboard.storyboardHeight) > 0
+    end function
+
+end namespace
