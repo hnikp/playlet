@@ -455,7 +455,8 @@ namespace RtlText
         return font
     end function
 
-    ' An roFont for measuring text width, cached per thread.
+    ' Something with GetOneLineWidth(text, maxWidth) to measure text in the bundled font, cached per thread.
+    ' roFontRegistry can't be created on the render thread, so there a hidden Label measures instead.
     function GetMeasureFont(size as integer, bold as boolean) as object
         cache = m.__rtlMeasureFonts
         if cache = invalid
@@ -463,22 +464,53 @@ namespace RtlText
             m.__rtlMeasureFonts = cache
         end if
         key = `${size}_${bold}`
-        font = cache[key]
-        if font = invalid
+        measurer = cache[key]
+        if measurer <> invalid
+            return measurer
+        end if
+
+        if IsRenderThread()
+            measurer = CreateLabelMeasurer(GetLabelFont(size, bold))
+        else
             registry = m.__rtlFontRegistry
             if registry = invalid
                 registry = CreateObject("roFontRegistry")
+                if registry = invalid
+                    return invalid
+                end if
                 registry.Register(FONT_REGULAR_FILE)
                 registry.Register(FONT_BOLD_FILE)
                 m.__rtlFontRegistry = registry
             end if
-            font = registry.GetFont(FONT_FAMILY, size, bold, false)
-            if font = invalid
-                return invalid
-            end if
-            cache[key] = font
+            measurer = registry.GetFont(FONT_FAMILY, size, bold, false)
         end if
-        return font
+
+        if measurer = invalid
+            return invalid
+        end if
+        cache[key] = measurer
+        return measurer
+    end function
+
+    ' Jobs run in Task nodes (m.top is a Task); components run on the render thread.
+    function IsRenderThread() as boolean
+        if m.__rtlIsRenderThread = invalid
+            m.__rtlIsRenderThread = IsNode(m.top) and not m.top.isSubtype("Task")
+        end if
+        return m.__rtlIsRenderThread
+    end function
+
+    function CreateLabelMeasurer(labelFont as object) as object
+        measureLabel = CreateObject("roSGNode", "Label")
+        measureLabel.font = labelFont
+        measureLabel.wrap = false
+        return {
+            label: measureLabel
+            GetOneLineWidth: function(text as string, _maxWidth as integer) as float
+                m.label.text = text
+                return m.label.boundingRect().width
+            end function
+        }
     end function
 
     ' The characters of a string. Split("") does it in one pass (Mid() in a loop is quadratic on long
