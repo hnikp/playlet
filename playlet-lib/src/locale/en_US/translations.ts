@@ -1420,5 +1420,29 @@
         <source>Select keyboard language</source>
         <translation>Select keyboard language</translation>
     </message>
+    <message>
+        <source>Open video page on select</source>
+        <translation>Open video page on select</translation>
+    </message>
+    <message>
+        <source>Selecting a video opens its page (description, comments, subscribe) instead of playing it right away</source>
+        <translation>Selecting a video opens its page (description, comments, subscribe) instead of playing it right away</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Play</translation>
+    </message>
+    <message>
+        <source>Add to queue</source>
+        <translation>Add to queue</translation>
+    </message>
+    <message>
+        <source>Comments</source>
+        <translation>Comments</translation>
+    </message>
+    <message>
+        <source>Related videos</source>
+        <translation>Related videos</translation>
+    </message>
 </context>
 </TS>

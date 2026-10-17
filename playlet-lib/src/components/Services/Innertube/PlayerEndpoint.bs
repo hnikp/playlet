@@ -175,6 +175,15 @@ namespace Innertube
             parsedResponse["viewCount"] = videoDetails["viewCount"].ToInt()
         end if
 
+        ' Shown on the video page
+        if IsString(videoDetails["shortDescription"])
+            parsedResponse["description"] = videoDetails["shortDescription"]
+        end if
+        publishDate = ObjectUtils.Dig(payload, ["microformat", "playerMicroformatRenderer", "publishDate"])
+        if IsString(publishDate)
+            parsedResponse["publishDate"] = publishDate
+        end if
+
         if hasDrm
             parsedResponse["drmParams"] = streamingData["drmParams"]
             parsedResponse["licenseInfos"] = streamingData["licenseInfos"]

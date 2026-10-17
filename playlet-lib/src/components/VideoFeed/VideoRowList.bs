@@ -6,6 +6,7 @@ import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/components/VideoView/VideoViewUtils.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -98,8 +99,13 @@ function OnRowItemSelected(index as object) as void
 
     if rowItem.type = "video"
         videoId = rowItem.videoId
-        LogInfo("Play video: " + videoId)
-        m.videoQueue.playVideo = rowItem
+        if m.preferences["misc.ok_opens_video_details"] = true
+            LogInfo("Open video: " + videoId)
+            VideoViewUtils.Open(rowItem, m.appController)
+        else
+            LogInfo("Play video: " + videoId)
+            m.videoQueue.playVideo = rowItem
+        end if
     else if rowItem.type = "playlist"
         playlistId = rowItem.playlistId
         LogInfo("Open playlist: " + playlistId)

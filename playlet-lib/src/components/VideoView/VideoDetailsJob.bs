@@ -1,0 +1,77 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+@job("VideoDetailsJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    videoView = input.videoView
+    invidiousNode = input.invidious
+    videoId = input.videoId
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+    metadata = service.GetVideoMetadata(videoId, { cancellation: JobGetCancellation() })
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if not IsAssociativeArray(metadata) or metadata.error <> invalid
+        error = "Invalid metadata"
+        if IsAssociativeArray(metadata)
+            error = ToString(metadata.error)
+        end if
+        JobError("Failed to load video details: " + error)
+        return
+    end if
+
+    videoView.details = {
+        title: ValidString(metadata.title)
+        author: ValidString(metadata.author)
+        authorId: ValidString(metadata.authorId)
+        authorThumbnail: InvidiousContent.GetChannelThumbnail(metadata.authorThumbnails)
+        subCountText: ValidString(metadata.subCountText)
+        description: ValidString(metadata.description)
+        viewCountText: InvidiousContent.VideoGetViewCountText(metadata)
+        publishedText: GetPublishedText(metadata)
+        liveNow: metadata.liveNow = true
+    }
+
+    instance = service.GetInstance()
+    related = CreateObject("roSGNode", "ContentNode")
+    row = CreateObject("roSGNode", "FeedContentNode")
+    row.title = Tr(Locale.Feed.RelatedVideos)
+    row.loadState = FeedLoadState.Loaded
+    for each item in ValidArray(metadata.recommendedVideos)
+        node = InvidiousContent.ToRowCellContentNode(item, instance)
+        if node <> invalid
+            row.appendChild(node)
+        end if
+    end for
+    if row.getChildCount() > 0
+        related.appendChild(row)
+        videoView.related = related
+    end if
+end function
+
+function GetPublishedText(metadata as object) as string
+    text = InvidiousContent.VideoGetPublishedText(metadata)
+    if text <> ""
+        return text
+    end if
+    ' built-in backend: "2024-05-01" or "2024-05-01T10:00:00-07:00"
+    if IsString(metadata.publishDate)
+        return Left(metadata.publishDate, 10)
+    end if
+    return ""
+end function

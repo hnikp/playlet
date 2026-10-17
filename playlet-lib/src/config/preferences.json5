@@ -273,6 +273,18 @@
             id: "trending_gaming",
             enabled: true,
           },
+          {
+            id: "category_music",
+            enabled: true,
+          },
+          {
+            id: "category_news",
+            enabled: true,
+          },
+          {
+            id: "category_movies",
+            enabled: true,
+          },
         ],
         visibility: "tv",
         rokuComponent: "EditHomeScreenControl",
@@ -288,6 +300,13 @@
         displayText: "Queue notifications",
         key: "misc.queue_notifications",
         description: "Show a notification when a video is added to the queue",
+        type: "boolean",
+        defaultValue: true,
+      },
+      {
+        displayText: "Open video page on select",
+        key: "misc.ok_opens_video_details",
+        description: "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away",
         type: "boolean",
         defaultValue: true,
       },

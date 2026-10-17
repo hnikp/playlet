@@ -1,0 +1,117 @@
+<!-- The video page: title, channel, description, actions (play, queue, channel, comments, subscribe) and related
+     videos. Opened with VideoViewUtils.Open() when selecting a video (preference misc.ok_opens_video_details). -->
+<component name="VideoView" extends="Group" includes="AutoBind,Focus,ContextMenuProvider,Disposable">
+    <interface>
+        <!-- a VideoContentNode -->
+        <field id="content" type="node" onChange="OnContentSet" />
+        <!-- set by VideoDetailsJob -->
+        <field id="details" type="assocarray" onChange="OnDetailsSet" />
+        <field id="related" type="node" onChange="OnRelatedSet" />
+        <field id="appController" type="node" bind="/AppController" />
+        <field id="invidious" type="node" bind="/Invidious" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+        <field id="videoQueue" type="node" bind="/VideoQueue" />
+        <field id="bookmarksService" type="node" bind="/BookmarksService" />
+    </interface>
+    <children>
+        <Rectangle
+            width="1280"
+            height="720"
+            color="0x242424" />
+
+        <Group id="container">
+            <Poster
+                id="thumbnail"
+                translation="[115,50]"
+                width="480"
+                height="270"
+                loadDisplayMode="scaleToZoom"
+                failedBitmapUri="pkg:/images/thumbnail-missing.jpg" />
+
+            <LayoutGroup
+                translation="[625,50]"
+                itemSpacings="[14,10]">
+                <Label
+                    id="titleLabel"
+                    width="540"
+                    maxLines="3"
+                    wrap="true">
+                    <Font role="font" uri="font:MediumSystemFontFile" size="30" />
+                </Label>
+                <Group>
+                    <CirclePoster
+                        id="authorThumbnail"
+                        width="48"
+                        height="48"
+                        failedBitmapUri="pkg:/images/thumbnail-missing.jpg" />
+                    <Label
+                        id="authorLabel"
+                        translation="[60,0]"
+                        width="480"
+                        font="font:SmallestBoldSystemFont" />
+                    <Label
+                        id="subCountLabel"
+                        translation="[60,26]"
+                        width="480"
+                        font="font:SmallestSystemFont" />
+                </Group>
+                <Label
+                    id="infoLabel"
+                    width="540"
+                    font="font:SmallestSystemFont" />
+            </LayoutGroup>
+
+            <LayoutGroup
+                id="buttons"
+                translation="[115,345]"
+                layoutDirection="horiz"
+                itemSpacings="[20]">
+                <ButtonEx id="playButton" iconVisible="false" padding="[30,30]" />
+                <ButtonEx id="queueButton" iconVisible="false" padding="[30,30]" />
+                <ButtonEx id="channelButton" iconVisible="false" padding="[30,30]" />
+                <ButtonEx id="commentsButton" iconVisible="false" padding="[30,30]" />
+                <SubscribeButton id="subscribeButton" iconVisible="false" padding="[30,30]" />
+            </LayoutGroup>
+
+            <Label
+                id="descriptionLabel"
+                translation="[115,430]"
+                width="1050"
+                maxLines="3"
+                wrap="true"
+                font="font:SmallestSystemFont" />
+
+            <BusySpinner
+                id="busySpinner"
+                spinInterval="1"
+                translation="[115,440]"
+                visible="false" />
+
+            <VideoRowList
+                itemComponentName="RowCell"
+                id="rowList"
+                focusable="false"
+                translation="[0,510]"
+                numRows="1"
+                rowitemSize="[[350,196]]"
+                rowItemSpacing="[[25,0]]"
+                itemSize="[1280,326]"
+                itemSpacing="[0,65]"
+                rowLabelOffset="[[115,20]]"
+                focusXOffset="[115]"
+                showRowLabel="[true]"
+                rowFocusAnimationStyle="floatingfocus"
+                variableWidthItems="true"
+                focusBitmapUri="pkg:/images/focus-glow-padding-30.$$RES$$.9.png" />
+        </Group>
+
+        <Animation
+            id="scrollAnimation"
+            duration="0.3">
+            <Vector2DFieldInterpolator
+                id="containerTranslation"
+                key="[ 0.0, 1.0 ]"
+                fieldToInterp="container.translation" />
+        </Animation>
+    </children>
+</component>

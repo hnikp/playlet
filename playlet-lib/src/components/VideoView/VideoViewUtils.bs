@@ -1,0 +1,11 @@
+namespace VideoViewUtils
+    function Open(contentNode as object, appController = invalid as object)
+        videoView = CreateObject("roSGNode", "VideoView")
+        if appController = invalid
+            appController = m.appController
+        end if
+        appController@.PushScreen(videoView)
+        videoView@.BindNode()
+        videoView.content = contentNode
+    end function
+end namespace

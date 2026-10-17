@@ -6,6 +6,7 @@
         <field id="videoQueue" type="node" bind="/VideoQueue" />
         <field id="bookmarksService" type="node" bind="/BookmarksService" />
         <field id="jobQueue" type="node" bind="/JobQueue" />
+        <field id="preferences" type="node" bind="/Preferences" />
         <field id="screen" type="node" />
         <field id="feeds" type="array" onChange="OnFeedsChange" />
         <!-- 

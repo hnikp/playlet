@@ -1,0 +1,314 @@
+import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' How far the page scrolls up when the related videos row has focus
+const RELATED_SCROLL_OFFSET = 300
+
+function Init()
+    m.container = m.top.findNode("container")
+    m.scrollAnimation = m.top.findNode("scrollAnimation")
+    m.containerTranslation = m.top.findNode("containerTranslation")
+
+    m.thumbnail = m.top.findNode("thumbnail")
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.authorThumbnail = m.top.findNode("authorThumbnail")
+    m.authorLabel = m.top.findNode("authorLabel")
+    m.subCountLabel = m.top.findNode("subCountLabel")
+    m.infoLabel = m.top.findNode("infoLabel")
+    m.descriptionLabel = m.top.findNode("descriptionLabel")
+    m.busySpinner = m.top.findNode("busySpinner")
+    m.busySpinner.poster.width = 60
+    m.busySpinner.poster.height = 60
+    m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+
+    m.playButton = m.top.findNode("playButton")
+    m.queueButton = m.top.findNode("queueButton")
+    m.channelButton = m.top.findNode("channelButton")
+    m.commentsButton = m.top.findNode("commentsButton")
+    m.subscribeButton = m.top.findNode("subscribeButton")
+    m.buttons = [m.playButton, m.queueButton, m.channelButton, m.commentsButton, m.subscribeButton]
+    m.focusedButton = m.playButton
+
+    m.playButton.text = Tr(Locale.Buttons.Play)
+    m.queueButton.text = Tr(Locale.Buttons.AddToQueue)
+    m.channelButton.text = Tr(Locale.SearchFilters.Channel)
+    m.commentsButton.text = Tr(Locale.Buttons.Comments)
+    ' TODO: shown once the comments panel exists
+    m.commentsButton.visible = false
+    m.commentsButton.focusable = false
+
+    m.rowList = m.top.findNode("rowList")
+    m.rowList.screen = m.top
+end function
+
+function OnNodeReady()
+    m.rowList@.BindNode()
+    m.subscribeButton@.BindNode()
+
+    DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
+    DisposableObserveFieldScoped(m.queueButton, "buttonSelected", FuncName(OnQueueButtonSelected))
+    DisposableObserveFieldScoped(m.channelButton, "buttonSelected", FuncName(OnChannelButtonSelected))
+    DisposableObserveFieldScoped(m.commentsButton, "buttonSelected", FuncName(OnCommentsButtonSelected))
+    DisposableObserveFieldScoped(m.subscribeButton, "enabled", FuncName(OnSubscribeButtonEnabledChange))
+    DisposableObserveField(m.rowList, "focusedChild", FuncName(OnRowListFocusChange))
+
+    SetNavigation(m.rowList, RemoteKeys.Up, m.playButton, OnRowListUp)
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    if m.rowList.isInFocusChain()
+        NodeSetFocus(m.rowList, true)
+        return
+    end if
+    FocusButton(m.focusedButton)
+end function
+
+function OnContentSet() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    m.authorLabel.text = content._author
+    m.thumbnail.uri = content.thumbnail
+    m.infoLabel.text = JoinNonEmpty([content.viewCountText, content.publishedText, content.lengthText])
+    m.subscribeButton.authorId = ValidString(content.authorId)
+    m.channelButton.visible = not StringUtils.IsNullOrEmpty(content.authorId)
+    m.channelButton.focusable = m.channelButton.visible
+
+    LoadDetails()
+end function
+
+function LoadDetails() as void
+    CancelDetailsJob()
+    videoId = ValidString(m.top.content.videoId)
+    if videoId = ""
+        return
+    end if
+
+    m.busySpinner.visible = true
+    m.busySpinner.control = "start"
+
+    m.detailsJob = JobSystem.CreateCallback(OnDetailsJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.VideoDetailsJob, {
+        videoView: m.top
+        invidious: m.invidious
+        videoId: videoId
+    }, m.detailsJob)
+end function
+
+function OnDetailsJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.detailsJob = invalid
+    m.busySpinner.visible = false
+    m.busySpinner.control = "stop"
+
+    info = event.getInfo()
+    if info.error <> invalid
+        LogWarn("Video details:", info.error)
+    end if
+end function
+
+function OnDetailsSet() as void
+    details = m.top.details
+    if details = invalid
+        return
+    end if
+
+    if details.title <> ""
+        m.titleLabel.text = details.title
+    end if
+    if details.author <> ""
+        m.authorLabel.text = details.author
+    end if
+    m.authorThumbnail.uri = details.authorThumbnail
+    m.subCountLabel.text = details.subCountText
+    m.descriptionLabel.text = details.description
+
+    content = m.top.content
+    m.infoLabel.text = JoinNonEmpty([details.viewCountText, details.publishedText, content.lengthText])
+
+    if StringUtils.IsNullOrEmpty(content.authorId) and details.authorId <> ""
+        content.authorId = details.authorId
+        m.subscribeButton.authorId = details.authorId
+        m.channelButton.visible = true
+        m.channelButton.focusable = true
+    end if
+end function
+
+function OnRelatedSet() as void
+    related = m.top.related
+    if related = invalid
+        return
+    end if
+    m.rowList.content = related
+    m.rowList.focusable = true
+    SetNavigation(invalid, RemoteKeys.Down, m.rowList, OnRowListDown)
+end function
+
+function OnPlayButtonSelected()
+    m.videoQueue.playVideo = m.top.content
+end function
+
+function OnQueueButtonSelected()
+    m.videoQueue@.FuncAddToQueueVideo(m.top.content)
+end function
+
+function OnChannelButtonSelected() as void
+    content = m.top.content
+    if StringUtils.IsNullOrEmpty(content.authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, {
+        authorId: content.authorId
+        author: content._author
+    })
+    ChannelUtils.Open(channel, m.appController)
+end function
+
+' Context menu (ContextMenuProvider): no page-specific options for the related videos
+function GetContextMenuOptionsForItem(_item as object) as object
+    return []
+end function
+
+function OnCommentsButtonSelected()
+    LogInfo("Comments not implemented yet")
+end function
+
+function OnSubscribeButtonEnabledChange()
+    if not m.subscribeButton.enabled and m.subscribeButton.hasFocus()
+        FocusButton(m.playButton)
+    end if
+end function
+
+function OnRowListDown()
+    ScrollTo(-RELATED_SCROLL_OFFSET)
+end function
+
+function OnRowListUp()
+    FocusButton(m.focusedButton)
+    ScrollTo(0)
+end function
+
+function OnRowListFocusChange()
+    if m.rowList.isInFocusChain()
+        ScrollTo(-RELATED_SCROLL_OFFSET)
+    end if
+end function
+
+function ScrollTo(y as integer) as void
+    current = m.container.translation
+    if current[1] = y
+        return
+    end if
+    m.scrollAnimation.control = "stop"
+    m.containerTranslation.keyValue = [current, [0, y]]
+    m.scrollAnimation.control = "start"
+end function
+
+function FocusButton(button as object)
+    m.focusedButton = button
+    NodeSetFocus(button, true)
+end function
+
+' Left/Right move between the visible buttons
+function MoveButtonFocus(direction as integer) as boolean
+    index = -1
+    for i = 0 to m.buttons.Count() - 1
+        if m.buttons[i].isSameNode(m.focusedButton)
+            index = i
+            exit for
+        end if
+    end for
+    if index = -1
+        return false
+    end if
+
+    index += direction
+    while index >= 0 and index < m.buttons.Count()
+        button = m.buttons[index]
+        if button.visible and button.focusable
+            FocusButton(button)
+            return true
+        end if
+        index += direction
+    end while
+    return true
+end function
+
+function JoinNonEmpty(values as object) as string
+    parts = []
+    for each value in values
+        if IsString(value) and value <> ""
+            parts.Push(value)
+        end if
+    end for
+    return parts.Join(" • ")
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+
+    if not press
+        return false
+    end if
+
+    buttonsFocused = not m.rowList.isInFocusChain()
+
+    if buttonsFocused and (key = RemoteKeys.Left or key = RemoteKeys.Right)
+        if key = RemoteKeys.Left
+            return MoveButtonFocus(-1)
+        end if
+        return MoveButtonFocus(1)
+    end if
+
+    ' Play on the page plays this video, unless a video is already open (the app toggles pause then)
+    if buttonsFocused and key = RemoteKeys.Play and not VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue)
+        OnPlayButtonSelected()
+        return true
+    end if
+
+    if key = RemoteKeys.Back
+        Close()
+        return true
+    end if
+
+    return false
+end function
+
+function Close()
+    m.appController@.PopScreen()
+    m.top.dispose = true
+end function
+
+function CancelDetailsJob()
+    if m.detailsJob <> invalid
+        m.detailsJob.cancel = true
+        m.detailsJob = invalid
+    end if
+end function
+
+function OnDispose()
+    CancelDetailsJob()
+    DisposeObservers()
+    m.rowList.dispose = true
+    m.subscribeButton.dispose = true
+end function

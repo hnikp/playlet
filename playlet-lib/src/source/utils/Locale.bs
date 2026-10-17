@@ -33,6 +33,9 @@ namespace Locale
         Refresh = "Refresh"
         PlayNextVideo = "Play next video"
         Clear = "Clear"
+        Play = "Play"
+        AddToQueue = "Add to queue"
+        Comments = "Comments"
     end enum
 
     @locale
@@ -54,6 +57,7 @@ namespace Locale
         Releases = "Releases"
         Podcasts = "Podcasts"
         Courses = "Courses"
+        RelatedVideos = "Related videos"
     end enum
 
     @locale
@@ -306,6 +310,8 @@ namespace Locale
         EditHomeScreenDescription = "Enable/disable and reorder sections on the home screen"
         QueueNotifications = "Queue notifications"
         QueueNotificationsDescription = "Show a notification when a video is added to the queue"
+        OpenVideoDetails = "Open video page on select"
+        OpenVideoDetailsDescription = "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"
