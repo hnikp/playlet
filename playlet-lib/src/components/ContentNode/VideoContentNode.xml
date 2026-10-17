@@ -29,5 +29,8 @@
         <field id="percentDurationWatched" type="float" />
         <!-- thumbnail preview frames, set while the item has focus (see StoryboardPreviewJob, VideoRowCell) -->
         <field id="previewStoryboard" type="assocarray" />
+        <!-- Persian/Arabic title and author prepared for VideoRowCell's labels (see RtlText.PrepareForLabel) -->
+        <field id="titlePrepared" type="assocarray" />
+        <field id="authorPrepared" type="assocarray" />
     </interface>
 </component>

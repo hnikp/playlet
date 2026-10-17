@@ -1,9 +1,12 @@
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
     m.videoCountRect = m.top.FindNode("videoCountRect")
     m.videoCountLabel = m.top.FindNode("videoCountLabel")
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.authorLabel = m.top.FindNode("authorLabel")
 end function
 
 function OnContentSet() as void
@@ -13,7 +16,7 @@ function OnContentSet() as void
         return
     end if
 
-    m.top.title = content.title
+    RtlText.ApplyToLabel(m.titleLabel, content.title, "font:SmallestBoldSystemFont", true, 18)
     lines = content.lines
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     author = content._author
@@ -22,7 +25,7 @@ function OnContentSet() as void
             author = lines[0]
         end if
     end if
-    m.top.author = author
+    RtlText.ApplyToLabel(m.authorLabel, author, "font:SmallestSystemFont", false, 18)
 
     updatedText = content.updatedText
     if StringUtils.IsNullOrEmpty(updatedText)

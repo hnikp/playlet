@@ -7,6 +7,7 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -19,6 +20,7 @@ function Init()
     m.background = m.top.findNode("background")
     m.backgroundSmall = m.top.findNode("backgroundSmall")
     m.titleLabel = m.top.findNode("titleLabel")
+    m.titleFont = m.titleLabel.font
     m.subtitleLabel = m.top.findNode("subtitleLabel")
     m.updatedLabel = m.top.findNode("updatedLabel")
     m.descriptionLabel = m.top.findNode("descriptionLabel")
@@ -44,7 +46,7 @@ function OnContentSet() as void
         return
     end if
 
-    m.titleLabel.text = content.title
+    RtlText.ApplyToLabel(m.titleLabel, content.title, m.titleFont, false, 36)
     ' Starts with RD means a mix, not a playlist
     if content.playlistId.StartsWith("RD")
         m.subtitleLabel.text = ""
@@ -58,7 +60,7 @@ function OnContentSet() as void
         end if
     end if
     m.updatedLabel.text = content.updatedText
-    m.descriptionLabel.text = content.description
+    RtlText.ApplyToLabel(m.descriptionLabel, content.description, "font:SmallestSystemFont", false, 18)
 
     ' We use two Posters to cross fade from the low res thumbnail to the high res thumbnail.
     ' We can't use a single Poster because we're using the blendColor. There's no loadingBitmapBlendColor.

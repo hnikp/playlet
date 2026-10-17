@@ -15,6 +15,7 @@ import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -87,6 +88,9 @@ function Initialize()
     m.chrome = m.top.findNode("Chrome")
     m.titleLabel = m.top.findNode("titleLabel")
     m.secondaryTitleLabel = m.top.findNode("secondaryTitleLabel")
+    ' kept to switch back from the Persian-capable font (RtlText)
+    m.titleFont = m.titleLabel.font
+    m.secondaryTitleFont = m.secondaryTitleLabel.font
     m.clock = m.top.findNode("clock")
     m.bifDisplay = m.top.findNode("bifDisplay")
     m.trickPlayBar = m.top.findNode("trickPlayBar")
@@ -1383,8 +1387,8 @@ function UpdateOverlayMeta() as void
     end if
     title = ValidString(content.title)
     secondaryTitle = ValidString(content.secondaryTitle)
-    m.titleLabel.text = title
-    m.secondaryTitleLabel.text = secondaryTitle
+    RtlText.ApplyToLabel(m.titleLabel, title, m.titleFont, true, 30)
+    RtlText.ApplyToLabel(m.secondaryTitleLabel, secondaryTitle, m.secondaryTitleFont, false, 24)
     ' the loading overlay shows the same title + secondary title while loading.
     m.spinner.title = title
     m.spinner.secondaryTitle = secondaryTitle

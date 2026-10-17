@@ -9,6 +9,7 @@ import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -22,6 +23,7 @@ function Init()
 
     m.thumbnail = m.top.findNode("thumbnail")
     m.titleLabel = m.top.findNode("titleLabel")
+    m.titleFont = m.titleLabel.font
     m.authorThumbnail = m.top.findNode("authorThumbnail")
     m.authorLabel = m.top.findNode("authorLabel")
     m.subCountLabel = m.top.findNode("subCountLabel")
@@ -85,8 +87,8 @@ function OnContentSet() as void
         return
     end if
 
-    m.titleLabel.text = content.title
-    m.authorLabel.text = content._author
+    RtlText.ApplyToLabel(m.titleLabel, content.title, m.titleFont, true, 30)
+    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:SmallestBoldSystemFont", true, 18)
     m.thumbnail.uri = content.thumbnail
     m.infoLabel.text = JoinNonEmpty([content.viewCountText, content.publishedText, content.lengthText])
     m.subscribeButton.authorId = ValidString(content.authorId)
@@ -133,14 +135,14 @@ function OnDetailsSet() as void
     end if
 
     if details.title <> ""
-        m.titleLabel.text = details.title
+        RtlText.ApplyToLabel(m.titleLabel, details.title, m.titleFont, true, 30)
     end if
     if details.author <> ""
-        m.authorLabel.text = details.author
+        RtlText.ApplyToLabel(m.authorLabel, details.author, "font:SmallestBoldSystemFont", true, 18)
     end if
     m.authorThumbnail.uri = details.authorThumbnail
     m.subCountLabel.text = details.subCountText
-    m.descriptionLabel.text = details.description
+    RtlText.SetLabelText(m.descriptionLabel, details.description, details.descriptionPrepared, "font:SmallestSystemFont", 18, false)
 
     content = m.top.content
     m.infoLabel.text = JoinNonEmpty([details.viewCountText, details.publishedText, content.lengthText])

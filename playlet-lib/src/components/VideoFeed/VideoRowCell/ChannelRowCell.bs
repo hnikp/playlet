@@ -1,4 +1,9 @@
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
+
+function Init()
+    m.authorLabel = m.top.FindNode("authorLabel")
+end function
 
 function OnContentSet() as void
     content = m.top.itemContent
@@ -8,7 +13,7 @@ function OnContentSet() as void
     end if
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    m.top._author = content._author
+    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:SmallestBoldSystemFont", true, 18)
     subCountText = content.authorSubTitle
     if StringUtils.IsNullOrEmpty(subCountText)
         if content.subCount > 0

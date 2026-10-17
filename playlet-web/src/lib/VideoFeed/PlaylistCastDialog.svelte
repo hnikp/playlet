@@ -122,7 +122,7 @@
           bind:invidiousInstance
         />
       </div>
-      <div class="m-4">{title}</div>
+      <div dir="auto" class="m-4">{title}</div>
     </div>
 
     <div class="flex flex-col">

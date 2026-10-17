@@ -23,9 +23,8 @@ namespace RtlText
         if not IsString(text)
             return false
         end if
-        length = Len(text)
-        for i = 1 to length
-            if IsArabicScriptCodePoint(Asc(Mid(text, i, 1)))
+        for each char in Chars(text)
+            if IsArabicScriptCodePoint(Asc(char))
                 return true
             end if
         end for
@@ -41,9 +40,8 @@ namespace RtlText
         if not IsString(text)
             return false
         end if
-        length = Len(text)
-        for i = 1 to length
-            t = BidiClass(Asc(Mid(text, i, 1)))
+        for each char in Chars(text)
+            t = BidiClass(Asc(char))
             if t = "R"
                 return true
             else if t = "L"
@@ -368,7 +366,9 @@ namespace RtlText
 
     ' Sets text on a Label, switching to the Persian-capable font for Arabic-script text and back to
     ' defaultFont otherwise. The label's width and maxLines are honored.
-    function ApplyToLabel(label as object, text as dynamic, defaultFont as object, bold = false as boolean) as void
+    ' defaultFont is a Font node or a font name ("font:SmallestSystemFont"); size is the font size to use for the
+    ' Persian-capable font (0 = the size of the defaultFont node).
+    function ApplyToLabel(label as object, text as dynamic, defaultFont as dynamic, bold = false as boolean, size = 0 as integer) as void
         if label = invalid
             return
         end if
@@ -382,9 +382,11 @@ namespace RtlText
             return
         end if
 
-        size = 24
-        if defaultFont <> invalid and IsNode(defaultFont) and defaultFont.size > 0
-            size = defaultFont.size
+        if size <= 0
+            size = 24
+            if IsNode(defaultFont) and defaultFont.size > 0
+                size = defaultFont.size
+            end if
         end if
 
         maxLines = 1
@@ -407,6 +409,28 @@ namespace RtlText
             label.horizAlign = "left"
         end if
         label.text = prepared.text
+    end function
+
+    ' Sets a label's text, using text prepared in a task thread (PrepareForLabel) when available, so the render
+    ' thread doesn't shape/wrap. Without prepared text, it is prepared here (ApplyToLabel).
+    function SetLabelText(label as object, text as dynamic, prepared as dynamic, defaultFont as dynamic, size as integer, bold as boolean) as void
+        if not IsAssociativeArray(prepared) or not prepared.DoesExist("hasArabicScript")
+            ApplyToLabel(label, text, defaultFont, bold, size)
+            return
+        end if
+        if prepared.hasArabicScript = true
+            label.font = GetLabelFont(size, bold)
+            if prepared.isRtl = true
+                label.horizAlign = "right"
+            else
+                label.horizAlign = "left"
+            end if
+            label.text = prepared.text
+            return
+        end if
+        label.font = defaultFont
+        label.horizAlign = "left"
+        label.text = ValidString(text)
     end function
 
     ' A SceneGraph Font node for the bundled font, cached per thread.
@@ -457,11 +481,25 @@ namespace RtlText
         return font
     end function
 
+    ' The characters of a string. Split("") does it in one pass (Mid() in a loop is quadratic on long
+    ' descriptions); falls back to Mid() if Split("") doesn't split into characters.
+    function Chars(text as string) as object
+        chars = text.Split("")
+        length = Len(text)
+        if chars.Count() = length
+            return chars
+        end if
+        chars = []
+        for i = 1 to length
+            chars.Push(Mid(text, i, 1))
+        end for
+        return chars
+    end function
+
     function ToCodePoints(text as string) as object
         cps = []
-        length = Len(text)
-        for i = 1 to length
-            cps.Push(Asc(Mid(text, i, 1)))
+        for each char in Chars(text)
+            cps.Push(Asc(char))
         end for
         return cps
     end function

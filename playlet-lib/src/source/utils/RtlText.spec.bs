@@ -16,6 +16,15 @@ namespace Tests
             m.assertEqual(RtlText.ContainsArabicScript(text), expected)
         end function
 
+        @describe("RtlText.Chars")
+
+        @it("Splits a string into characters")
+        function _()
+            m.assertEqual(RtlText.Chars("سلام"), ["س", "ل", "ا", "م"])
+            m.assertEqual(RtlText.Chars("ab"), ["a", "b"])
+            m.assertEqual(RtlText.Chars(""), [])
+        end function
+
         @describe("RtlText.IsRtlParagraph")
 
         @it("Uses the first strong character")

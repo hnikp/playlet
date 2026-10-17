@@ -26,27 +26,10 @@ function OnContentSet() as void
     if content.publishedText <> ""
         author += " • " + content.publishedText
     end if
-    SetPreparedText(m.authorLabel, author, content.authorPrepared, m.boldFont, true)
-    SetPreparedText(m.contentLabel, content.content, content.contentPrepared, m.regularFont, false)
+    RtlText.SetLabelText(m.authorLabel, author, content.authorPrepared, m.boldFont, FONT_SIZE, true)
+    RtlText.SetLabelText(m.contentLabel, content.content, content.contentPrepared, m.regularFont, FONT_SIZE, false)
 
     m.footerLabel.text = CommentsFooterText(content)
-end function
-
-' Arabic-script text is prepared (shaped, wrapped, reordered) in the job: use it with the Persian-capable font
-function SetPreparedText(label as object, text as string, prepared as object, defaultFont as object, bold as boolean) as void
-    if IsAssociativeArray(prepared) and prepared.hasArabicScript = true
-        label.font = RtlText.GetLabelFont(FONT_SIZE, bold)
-        if prepared.isRtl
-            label.horizAlign = "right"
-        else
-            label.horizAlign = "left"
-        end if
-        label.text = prepared.text
-        return
-    end if
-    label.font = defaultFont
-    label.horizAlign = "left"
-    label.text = text
 end function
 
 function CommentsFooterText(content as object) as string

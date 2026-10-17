@@ -98,7 +98,7 @@
       bind:invidiousInstance
     />
     <div class="card-body">
-      <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
+      <h3 dir="auto" class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
       <div class="font-semibold">
         {author || (lines?.length > 0 ? lines[0] : "")}
       </div>

@@ -210,8 +210,9 @@
       bind:percentDurationWatched
     />
     <div class="card-body">
-      <h3 class="card-title text-base line-clamp-2 min-h-12">{title || ""}</h3>
+      <h3 dir="auto" class="card-title text-base line-clamp-2 min-h-12">{title || ""}</h3>
       <span
+        dir="auto"
         class="font-semibold link cursor-pointer"
         role="button"
         tabindex="0"

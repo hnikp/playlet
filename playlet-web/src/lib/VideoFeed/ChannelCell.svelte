@@ -50,7 +50,7 @@
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <ChannelThumbnail bind:author bind:authorThumbnails />
     <div class="card-body">
-      <h3 class="card-title text-base line-clamp-2 min-h-8">{author}</h3>
+      <h3 dir="auto" class="card-title text-base line-clamp-2 min-h-8">{author}</h3>
       <div>{getSubCountText()}</div>
       <div>{channelHandle || ""}</div>
     </div>

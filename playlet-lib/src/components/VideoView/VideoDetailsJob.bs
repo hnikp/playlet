@@ -3,6 +3,7 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
 
 @job("VideoDetailsJob")
@@ -42,6 +43,8 @@ function ExecuteJob() as void
         authorThumbnail: InvidiousContent.GetChannelThumbnail(metadata.authorThumbnails)
         subCountText: ValidString(metadata.subCountText)
         description: ValidString(metadata.description)
+        ' long text: shaped here, not in the render thread (sizes match VideoView's descriptionLabel)
+        descriptionPrepared: RtlText.PrepareForLabel(metadata.description, 18, false, 1050, 3)
         viewCountText: InvidiousContent.VideoGetViewCountText(metadata)
         publishedText: GetPublishedText(metadata)
         liveNow: metadata.liveNow = true

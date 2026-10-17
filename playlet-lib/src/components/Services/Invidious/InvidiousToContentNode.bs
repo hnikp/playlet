@@ -1,6 +1,7 @@
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/LocaleUtils.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 
@@ -54,6 +55,15 @@ namespace InvidiousContent
         SetIfExists(node, "lines", item, "lines")
         SetIfExists(node, "videoInfo", item, "videoInfo")
         SetIfExists(node, "percentDurationWatched", item, "percentDurationWatched")
+
+        ' Shape Persian/Arabic text here (usually a task thread) rather than in VideoRowCell (render thread).
+        ' Sizes match VideoRowCell's labels.
+        node.titlePrepared = RtlText.PrepareForLabel(node.title, 18, true, 350, 2)
+        author = node._author
+        if author = "" and IsArray(node.lines) and node.lines.Count() > 0
+            author = node.lines[0]
+        end if
+        node.authorPrepared = RtlText.PrepareForLabel(author, 18, false, 350, 1)
 
         return node
     end function
