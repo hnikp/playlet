@@ -169,6 +169,11 @@ namespace Http
             if socket = invalid
                 return invalid
             end if
+            ' listen() limits the pending backlog, not accepted connections.
+            if m.connections.Count() >= m.settings.MaxConnections
+                socket.Close()
+                return invalid
+            end if
             conn = new HttpConnection(m, m.settings)
             conn.Accepted(m, socket)
             return conn

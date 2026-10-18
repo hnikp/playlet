@@ -32,6 +32,7 @@ namespace Http
         private id = 0
         ' copied members
         private ready_for_response = false
+        public too_large = false
 
         function new()
             m.id = Http.GetHttpRequestId()
@@ -69,6 +70,9 @@ namespace Http
             received = socket.Receive(m.buffer, m.buffer_index, lengthToRead)
             if received > 0
                 m.buffer_index += received
+                while m.buffer.Count() > m.buffer_index
+                    m.buffer.Pop()
+                end while
             end if
             return received
         end function
@@ -84,6 +88,11 @@ namespace Http
 
             if m.state = Http.HttpRequestState.READING_START_AND_HEADERS
                 if m.ParseStartAndHeaders()
+                    if m.ExceedsDeclaredLengthLimit(connection.settings.MaxRequestLength)
+                        m.too_large = true
+                        m.ready_for_response = true
+                        return true
+                    end if
                     m.ParseUri()
                     m.ProcessHeaders(connection)
                     m.state = Http.HttpRequestState.READING_BODY
@@ -98,6 +107,23 @@ namespace Http
             end if
 
             return m.ready_for_response
+        end function
+
+        function ExceedsDeclaredLengthLimit(maxLength as integer) as boolean
+            contentLength = m.headers["Content-Length"]
+            if contentLength = invalid
+                return false
+            end if
+            ' Compare decimal strings so a huge declared length cannot overflow ToInt().
+            if not CreateObject("roRegex", "^[0-9]+$", "").IsMatch(contentLength)
+                return false
+            end if
+            lengthDigits = CreateObject("roRegex", "^0+", "").Replace(contentLength, "")
+            remaining = (maxLength - m.content_index).ToStr()
+            if lengthDigits.Len() <> remaining.Len()
+                return lengthDigits.Len() > remaining.Len()
+            end if
+            return lengthDigits > remaining
         end function
 
         function ParseStartAndHeaders() as boolean

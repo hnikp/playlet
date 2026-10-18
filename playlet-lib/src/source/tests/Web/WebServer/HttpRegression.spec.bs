@@ -1,0 +1,248 @@
+import "pkg:/components/Web/PlayletWebServer/Middleware/StateApiRouter.bs"
+import "pkg:/components/Web/WebServer/Http/HttpServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    function RegressionSocket() as object
+        return {
+            input: ""
+            output: ""
+            closed: false
+            GetCountRcvBuf: function() as integer
+                return m.input.Len()
+            end function
+            Receive: function(buffer as object, offset as integer, count as integer) as integer
+                bytes = CreateObject("roByteArray")
+                bytes.FromAsciiString(m.input.Left(count))
+                for i = 0 to bytes.Count() - 1
+                    buffer[offset + i] = bytes[i]
+                end for
+                m.input = m.input.Mid(count)
+                return bytes.Count()
+            end function
+            SendStr: function(text as string) as integer
+                m.output += text
+                return text.Len()
+            end function
+            Send: function(buffer as object, offset as integer, count as integer) as integer
+                m.output += ByteArrayUtils.Slice(buffer, offset, offset + count).ToAsciiString()
+                return count
+            end function
+            eOK: function() as boolean
+                return true
+            end function
+            eSuccess: function() as boolean
+                return true
+            end function
+            GetID: function() as integer
+                return 12345
+            end function
+            GetReceivedFromAddress: function() as object
+                return {
+                    GetAddress: function() as string
+                        return "test"
+                    end function
+                }
+            end function
+            Close: function()
+                m.closed = true
+            end function
+        }
+    end function
+
+    ' Exercise admission without binding a real socket on the render thread.
+    class RegressionHttpServer extends Http.HttpServer
+        override function Init() as boolean
+            m.connections = {}
+            return true
+        end function
+    end class
+
+    @suite
+    class HttpRegressionTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.settings = new Http.HttpSettings(CreateObject("roMessagePort"))
+            m.settings.Port = 0
+            m.settings.WebSocketsEnabled = false
+            m.settings.MaxConnections = 2
+            m.settings.MaxRequestLength = 128
+            m.router = {
+                hits: 0
+                OnRequest: function(_request as object, response as object, _connection as object) as boolean
+                    m.hits++
+                    response.Default(204, "OK")
+                    return true
+                end function
+            }
+            m.server = {
+                routers: [m.router]
+                postRouters: []
+                utils: new Http.Utils()
+                total_in: 0
+                total_out: 0
+                num_requests: 0
+            }
+        end function
+
+        function Connection() as object
+            connection = new Http.HttpConnection(m.server, m.settings)
+            connection.socket = Tests.RegressionSocket()
+            connection.client = "test"
+            return connection
+        end function
+
+        function Header(bodyLength as integer) as string
+            return `POST /test HTTP/1.1\r\nHost: test\r\nContent-Length: ${bodyLength}\r\n\r\n`
+        end function
+
+        function SizedRequest(size as integer) as string
+            ' Header length is stable for two-digit content lengths at these boundaries.
+            bodyLength = size - m.Header(70).Len()
+            return m.Header(bodyLength) + string(bodyLength, "x")
+        end function
+
+        @describe("request size enforcement")
+
+        @it("dispatches requests below and exactly at the byte limit")
+        function _()
+            for each size in [127, 128]
+                connection = m.Connection()
+                connection.socket.input = m.SizedRequest(size)
+                m.assertEqual(connection.socket.input.Len(), size)
+                connection.PollRequest(m.server)
+                m.assertEqual(connection.response.http_code, 204)
+            end for
+            m.assertEqual(m.router.hits, 2)
+        end function
+
+        @it("rejects a complete oversized request before dispatch")
+        function _()
+            connection = m.Connection()
+            connection.socket.input = m.SizedRequest(129)
+            connection.PollRequest(m.server)
+            m.assertEqual(connection.response.http_code, 413)
+            m.assertTrue(connection.close)
+            m.assertEqual(m.router.hits, 0)
+        end function
+
+        @it("rejects an oversized final receive after fragmented headers")
+        function _()
+            connection = m.Connection()
+            text = m.SizedRequest(129)
+            split = text.InStr("Content-Length") + 5
+            connection.socket.input = text.Left(split)
+            connection.PollRequest(m.server)
+            m.assertInvalid(connection.response)
+            connection.socket.input = text.Mid(split)
+            connection.PollRequest(m.server)
+            m.assertEqual(connection.response.http_code, 413)
+            m.assertEqual(m.router.hits, 0)
+        end function
+
+        @it("accepts a body received in fragments at the byte limit")
+        function _()
+            connection = m.Connection()
+            text = m.SizedRequest(128)
+            connection.socket.input = text.Left(text.Len() - 10)
+            connection.PollRequest(m.server)
+            m.assertInvalid(connection.response)
+            connection.socket.input = text.Right(10)
+            connection.PollRequest(m.server)
+            m.assertEqual(connection.response.http_code, 204)
+            m.assertEqual(m.router.hits, 1)
+        end function
+
+        @it("rejects oversized declarations without waiting for their bodies")
+        function _()
+            for each length in ["1000", "999999999999999999999999999", "000001000"]
+                connection = m.Connection()
+                connection.socket.input = `POST /test HTTP/1.1\r\nHost: test\r\nContent-Length: ${length}\r\nConnection: keep-alive\r\n\r\n`
+                connection.PollRequest(m.server)
+                m.assertEqual(connection.response.http_code, 413)
+                m.assertTrue(connection.close)
+            end for
+            m.assertEqual(m.router.hits, 0)
+        end function
+
+        @it("rejects oversized headers with no body delimiter")
+        function _()
+            connection = m.Connection()
+            connection.socket.input = "GET /test HTTP/1.1" + string(129, "x")
+            connection.PollRequest(m.server)
+            m.assertEqual(connection.response.http_code, 413)
+            m.assertEqual(m.router.hits, 0)
+        end function
+
+        @it("closes the socket when the response rejects requested keep-alive")
+        function _()
+            m.router.OnRequest = function(_request as object, response as object, _connection as object) as boolean
+                response.Default(200, "A nonempty response must close too")
+                return true
+            end function
+            connection = m.Connection()
+            connection.socket.input = `GET /test HTTP/1.1\r\nHost: test\r\nConnection: keep-alive\r\n\r\n`
+            connection.PollRequest(m.server)
+            m.assertEqual(connection.response.http_code, 200)
+            m.assertEqual(connection.response.headers.Connection, "close")
+            m.assertTrue(connection.close)
+            m.assertEqual(connection.state, Http.HttpConnectionState.DONE)
+        end function
+
+        @describe("active connection limit")
+
+        @it("closes excess sockets and accepts again when capacity is released")
+        function _()
+            server = new Tests.RegressionHttpServer(m.settings, {})
+            socket = Tests.RegressionSocket()
+            server.sockin = {
+                socket: socket
+                Accept: function() as object
+                    return m.socket
+                end function
+                eOK: function() as boolean
+                    return true
+                end function
+            }
+            server.connections = { first: {}, second: {} }
+            rejected = server.AcceptHttpConnection()
+            closed = socket.closed
+            server.connections.Delete("second")
+            socket = Tests.RegressionSocket()
+            server.sockin.socket = socket
+            accepted = server.AcceptHttpConnection()
+            server.connections.Clear()
+            socket.Close()
+            m.assertInvalid(rejected)
+            m.assertTrue(closed)
+            m.assertNotInvalid(accepted)
+        end function
+
+        @describe("navigation and state routes")
+
+        @it("returns unavailable version immediately and resolved version on the next read")
+        function _()
+            info = {
+                version: "N/A"
+                CallFunc: function(_name as string, _arg as dynamic) as object
+                    return { lib_version_latest: m.version }
+                end function
+            }
+            router = new Http.StateApiRouter({ sceneNodes: { applicationInfo: info } })
+            request = new Http.HttpRequest()
+            request.FromParsedData("GET", "/api/state?key=app", {}, "")
+            response = new Http.HttpResponse(request, m.server, m.settings)
+            timer = CreateObject("roTimespan")
+            m.assertTrue(router.OnRequest(request, response, {}))
+            elapsed = timer.TotalMilliseconds()
+            m.assertEqual(response.http_code, 200)
+            m.assertEqual(StringUtils.ParseJsonSafe(response.body_buffer.ToAsciiString()).app.lib_version_latest, "N/A")
+            m.assertTrue(elapsed < 1000)
+            info.version = "1.2.3"
+            router.OnRequest(request, response, {})
+            m.assertEqual(StringUtils.ParseJsonSafe(response.body_buffer.ToAsciiString()).app.lib_version_latest, "1.2.3")
+        end function
+    end class
+end namespace

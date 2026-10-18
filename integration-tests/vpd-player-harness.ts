@@ -14,7 +14,7 @@ export { Key, ecp, odc };
 // Mirror the BrightScript enums the renderers project.
 export const Mode = { idle: 0, scrub: 1, scan: 2, liveDvr: 3 } as const;
 export const Glyph = { none: 0, replay: 9 } as const;
-export const Button = { playPause: 0, minimize: 1 } as const;
+export const Button = { playPause: 0, menu: 1, minimize: 2 } as const;
 
 const j = (v: unknown) => JSON.stringify(v);
 const eq = (a: unknown, b: unknown) => j(a) === j(b);
@@ -186,7 +186,7 @@ export async function assertSponsorBlockFixture(): Promise<void> {
 export async function launch(contentId: string, timeoutMs = 30_000): Promise<boolean> {
     setupEnvironment(AppId.DEV);
     console.log(`launch: contentId=${contentId}`);
-    await ecp.sendLaunchChannel({ params: { contentId } });
+    await ecp.sendLaunchChannel({ params: { contentId }, verifyLaunchTimeOut: 15000 });
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         let state: string | undefined;

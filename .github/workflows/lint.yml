@@ -39,6 +39,9 @@ jobs:
       - name: Run formatter
         run: npm run format:fix
 
+      - name: Run browser regression tests
+        run: npm run test:web
+
       - name: Build tests
         run: npm run test:build
 

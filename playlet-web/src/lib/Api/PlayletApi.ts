@@ -134,18 +134,18 @@ export class PlayletApi {
         if (!playlistId) {
             return;
         }
-        let url = `${PlayletApi.host()}/api/view/open?playlistId=${playlistId}`;
+        let url = `${PlayletApi.host()}/api/view/open?playlistId=${encodeURIComponent(playlistId)}`;
         if (continuationVideoId) {
-            url += `&videoId=${continuationVideoId}`;
+            url += `&videoId=${encodeURIComponent(continuationVideoId)}`;
         }
-        await fetch(url);
+        await PlayletApi.send("POST", url);
     }
 
     static async openChannel(authorId) {
         if (!authorId) {
             return;
         }
-        await fetch(`${PlayletApi.host()}/api/view/open?authorId=${authorId}`);
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/view/open?authorId=${encodeURIComponent(authorId)}`);
     }
 
     static async getSearchHistory() {

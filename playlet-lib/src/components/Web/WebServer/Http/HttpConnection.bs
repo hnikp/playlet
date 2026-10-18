@@ -80,21 +80,23 @@ namespace Http
                 server.total_in = server.total_in + received
             end if
 
-            if m.request.ProcessNext(m)
-                if m.request.state = Http.HttpRequestState.DONE
-                    server.num_requests = validint(server.num_requests) + 1
-                    m.response = new HttpResponse(m.request, m.server, m.settings)
-                    m.response.Process(m)
-                    m.SetState(Http.HttpConnectionState.SEND_HEADER)
+            if m.request.buffer_index > m.settings.MaxRequestLength
+                m.RejectOversizedRequest()
+            else if m.request.ProcessNext(m)
+                if m.request.too_large
+                    m.RejectOversizedRequest()
                 else
-                    m.setState(Http.HttpConnectionState.DONE)
-                    m.close = true
-                    LogErrorNoTelemetry("couldn't process request or response, closing @" + m.client)
+                    if m.request.state = Http.HttpRequestState.DONE
+                        server.num_requests = validint(server.num_requests) + 1
+                        m.response = new HttpResponse(m.request, m.server, m.settings)
+                        m.response.Process(m)
+                        m.SetState(Http.HttpConnectionState.SEND_HEADER)
+                    else
+                        m.setState(Http.HttpConnectionState.DONE)
+                        m.close = true
+                        LogErrorNoTelemetry("couldn't process request or response, closing @" + m.client)
+                    end if
                 end if
-            else if m.request.buffer.Count() > m.settings.MaxRequestLength ' die if it's too long
-                m.response = new HttpResponse(m.request, m.server, m.settings)
-                m.response.Default(413, "Your request was dropped because it was too long.")
-                m.SetState(Http.HttpConnectionState.SEND_HEADER)
             end if
 
             ' if we've moved on to the next state, try to send right away, instead of
@@ -105,12 +107,24 @@ namespace Http
             end if
         end function
 
+        function RejectOversizedRequest() as void
+            m.close = true
+            m.response = new HttpResponse(m.request, m.server, m.settings)
+            m.response.Default(413, "Your request was dropped because it was too long.")
+            m.SetState(Http.HttpConnectionState.SEND_HEADER)
+        end function
+
         function PollHeader(server as HttpServer) as void
             if m.state <> Http.HttpConnectionState.SEND_HEADER
                 LogError("illegal header state @" + m.client)
             end if
 
             sent = m.response.SendHeader(m.socket)
+            ' GenerateHeader may choose close even when the request asked for keep-alive.
+            ' Honor the response so browser connections release their admission slots.
+            if LCase(ValidString(m.response.headers["Connection"])) = "close"
+                m.close = true
+            end if
 
             if m.CheckResult(sent, HttpConnectionOperation.SEND_HEADER)
                 m.total_sent = m.total_sent + sent

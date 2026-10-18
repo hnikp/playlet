@@ -16,6 +16,13 @@ namespace Http
         end function
 
         @get("/api/view/open")
+        function RejectGet(context as object) as boolean
+            context.response.headers["Allow"] = "POST"
+            context.response.Default(405, "Use POST to open a view")
+            return true
+        end function
+
+        @post("/api/view/open")
         function OpenView(context as object) as boolean
             request = context.request
             response = context.response

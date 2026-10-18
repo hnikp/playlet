@@ -1,0 +1,18 @@
+namespace Tests
+    @SGNode("PlayletWebServer")
+    @suite
+    class ViewRouterRegressionTests extends Rooibos.BaseTestSuite
+        @describe("navigation route")
+        @it("rejects GET navigation without accessing UI nodes")
+        function _()
+            router = new Http.ViewRouter({ sceneNodes: {} })
+            request = new Http.HttpRequest()
+            request.FromParsedData("GET", "/api/view/open?authorId=test", {}, "")
+            response = new Http.HttpResponse(request, { utils: new Http.Utils() }, new Http.HttpSettings(CreateObject("roMessagePort")))
+            m.assertTrue(router.OnRequest(request, response, {}))
+            m.assertEqual(response.http_code, 405)
+            m.assertEqual(response.headers.Allow, "POST")
+        end function
+
+    end class
+end namespace

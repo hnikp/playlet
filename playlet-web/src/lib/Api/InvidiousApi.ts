@@ -344,32 +344,30 @@ export class InvidiousApi {
     }
 
     public static clearCache() {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith("v1:")) {
-                localStorage.removeItem(key);
+        try {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith("v1:")) {
+                    localStorage.removeItem(key);
+                }
             }
+        } catch (error) {
+            console.error(error);
         }
     }
 
-    // TODO:P2 use more appropriate cache storage
+    // Cache access is best-effort: storage failures must not fail network requests.
     private getCache(url: string, cacheSeconds: number) {
-        if (DISABLE_CACHE) {
-            return null;
-        }
-        const cacheKey = this.getCacheKey(url);
-        const cache = localStorage.getItem(cacheKey);
-        if (!cache) {
-            return null;
-        }
-
+        if (DISABLE_CACHE) return null;
         try {
+            const cache = localStorage.getItem(this.getCacheKey(url));
+            if (!cache) return null;
             const cacheData = JSON.parse(cache);
-            if (cacheData.timestamp + cacheSeconds * 1000 < Date.now()) {
+            if (cacheData?.__version !== 1 || !Number.isFinite(cacheData.timestamp) ||
+                cacheData.timestamp + cacheSeconds * 1000 < Date.now()) {
                 this.deleteCache(url);
                 return null;
             }
-            console.log(`Cache hit for ${url}`);
             return cacheData.data;
         } catch (error) {
             console.error(error);
@@ -379,19 +377,25 @@ export class InvidiousApi {
     }
 
     private setCache(url: string, data: any) {
-        const cacheKey = this.getCacheKey(url);
-        const cacheData = {
-            __version: 1,
-            timestamp: Date.now(),
-            data
-        };
-
-        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        if (DISABLE_CACHE) return;
+        try {
+            localStorage.setItem(this.getCacheKey(url), JSON.stringify({
+                __version: 1,
+                timestamp: Date.now(),
+                data
+            }));
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     private deleteCache(url: string) {
-        const cacheKey = this.getCacheKey(url);
-        localStorage.removeItem(cacheKey);
+        if (DISABLE_CACHE) return;
+        try {
+            localStorage.removeItem(this.getCacheKey(url));
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     private getCacheKey(url: string) {
