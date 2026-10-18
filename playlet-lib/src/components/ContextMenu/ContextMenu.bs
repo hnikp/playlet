@@ -1,6 +1,7 @@
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -83,10 +84,17 @@ import "pkg:/source/utils/Types.bs"
 '      - Other "Playlists" related context menu items
 
 function Init()
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.subtitleLabel = m.top.findNode("subtitleLabel")
     m.optionsList = m.top.findNode("optionsList")
     m.showAnimation = m.top.findNode("showAnimation")
 end function
 
+
+function OnTitleChange() as void
+    RtlText.ApplyToLabel(m.titleLabel, m.top.title, "font:MediumBoldSystemFont", true, 24)
+    RtlText.ApplyToLabel(m.subtitleLabel, m.top.subtitle, "font:SmallestBoldSystemFont", true, 18)
+end function
 function Show(_unused as dynamic)
     m.optionsList.ObserveField("itemSelected", FuncName(OnItemSelected))
     m.showAnimation.control = "start"

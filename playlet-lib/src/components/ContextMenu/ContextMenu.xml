@@ -1,8 +1,9 @@
 <component name="ContextMenu" extends="Group" includes="Focus">
     <interface>
         <field id="thumbnail" type="uri" alias="thumbnail.uri" />
-        <field id="title" type="string" alias="titleLabel.text" />
-        <field id="subtitle" type="string" alias="subtitleLabel.text" />
+        <!-- not aliased to the labels: Persian/Arabic titles must go through RtlText first. -->
+        <field id="title" type="string" onChange="OnTitleChange" />
+        <field id="subtitle" type="string" onChange="OnTitleChange" />
         <field id="options" type="nodearray" onChange="OnOptionsSet" />
         <field id="appController" type="node" />
         <function name="Show" />

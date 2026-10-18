@@ -1,4 +1,5 @@
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -7,6 +8,8 @@ function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
     m.progressRect = m.top.FindNode("progressRect")
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.authorLabel = m.top.FindNode("authorLabel")
 end function
 
 function OnContentSet() as void
@@ -16,7 +19,9 @@ function OnContentSet() as void
         return
     end if
 
-    m.top.title = content.title
+    ' Persian/Arabic text needs RtlText; the title was prepared off the render thread for this label size
+    ' (same as VideoRowCell's), the author line is combined here so it is shaped here.
+    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont", 18, true)
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     author = content._author
     if not StringUtils.IsNullOrEmpty(author)
@@ -33,7 +38,7 @@ function OnContentSet() as void
             end if
         end if
     end if
-    m.top.author = author
+    RtlText.ApplyToLabel(m.authorLabel, author, "font:SmallestSystemFont", false, 18)
 
     m.top.thumbnailUri = content.thumbnail
 
