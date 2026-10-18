@@ -4,7 +4,9 @@ import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/VideoFeed/PaginationType.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/utils/FeedRanking.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
@@ -319,6 +321,28 @@ namespace Invidious
                 }
             end if
 
+            ' Handler-only endpoints don't send a request themselves; the handler
+            ' fetches what it needs (e.g. RankedChannelVideosHandler).
+            if endpoint.handlerOnly = true
+                result = m[m.GetResponseHandlerName(feedSource, endpoint)]({
+                    feedSource: feedSource
+                    response: invalid
+                    profile: invalid
+                    options: options
+                })
+                if result <> invalid
+                    return {
+                        success: true
+                        result: result
+                    }
+                end if
+                return {
+                    success: false
+                    error: `Handler of endpoint ${feedSource.endpoint} failed`
+                    cancelled: CancellationUtils.IsCancelled(cancellation)
+                }
+            end if
+
             profile = invalid
 
             if endpoint.authenticated = true
@@ -389,18 +413,7 @@ namespace Invidious
 
             response = m.SendRequest(request, httpServer)
 
-            ' A feed source (e.g. a row in a layout yaml) can override its endpoint's handler,
-            ' e.g. to filter a search ("ChessLiveHandler").
-            responseHandler = invalid
-            if IsString(feedSource.responseHandler) and feedSource.responseHandler.EndsWith("Handler") and m.DoesExist(feedSource.responseHandler)
-                responseHandler = feedSource.responseHandler
-            else if IsString(endpoint.responseHandler) and m.DoesExist(endpoint.responseHandler)
-                responseHandler = endpoint.responseHandler
-            else
-                responseHandler = "DefaultHandler"
-            end if
-
-            result = m[responseHandler]({
+            result = m[m.GetResponseHandlerName(feedSource, endpoint)]({
                 feedSource: feedSource
                 response: response
                 profile: profile
@@ -421,14 +434,30 @@ namespace Invidious
             end if
         end function
 
+        ' A feed source (e.g. a row in a layout yaml) can override its endpoint's handler,
+        ' e.g. to filter a search ("ChessLiveHandler").
+        function GetResponseHandlerName(feedSource as object, endpoint as object) as string
+            if IsString(feedSource.responseHandler) and feedSource.responseHandler.EndsWith("Handler") and m.DoesExist(feedSource.responseHandler)
+                return feedSource.responseHandler
+            else if IsString(endpoint.responseHandler) and m.DoesExist(endpoint.responseHandler)
+                return endpoint.responseHandler
+            end if
+            return "DefaultHandler"
+        end function
+
+        ' Requests to the built-in backend (local web server) are processed in-task
+        ' by SendRequest when an httpServer is given.
+        function IsLocalServerUrl(url as string) as boolean
+            return url.StartsWith("http://127.0.0.1:8888") or url.StartsWith(m.invidiousNode.webServer@.GetServerAddress())
+        end function
+
         function SendRequest(request as HttpClient.Request, httpServer as dynamic) as HttpClient.Response
             if httpServer = invalid
                 return request.Await()
             end if
 
             url = request.GetFullUrl()
-            isUrlToLocalServer = url.StartsWith("http://127.0.0.1:8888") or url.StartsWith(m.invidiousNode.webServer@.GetServerAddress())
-            if not isUrlToLocalServer
+            if not m.IsLocalServerUrl(url)
                 return request.Await()
             end if
 
@@ -708,6 +737,104 @@ namespace Invidious
             return result
         end function
 
+        ' "Top recent": the latest videos of several channels (feedSource.channels, an array
+        ' of ucids), ranked by FeedRanking (views relative to each channel's median, decayed
+        ' by age). Used by a handlerOnly endpoint: it fetches the channels itself.
+        function RankedChannelVideosHandler(context as object) as object
+            feedSource = context.feedSource
+            channels = feedSource.channels
+            if IsString(channels)
+                channels = channels.Split(",")
+            end if
+            channels = ValidArray(channels)
+
+            cancellation = OptionUtils.Get(context.options, "cancellation")
+            httpServer = OptionUtils.Get(context.options, "httpServer")
+
+            if m.endpoints = invalid
+                m.endpoints = m.invidiousNode.apiDefinitions
+            end if
+            endpoint = m.endpoints[feedSource.endpoint]
+            url = m.GetInstance() + endpoint.url
+            ' Requests are sent in parallel, except those the built-in backend processes in this task
+            ' (with an httpServer, see SendRequest), which go one by one.
+            isLocal = httpServer <> invalid and m.IsLocalServerUrl(url)
+
+            requests = []
+            ' An entry is a ucid, or { ucid, name } to name the channel on its videos (the built-in
+            ' backend's channel videos have no author)
+            for each channel in channels
+                name = ""
+                if IsAssociativeArray(channel)
+                    name = ValidString(channel.name)
+                    channel = channel.ucid
+                end if
+                ucid = ValidString(channel).Trim()
+                if ucid = ""
+                    continue for
+                end if
+                request = HttpClient.Get(url)
+                request.PathParams({ ucid: ucid })
+                request.QueryParam("sort_by", "newest")
+                request.CacheForSeconds(1800)
+                request.Cancellation(cancellation)
+                pending = invalid
+                if not isLocal
+                    pending = request.Send()
+                end if
+                requests.Push({ ucid: ucid, name: name, request: request, pending: pending })
+            end for
+
+            lists = []
+            for each entry in requests
+                if entry.pending <> invalid
+                    response = entry.pending.Await()
+                else
+                    response = m.SendRequest(entry.request, httpServer)
+                end if
+
+                if not response.IsSuccess()
+                    LogWarn(`Failed to load videos of channel ${entry.ucid}: ${response.ErrorMessage()}`)
+                    continue for
+                end if
+                json = response.Json()
+                if not IsAssociativeArray(json) or not IsArray(json.videos)
+                    LogWarn(`Invalid videos response of channel ${entry.ucid}`)
+                    continue for
+                end if
+                if entry.name <> ""
+                    for each video in json.videos
+                        m.SetMissingAuthor(video, entry.ucid, entry.name)
+                    end for
+                end if
+                lists.Push(json.videos)
+            end for
+
+            if lists.Count() = 0
+                return invalid
+            end if
+
+            return {
+                items: FeedRanking.Rank(lists, {})
+                isLastPage: true
+            }
+        end function
+
+        ' A mixed row needs the channel on each video. The built-in backend's items only have
+        ' lines ["871k views • 1 day ago"], which the cell shows as author: put the name first.
+        function SetMissingAuthor(video as object, ucid as string, name as string) as void
+            if not IsAssociativeArray(video) or not StringUtils.IsNullOrEmpty(video.author)
+                return
+            end if
+            video.author = name
+            if StringUtils.IsNullOrEmpty(video.authorId)
+                video.authorId = ucid
+            end if
+            if IsArray(video.lines) and video.lines.Count() = 1
+                video.lines = [name, video.lines[0]]
+            end if
+        end function
+
         ' Topic shelves (Playlet backend only) respond with { videos, continuation }.
         function TopicShelfHandler(context as object) as object
             response = context.response
@@ -743,6 +870,23 @@ namespace Invidious
                 return { q: "full movie", duration: "long" }
             end if
             return invalid
+        end function
+
+        ' Football videos from the user's subscriptions: the auth feed (with its reauth check),
+        ' filtered by Invidious.FilterFootballItems. The feed source's optional "channels" (ucids)
+        ' are always kept. Keeps the continuation, so a page can come back empty and still paginate.
+        function FootballSubscriptionsHandler(context as object) as object
+            result = m.AuthFeedHandler(context)
+            if result = invalid or not IsArray(result.items)
+                return result
+            end if
+
+            channelIds = invalid
+            if IsAssociativeArray(context.feedSource)
+                channelIds = context.feedSource.channels
+            end if
+            result.items = Invidious.FilterFootballItems(result.items, channelIds)
+            return result
         end function
 
         function WatchHistoryHandler(context as object) as object
@@ -942,6 +1086,67 @@ namespace Invidious
             filtered.Push(item)
         end for
         return filtered
+    end function
+
+    ' Keeps the football videos of a feed: from one of channelIds (ucids, optional), or
+    ' matching a football keyword. Specific keywords match the title or the author (channel
+    ' name); loose ones ("united", "goal", "highlights", "fc", Persian "گل") also appear in
+    ' unrelated titles, so they only match the author. Case-insensitive.
+    function FilterFootballItems(items as object, channelIds = invalid as object) as object
+        channelSet = {}
+        ' Entries are ucids, or { ucid, name } like ranked_channel_videos' channels
+        for each channelId in ValidArray(channelIds)
+            if IsAssociativeArray(channelId)
+                channelId = channelId.ucid
+            end if
+            if IsString(channelId)
+                channelSet[channelId] = true
+            end if
+        end for
+
+        specificKeywords = ["football", "soccer", "futbol", "premier league", "champions league", "la liga", "serie a", "bundesliga", "uefa", "fifa", "world cup", "فوتبال", "لیگ", "پرسپولیس", "استقلال", "سپاهان", "خلاصه بازی", "تیم ملی"]
+        authorKeywords = ["united", "goal", "highlights", "گل"]
+        fcRegex = CreateObject("roRegex", "\bfc\b", "i")
+
+        filtered = []
+        for each item in ValidArray(items)
+            if not IsAssociativeArray(item)
+                continue for
+            end if
+            if item.type <> invalid and item.type <> "video"
+                continue for
+            end if
+
+            authorId = ValidString(item.authorId)
+            if authorId <> "" and channelSet.DoesExist(authorId)
+                filtered.Push(item)
+                continue for
+            end if
+
+            title = LCase(ValidString(item.title))
+            author = LCase(ValidString(item.author))
+            if Invidious.ContainsAnyKeyword(title, specificKeywords) or Invidious.ContainsAnyKeyword(author, specificKeywords)
+                filtered.Push(item)
+                continue for
+            end if
+            if Invidious.ContainsAnyKeyword(author, authorKeywords) or fcRegex.IsMatch(author)
+                filtered.Push(item)
+            end if
+        end for
+        return filtered
+    end function
+
+    ' Whether text contains one of keywords (both expected lower case).
+    function ContainsAnyKeyword(text as string, keywords as object) as boolean
+        if text = ""
+            return false
+        end if
+        for each keyword in keywords
+            if Instr(1, text, keyword) > 0
+                return true
+            end if
+        end for
+        return false
     end function
 
     function NeedsLiveStreamInfo(metadata as object) as boolean

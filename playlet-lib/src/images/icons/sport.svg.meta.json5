@@ -1,0 +1,11 @@
+{
+  inputHash: '9118cdb37efce224b9a4d51d54bdb24b',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/sport.png',
+      outputHash: '2c405c8627fa82493ac2dab4f03daf41',
+      width: 48,
+      height: 48,
+    },
+  ],
+}

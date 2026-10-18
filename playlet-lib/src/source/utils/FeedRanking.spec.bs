@@ -1,0 +1,167 @@
+namespace Tests
+
+    @suite
+    class FeedRankingTests extends Rooibos.BaseTestSuite
+
+        ' Fixed "now" so that the ages are deterministic.
+        NOW = 1800000000
+
+        function InvVideo(videoId as string, viewCount as dynamic, ageHours as float) as object
+            return {
+                type: "video"
+                videoId: videoId
+                viewCount: viewCount
+                published: m.NOW - Int(ageHours * 3600)
+                lengthSeconds: 600
+            }
+        end function
+
+        function Builtin(videoId as string, line as string) as object
+            return {
+                type: "video"
+                videoId: videoId
+                lines: [line]
+                lengthText: "10:00"
+            }
+        end function
+
+        function VideoIds(items as object) as object
+            result = []
+            for each item in items
+                result.Push(item.videoId)
+            end for
+            return result
+        end function
+
+        function AssertNear(actual as dynamic, expected as dynamic)
+            m.assertNotInvalid(actual)
+            m.assertTrue(Abs(actual - expected) < 0.5, `expected ${expected}, got ${actual}`)
+        end function
+
+        @describe("FeedRanking.ParseViews")
+
+        @it("parses k, m and comma separated view counts")
+        function _()
+            m.AssertNear(FeedRanking.ParseViews({ lines: ["871k views • 1 day ago"] }), 871000)
+            m.AssertNear(FeedRanking.ParseViews({ viewCountText: "1.2M views" }), 1200000)
+            m.AssertNear(FeedRanking.ParseViews({ lines: ["5.1m views • 5 years ago"] }), 5100000)
+            m.AssertNear(FeedRanking.ParseViews({ viewCountText: "2,345 views" }), 2345)
+            m.AssertNear(FeedRanking.ParseViews({ viewCountText: "1 view" }), 1)
+            m.AssertNear(FeedRanking.ParseViews({ viewCountText: "No views" }), 0)
+        end function
+
+        @it("prefers the Invidious viewCount and skips unrelated lines")
+        function _()
+            m.assertEqual(FeedRanking.ParseViews({ viewCount: 1234, viewCountText: "9 views" }), 1234)
+            m.AssertNear(FeedRanking.ParseViews({ lines: ["Subtitles", "80k views • Streamed 20 hours ago"] }), 80000)
+            m.assertInvalid(FeedRanking.ParseViews({ lines: ["Subtitles"] }))
+            m.assertInvalid(FeedRanking.ParseViews({}))
+        end function
+
+        @describe("FeedRanking.ParseAgeHours")
+
+        @it("uses the Invidious published timestamp")
+        function _()
+            m.AssertNear(FeedRanking.ParseAgeHours({ published: m.NOW - 7200, publishedText: "1 year ago" }, m.NOW), 2)
+        end function
+
+        @it("parses relative texts of the built-in backend")
+        function _()
+            m.AssertNear(FeedRanking.ParseAgeHours({ lines: ["80k views • Streamed 20 hours ago"] }, m.NOW), 20)
+            m.AssertNear(FeedRanking.ParseAgeHours({ lines: ["871k views • 1 day ago"] }, m.NOW), 24)
+            m.AssertNear(FeedRanking.ParseAgeHours({ publishedText: "Premiered 2 weeks ago" }, m.NOW), 336)
+            m.AssertNear(FeedRanking.ParseAgeHours({ published: 0, publishedText: "3 minutes ago" }, m.NOW), 0.05)
+            m.assertInvalid(FeedRanking.ParseAgeHours({ lines: ["32 waiting • Scheduled for 19/10/2026, 10:00"] }, m.NOW))
+        end function
+
+        @describe("FeedRanking.IsUpcoming")
+
+        @it("detects upcoming videos of both backends")
+        function _()
+            m.assertTrue(FeedRanking.IsUpcoming({ isUpcoming: true }))
+            m.assertTrue(FeedRanking.IsUpcoming({ lines: ["32 waiting • Scheduled for 19/10/2026, 10:00"] }))
+            m.assertTrue(FeedRanking.IsUpcoming({ publishedText: "Premieres in 3 hours" }))
+            m.assertFalse(FeedRanking.IsUpcoming({ lines: ["871k views • 1 day ago"] }))
+            m.assertFalse(FeedRanking.IsUpcoming({ publishedText: "Premiered 2 days ago" }))
+        end function
+
+        @describe("FeedRanking.Rank")
+
+        @it("drops upcoming, live, shorts, unknown ages and videos older than maxAgeHours")
+        function _()
+            channel = [
+                m.InvVideo("ok", 1000, 10)
+                m.Builtin("upcoming", "32 waiting • Scheduled for 19/10/2026, 10:00")
+                { type: "video", videoId: "live", viewCount: 1000, published: m.NOW - 3600, liveNow: true }
+                { type: "video", videoId: "short", viewCount: 1000, published: m.NOW - 3600, lengthSeconds: 40 }
+                { type: "video", videoId: "shortText", lines: ["1k views • 1 hour ago"], lengthText: "0:45" }
+                { type: "video", videoId: "noAge", viewCount: 1000 }
+                m.InvVideo("old", 1000000, 22 * 24)
+            ]
+            result = FeedRanking.Rank([channel], { nowSeconds: m.NOW, perChannel: 10 })
+            m.assertEqual(m.VideoIds(result), ["ok"])
+        end function
+
+        @it("decays older videos with the half-life")
+        function _()
+            channel = [
+                m.InvVideo("older", 1000, 96)
+                m.InvVideo("newer", 1000, 1)
+                m.InvVideo("middle", 1000, 48)
+            ]
+            result = FeedRanking.Rank([channel], { nowSeconds: m.NOW })
+            m.assertEqual(m.VideoIds(result), ["newer", "middle", "older"])
+        end function
+
+        @it("ranks views relative to the median of each channel")
+        function _()
+            small = [
+                m.Builtin("smallHit", "5k views • 1 day ago")
+                m.Builtin("small2", "1k views • 3 days ago")
+                m.Builtin("small3", "1k views • 4 days ago")
+            ]
+            big = [
+                m.InvVideo("bigMiss", 300000, 24)
+                m.InvVideo("big2", 1000000, 72)
+                m.InvVideo("big3", 1000000, 96)
+            ]
+            result = FeedRanking.Rank([big, small], { nowSeconds: m.NOW, perChannel: 1 })
+            m.assertEqual(m.VideoIds(result), ["smallHit", "bigMiss"])
+        end function
+
+        @it("treats unknown views as the channel median")
+        function _()
+            channel = [
+                m.InvVideo("below", 100, 2)
+                m.InvVideo("median", 1000, 2)
+                m.InvVideo("above", 10000, 2)
+                { type: "video", videoId: "unknown", published: m.NOW - 7200 }
+            ]
+            result = FeedRanking.Rank([channel], { nowSeconds: m.NOW, perChannel: 10 })
+            ids = m.VideoIds(result)
+            m.assertEqual(ids[0], "above")
+            m.assertEqual(ids[3], "below")
+        end function
+
+        @it("caps the videos per channel, the total, and dedupes video ids")
+        function _()
+            channelA = [
+                m.InvVideo("a1", 1000, 1)
+                m.InvVideo("a2", 1000, 2)
+                m.InvVideo("a3", 1000, 3)
+                m.InvVideo("a4", 1000, 4)
+            ]
+            channelB = [
+                m.InvVideo("a1", 1000, 1)
+                m.InvVideo("b2", 1000, 5)
+            ]
+            result = FeedRanking.Rank([channelA, channelB], { nowSeconds: m.NOW, perChannel: 2 })
+            m.assertEqual(m.VideoIds(result), ["a1", "a2", "b2"])
+
+            result = FeedRanking.Rank([channelA, channelB], { nowSeconds: m.NOW, perChannel: 2, limit: 2 })
+            m.assertEqual(m.VideoIds(result), ["a1", "a2"])
+        end function
+
+    end class
+
+end namespace

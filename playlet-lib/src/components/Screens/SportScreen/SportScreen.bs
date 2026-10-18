@@ -1,0 +1,9 @@
+import "pkg:/source/utils/Locale.bs"
+
+' Runs after FeedScreen's Init
+function Init()
+    m.top.feedFile = "libpkg:/config/sport_layout.yaml"
+    m.top.headerTitle = Tr(Locale.NavBar.Sport)
+    m.top.headerIcon = "pkg:/images/icons/sport.png"
+    m.top.accentColor = "#2E9E4FFF"
+end function

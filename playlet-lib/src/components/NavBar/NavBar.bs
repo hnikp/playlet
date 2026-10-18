@@ -16,12 +16,166 @@ function Init()
 end function
 
 function OnNodeReady()
-    m.lastItemFocused = m.itemsList.itemFocused
+    m.itemFocusedObserved = false
+    m.ignoreUnfocusedItemFocus = false
     m.itemsList.observeField("focusedChild", FuncName(OnListFirstFocus))
 
-    ' NavBar should be resized after the content is changed.
-    ' Since we don't expect it change after initial setup, resize on node ready once.
+    ' Keep every item: the ones with a preference (Bookmarks, Remote, Info) are only shown when switched on
+    m.allItems = []
+    content = m.top.content
+    if content <> invalid
+        m.allItems = content.getChildren(-1, 0)
+    end if
+
+    ' Remember the initial item by screen name, since hidden items shift the indices
+    m.initialScreen = ""
+    initialFocus = m.top.initialFocus
+    if initialFocus > -1 and initialFocus < m.allItems.Count()
+        m.initialScreen = m.allItems[initialFocus].screen
+    end if
+
+    ObserveNavPreferences()
+    ApplyNavItemsVisibility()
+    m.lastItemFocused = m.itemsList.itemFocused
+
+    ' NavBar should be resized after the content is changed (here and in OnNavPreferenceChange)
     ResizeNavBar()
+end function
+
+function ObserveNavPreferences() as void
+    if m.preferences = invalid
+        return
+    end if
+
+    observed = {}
+    for each item in m.allItems
+        key = item.preference
+        if key <> "" and not observed.DoesExist(key)
+            observed[key] = true
+            m.preferences.observeFieldScoped(key, FuncName(OnNavPreferenceChange))
+        end if
+    end for
+end function
+
+function IsNavItemVisible(item as object) as boolean
+    key = item.preference
+    if key = ""
+        return true
+    end if
+    if m.preferences = invalid
+        return false
+    end if
+    return m.preferences[key] = true
+end function
+
+' Rebuilds the list content from the visible items. Returns false if nothing changed.
+function ApplyNavItemsVisibility() as boolean
+    content = m.itemsList.content
+    if content = invalid
+        return false
+    end if
+
+    visibleItems = []
+    for each item in m.allItems
+        if IsNavItemVisible(item)
+            visibleItems.push(item)
+        end if
+    end for
+
+    currentItems = content.getChildren(-1, 0)
+    if currentItems.Count() = visibleItems.Count()
+        same = true
+        for i = 0 to visibleItems.Count() - 1
+            if not currentItems[i].isSameNode(visibleItems[i])
+                same = false
+                exit for
+            end if
+        end for
+        if same
+            return false
+        end if
+    end if
+
+    content.removeChildrenIndex(content.getChildCount(), 0)
+    content.appendChildren(visibleItems)
+    return true
+end function
+
+function FindNavItemIndex(screenName as string) as integer
+    if screenName = ""
+        return -1
+    end if
+
+    content = m.itemsList.content
+    if content = invalid
+        return -1
+    end if
+
+    childCount = content.getChildCount()
+    for i = 0 to childCount - 1
+        if content.getChild(i).screen = screenName
+            return i
+        end if
+    end for
+    return -1
+end function
+
+' A Show page switch changed (from Settings, or remotely from the web app)
+function OnNavPreferenceChange() as void
+    ' The screen currently shown, looked up before the indices shift
+    currentScreen = ""
+    currentItem = GetItem(m.lastItemFocused)
+    if currentItem <> invalid
+        currentScreen = currentItem.screen
+    end if
+
+    ' Changing the content may move itemFocused: don't let that show/hide screens
+    wasObserved = m.itemFocusedObserved
+    if wasObserved
+        m.itemsList.unobserveField("itemFocused")
+    end if
+
+    if not ApplyNavItemsVisibility()
+        if wasObserved
+            m.itemsList.observeField("itemFocused", FuncName(OnItemFocused))
+        end if
+        return
+    end if
+
+    ResizeNavBar()
+
+    if not wasObserved
+        ' Never focused yet, so no screen is shown: OnListFirstFocus jumps to the initial screen by name
+        m.lastItemFocused = m.itemsList.itemFocused
+        return
+    end if
+
+    newIndex = FindNavItemIndex(currentScreen)
+    if newIndex = -1
+        ' The shown screen was hidden: fall back to Home
+        screen = m.appController@.GetRootScreen(currentScreen)
+        hadFocus = screen <> invalid and screen.isInFocusChain()
+        m.appController@.HideRootScreen(currentScreen)
+
+        newIndex = FindNavItemIndex("HomeScreen")
+        if newIndex = -1
+            newIndex = 0
+        end if
+        item = GetItem(newIndex)
+        if item <> invalid
+            m.appController@.ShowRootScreen(item.screen)
+        end if
+
+        if hadFocus
+            NodeSetFocus(m.top, true)
+        end if
+    end if
+
+    m.itemsList.jumpToItem = newIndex
+    m.lastItemFocused = newIndex
+    ' The list may still settle its focus after the rebuild; snap it back while the user is on a screen
+    m.ignoreUnfocusedItemFocus = true
+    m.itemsList.observeField("itemFocused", FuncName(OnItemFocused))
 end function
 
 function ResizeNavBar() as void
@@ -55,10 +209,11 @@ function OnListFirstFocus() as void
     end if
 
     m.itemsList.unobserveField("focusedChild")
-    initialFocus = m.top.initialFocus
+    initialFocus = FindNavItemIndex(m.initialScreen)
     if initialFocus > -1
         m.itemsList.jumpToItem = initialFocus
     end if
+    m.itemFocusedObserved = true
     m.itemsList.observeField("itemFocused", FuncName(OnItemFocused))
     m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
 end function
@@ -95,6 +250,16 @@ end function
 
 function OnItemFocused() as void
     index = m.itemsList.itemFocused
+    if m.ignoreUnfocusedItemFocus
+        if not m.itemsList.hasFocus()
+            if index <> m.lastItemFocused
+                m.itemsList.jumpToItem = m.lastItemFocused
+            end if
+            return
+        end if
+        m.ignoreUnfocusedItemFocus = false
+    end if
+
     item = GetItem(index)
     if item = invalid
         return

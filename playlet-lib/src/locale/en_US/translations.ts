@@ -1716,5 +1716,49 @@
         <source>1 like</source>
         <translation>1 like</translation>
     </message>
+    <message>
+        <source>Sport</source>
+        <translation>Sport</translation>
+    </message>
+    <message>
+        <source>Top recent</source>
+        <translation>Top recent</translation>
+    </message>
+    <message>
+        <source>Manchester United highlights</source>
+        <translation>Manchester United highlights</translation>
+    </message>
+    <message>
+        <source>Persepolis highlights</source>
+        <translation>Persepolis highlights</translation>
+    </message>
+    <message>
+        <source>Football from your subscriptions</source>
+        <translation>Football from your subscriptions</translation>
+    </message>
+    <message>
+        <source>Show Bookmarks page</source>
+        <translation>Show Bookmarks page</translation>
+    </message>
+    <message>
+        <source>Show the Bookmarks page in the menu</source>
+        <translation>Show the Bookmarks page in the menu</translation>
+    </message>
+    <message>
+        <source>Show Remote page</source>
+        <translation>Show Remote page</translation>
+    </message>
+    <message>
+        <source>Show the Remote page (control Playlet from your phone) in the menu</source>
+        <translation>Show the Remote page (control Playlet from your phone) in the menu</translation>
+    </message>
+    <message>
+        <source>Show Info page</source>
+        <translation>Show Info page</translation>
+    </message>
+    <message>
+        <source>Show the Info page (app version and details) in the menu</source>
+        <translation>Show the Info page (app version and details) in the menu</translation>
+    </message>
 </context>
 </TS>

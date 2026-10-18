@@ -1,0 +1,119 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class FootballSubscriptionsHandlerTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function CreateService() as object
+            return new Invidious.InvidiousService({
+                preferences: { "backend.selected": "playlet" }
+                apiDefinitions: {
+                    auth_feed: { url: "/api/v1/auth/feed", paginationType: "Pages" }
+                }
+            })
+        end function
+
+        function Video(videoId as string, title as string, author = "Some Channel" as string, authorId = "UCother" as string) as object
+            return { type: "video", videoId: videoId, title: title, author: author, authorId: authorId }
+        end function
+
+        function VideoIds(items as object) as object
+            result = []
+            for each item in items
+                result.Push(item.videoId)
+            end for
+            return result
+        end function
+
+        function JsonResponse(body as object) as object
+            return new HttpClient.Response({
+                statusCode: 200
+                headers: {}
+                text: FormatJson(body)
+            })
+        end function
+
+        @describe("Invidious.FilterFootballItems")
+
+        @it("keeps any video of the given channels")
+        function _()
+            items = [
+                m.Video("a", "Behind the scenes at Carrington", "Man Utd", "UC6yW44UGJJBvYTlfC7CRg2Q")
+                m.Video("b", "Cooking pasta", "Chef", "UCchef")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items, ["UC6yW44UGJJBvYTlfC7CRg2Q"])), ["a"])
+        end function
+
+        @it("keeps videos with a football keyword in the title, Persian included, case-insensitive")
+        function _()
+            items = [
+                m.Video("en", "PREMIER LEAGUE: matchday 8 review")
+                m.Video("fa", "خلاصه بازی پرسپولیس و استقلال")
+                m.Video("fa2", "اخبار فوتبال امروز")
+                m.Video("author", "Episode 12", "The Rest Is Football")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items)), ["en", "fa", "fa2", "author"])
+        end function
+
+        @it("drops videos that aren't football, and items that aren't videos")
+        function _()
+            items = [
+                m.Video("tech", "iPhone 18 review", "TechChannel")
+                m.Video("music", "New album out now", "Band")
+                { type: "channel", videoId: "channel", title: "Football" }
+                invalid
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items)), [])
+        end function
+
+        @it("matches loose keywords only in the author")
+        function _()
+            items = [
+                m.Video("titleUnited", "United Nations general assembly", "News")
+                m.Video("titleGoal", "My fitness goal for 2026", "Gym")
+                m.Video("titleGol", "گل های بهاری", "Garden")
+                m.Video("titleFc", "FC 26 ultimate team pack opening", "Gamer")
+                m.Video("authorUnited", "Match recap", "Leeds United")
+                m.Video("authorFc", "Training session", "Chelsea FC")
+                m.Video("authorGol", "بهترین ها", "گل گل")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items)), ["authorUnited", "authorFc", "authorGol"])
+        end function
+
+        @describe("Invidious.InvidiousService.FootballSubscriptionsHandler")
+
+        @it("filters an auth feed response, keeping the continuation")
+        function _()
+            response = m.JsonResponse({
+                notifications: [m.Video("n", "Champions League highlights")]
+                videos: [
+                    m.Video("a", "Vlog", "Persepolis", "UC_myQ7G7yD82dVO13BP1hlg")
+                    m.Video("b", "Cooking pasta", "Chef")
+                ]
+                continuation: "next"
+            })
+            context = {
+                response: response
+                feedSource: { channels: ["UC_myQ7G7yD82dVO13BP1hlg"] }
+            }
+            result = m.CreateService().FootballSubscriptionsHandler(context)
+            m.assertEqual(m.VideoIds(result.items), ["n", "a"])
+            m.assertEqual(result.continuation, "next")
+        end function
+
+        @it("fails like the auth feed handler for a failed response")
+        function _()
+            response = new HttpClient.Response({ statusCode: 500, headers: {}, text: "" })
+            m.assertInvalid(m.CreateService().FootballSubscriptionsHandler({ response: response, feedSource: {} }))
+        end function
+
+    end class
+
+end namespace

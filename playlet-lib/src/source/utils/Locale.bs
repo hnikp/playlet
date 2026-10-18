@@ -10,6 +10,7 @@ namespace Locale
         Remote = "Remote"
         Info = "Info"
         Chess = "Chess"
+        Sport = "Sport"
     end enum
 
     @locale
@@ -62,6 +63,10 @@ namespace Locale
         PersianMusicNew = "Persian music – new"
         PersianMusicPopular = "Persian music – popular"
         LiveNow = "Live now"
+        TopRecent = "Top recent"
+        ManUnitedHighlights = "Manchester United highlights"
+        PersepolisHighlights = "Persepolis highlights"
+        FootballFromSubscriptions = "Football from your subscriptions"
     end enum
 
     @locale
@@ -320,6 +325,12 @@ namespace Locale
         QueueNotificationsDescription = "Show a notification when a video is added to the queue"
         OpenVideoDetails = "Open video page on select"
         OpenVideoDetailsDescription = "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away"
+        ShowBookmarksPage = "Show Bookmarks page"
+        ShowBookmarksPageDescription = "Show the Bookmarks page in the menu"
+        ShowRemotePage = "Show Remote page"
+        ShowRemotePageDescription = "Show the Remote page (control Playlet from your phone) in the menu"
+        ShowInfoPage = "Show Info page"
+        ShowInfoPageDescription = "Show the Info page (app version and details) in the menu"
         ThumbnailPreview = "Thumbnail preview"
         ThumbnailPreviewDescription = "When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing"
         ThumbnailPreviewFrames = "Frames"

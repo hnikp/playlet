@@ -246,3 +246,13 @@ topic_shelf_auth:
   authenticated: true
   responseHandler: TopicShelfHandler
   paginationType: Continuation
+
+# The latest uploads of several channels (feedSource.channels, a list of ucids) in one row,
+# ranked by recency and by views compared to each channel's usual views (FeedRanking.Rank).
+# No request of its own (handlerOnly): RankedChannelVideosHandler fetches each channel's videos.
+# Used by the Chess and Sport pages' "Top recent" rows.
+ranked_channel_videos:
+  title: Top recent
+  url: /api/v1/channels/{ucid}/videos
+  handlerOnly: true
+  responseHandler: RankedChannelVideosHandler

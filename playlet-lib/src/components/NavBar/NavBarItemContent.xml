@@ -4,5 +4,7 @@
         <field id="icon" type="string" />
         <field id="text" type="string" />
         <field id="isProfile" type="boolean" />
+        <!-- A boolean preference that shows or hides the item (shown when unset) -->
+        <field id="preference" type="string" />
     </interface>
 </component>

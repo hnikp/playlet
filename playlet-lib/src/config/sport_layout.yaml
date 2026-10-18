@@ -1,0 +1,130 @@
+# Rows of the Sport page (FeedScreen, football): the most viewed recent uploads of the
+# football channels below, highlights searches, football from the user's subscriptions,
+# then the latest uploads of each channel. Channel names are not translated.
+# "Top recent" uses the ranked_channel_videos endpoint over the channels' ucids.
+# "Football from your subscriptions" uses FootballSubscriptionsHandler (instead of the
+# auth feed's handler) to keep only football videos; its channels are always kept.
+- title: Top recent
+  id: sport_top_recent
+  feedSources:
+    - id: inv_ranked_sport
+      title: Top recent
+      apiType: Invidious
+      endpoint: ranked_channel_videos
+      channels:
+        - ucid: UC6yW44UGJJBvYTlfC7CRg2Q
+          name: "Manchester United"
+        - ucid: UC_myQ7G7yD82dVO13BP1hlg
+          name: "Persepolis F.C."
+        - ucid: UCuSS7Q8O6Wv1SGQVAs1Uvgg
+          name: "Football360"
+        - ucid: UCAQeufREQCf7V0wf8M8NISw
+          name: "Alefball"
+        - ucid: UCkgsrOXWQNZRS_Cj8-_7sPw
+          name: "The Rest Is Football"
+
+- title: Manchester United highlights
+  id: sport_search_man_united_highlights
+  feedSources:
+    - id: inv_search_sport_man_united_highlights
+      title: Manchester United highlights
+      apiType: Invidious
+      endpoint: search
+      queryParams:
+        q: Manchester United highlights
+        sort: date
+        date: week
+        type: video
+
+- title: Persepolis highlights
+  id: sport_search_persepolis_highlights
+  feedSources:
+    - id: inv_search_sport_persepolis_highlights
+      title: Persepolis highlights
+      apiType: Invidious
+      endpoint: search
+      queryParams:
+        q: خلاصه بازی پرسپولیس
+        sort: date
+        date: month
+        type: video
+
+- title: Football from your subscriptions
+  id: sport_subscriptions
+  feedSources:
+    - id: inv_auth_feed_sport
+      title: Football from your subscriptions
+      apiType: Invidious
+      endpoint: auth_feed
+      responseHandler: FootballSubscriptionsHandler
+      channels:
+        - ucid: UC6yW44UGJJBvYTlfC7CRg2Q
+          name: "Manchester United"
+        - ucid: UC_myQ7G7yD82dVO13BP1hlg
+          name: "Persepolis F.C."
+        - ucid: UCuSS7Q8O6Wv1SGQVAs1Uvgg
+          name: "Football360"
+        - ucid: UCAQeufREQCf7V0wf8M8NISw
+          name: "Alefball"
+        - ucid: UCkgsrOXWQNZRS_Cj8-_7sPw
+          name: "The Rest Is Football"
+
+- title: Manchester United
+  id: sport_channel_UC6yW44UGJJBvYTlfC7CRg2Q
+  feedSources:
+    - id: inv_channel_videos_UC6yW44UGJJBvYTlfC7CRg2Q
+      title: Manchester United
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UC6yW44UGJJBvYTlfC7CRg2Q
+      queryParams:
+        sort_by: newest
+
+- title: "Persepolis F.C."
+  id: sport_channel_UC_myQ7G7yD82dVO13BP1hlg
+  feedSources:
+    - id: inv_channel_videos_UC_myQ7G7yD82dVO13BP1hlg
+      title: "Persepolis F.C."
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UC_myQ7G7yD82dVO13BP1hlg
+      queryParams:
+        sort_by: newest
+
+- title: Football360
+  id: sport_channel_UCuSS7Q8O6Wv1SGQVAs1Uvgg
+  feedSources:
+    - id: inv_channel_videos_UCuSS7Q8O6Wv1SGQVAs1Uvgg
+      title: Football360
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCuSS7Q8O6Wv1SGQVAs1Uvgg
+      queryParams:
+        sort_by: newest
+
+- title: Alefball
+  id: sport_channel_UCAQeufREQCf7V0wf8M8NISw
+  feedSources:
+    - id: inv_channel_videos_UCAQeufREQCf7V0wf8M8NISw
+      title: Alefball
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCAQeufREQCf7V0wf8M8NISw
+      queryParams:
+        sort_by: newest
+
+- title: The Rest Is Football
+  id: sport_channel_UCkgsrOXWQNZRS_Cj8-_7sPw
+  feedSources:
+    - id: inv_channel_videos_UCkgsrOXWQNZRS_Cj8-_7sPw
+      title: The Rest Is Football
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCkgsrOXWQNZRS_Cj8-_7sPw
+      queryParams:
+        sort_by: newest

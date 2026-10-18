@@ -4,6 +4,7 @@
         <field id="appController" type="node" />
         <field id="content" type="node" alias="ItemsList.content" />
         <field id="itemsList" type="node" bind="./ItemsList" />
+        <field id="preferences" type="node" bind="/Preferences" />
         <field id="initialFocus" type="int" value="-1" />
         <field id="screenOffset" type="float" value="170" />
     </interface>
@@ -53,10 +54,10 @@
                 focusBitmapUri="pkg:/images/white.$$RES$$.9.png"
                 focusBitmapBlendColor="0xFF1C30FF"
                 vertFocusAnimationStyle="floatingFocus"
-                numRows="9"
+                numRows="10"
                 scrollSpeed="99999"
-                itemSpacing="[0, 10]"
-                translation="[13, 150]">
+                itemSpacing="[0, 5]"
+                translation="[13, 145]">
             </MarkupList>
         </Rectangle>
 

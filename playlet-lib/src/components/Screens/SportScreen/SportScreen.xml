@@ -1,0 +1,5 @@
+<!-- The Sport page (football): top recent videos of football channels, highlights searches, football
+     from the user's subscriptions, then the latest uploads of football channels (sport_layout.yaml).
+     A separate component because the nav bar creates one screen per component name. -->
+<component name="SportScreen" extends="FeedScreen">
+</component>

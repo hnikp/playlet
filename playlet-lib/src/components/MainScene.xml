@@ -38,7 +38,12 @@
                                 text="Chess"
                                 icon="pkg:/images/icons/chess.png" />
                             <NavBarItemContent
+                                screen="SportScreen"
+                                text="Sport"
+                                icon="pkg:/images/icons/sport.png" />
+                            <NavBarItemContent
                                 screen="BookmarksScreen"
+                                preference="browsing.show_bookmarks"
                                 text="Bookmarks"
                                 icon="pkg:/images/icons/star.png" />
                             <NavBarItemContent
@@ -47,10 +52,12 @@
                                 icon="pkg:/images/icons/settings.png" />
                             <NavBarItemContent
                                 screen="RemoteScreen"
+                                preference="browsing.show_remote"
                                 text="Remote"
                                 icon="pkg:/images/icons/phone.png" />
                             <NavBarItemContent
                                 screen="AppInfoScreen"
+                                preference="browsing.show_info"
                                 text="Info"
                                 icon="pkg:/images/icons/info.png" />
                         </ContentNode>

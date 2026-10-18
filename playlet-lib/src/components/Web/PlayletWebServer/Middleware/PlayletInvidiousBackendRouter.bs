@@ -19,6 +19,15 @@ namespace Http
             m.topicShelvesCache = {}
             ' Keys hold access tokens, which are case-sensitive.
             m.topicShelvesCache.SetModeCaseSensitive()
+
+            ' InnerTube params of the channel tabs, used when a tab is requested without
+            ' params. Without params, InnerTube returns the channel's home tab (featured
+            ' video and "Popular" shelves) instead of the requested tab.
+            m.defaultChannelTabParams = {
+                "videos": "EgZ2aWRlb3PyBgQKAjoA"
+                "streams": "EgdzdHJlYW1z8gYECgJ6AA=="
+                "shorts": "EgZzaG9ydHPyBgUKA5oBAA=="
+            }
         end function
 
         @get("/playlet-invidious-backend/authorize_token")
@@ -854,6 +863,15 @@ namespace Http
                         if sortBy.DoesExist("continuation")
                             options.continuation = sortBy.continuation
                         end if
+                    end if
+                end if
+
+                ' Rows from the layout (and bookmarks) don't know the tab params, which
+                ' ChannelView parses from the channel page. Fall back to the default ones.
+                if StringUtils.IsNullOrEmpty(options.params) and StringUtils.IsNullOrEmpty(options.continuation)
+                    tabParams = m.defaultChannelTabParams[LCase(_tab)]
+                    if tabParams <> invalid
+                        options.params = tabParams
                     end if
                 end if
 

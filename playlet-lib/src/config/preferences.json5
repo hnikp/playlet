@@ -146,6 +146,27 @@
         type: "boolean",
         defaultValue: true,
       },
+      {
+        displayText: "Show Bookmarks page",
+        key: "browsing.show_bookmarks",
+        description: "Show the Bookmarks page in the menu",
+        type: "boolean",
+        defaultValue: false,
+      },
+      {
+        displayText: "Show Remote page",
+        key: "browsing.show_remote",
+        description: "Show the Remote page (control Playlet from your phone) in the menu",
+        type: "boolean",
+        defaultValue: false,
+      },
+      {
+        displayText: "Show Info page",
+        key: "browsing.show_info",
+        description: "Show the Info page (app version and details) in the menu",
+        type: "boolean",
+        defaultValue: false,
+      },
     ],
   },
   {

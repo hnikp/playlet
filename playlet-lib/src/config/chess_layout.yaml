@@ -1,7 +1,12 @@
-# Rows of the Chess page (FeedScreen): live chess streams, then the latest
-# uploads of well-known chess channels. Channel names are not translated.
+# Rows of the Chess page (FeedScreen): live chess streams, the top recent videos
+# of all the channels below, then the latest uploads of each well-known chess
+# channel. Channel names are not translated.
 # "Live now" uses ChessLiveHandler (instead of the search endpoint's handler) to
 # drop non-chess games (Auto Chess, Magic Chess...).
+# "Top recent" (ranked_channel_videos, RankedChannelVideosHandler) fetches the
+# latest videos of each channel in "channels" and ranks them with FeedRanking:
+# views relative to the channel's usual reach, decayed by age. Keep its channel
+# list in sync with the channel rows.
 - title: Live now
   id: chess_live
   feedSources:
@@ -15,6 +20,35 @@
         features: live
         sort: views
         type: video
+
+- title: Top recent
+  id: chess_top_recent
+  feedSources:
+    - id: inv_ranked_chess
+      title: Top recent
+      apiType: Invidious
+      endpoint: ranked_channel_videos
+      channels:
+        - ucid: UC9B47GnzCRFHTT1BIBWvStQ
+          name: "FIDE"
+        - ucid: UC5kS0l76kC0xOzMPtOmSFGw
+          name: "Chess.com"
+        - ucid: UCM-ONC2bCHytG2mYtKDmIeA
+          name: "Saint Louis Chess Club"
+        - ucid: UCkTCNuQ2mGfW6-SpHpaze_g
+          name: "chess24"
+        - ucid: UCQHX6ViZmPsWiYSFAyS0a3Q
+          name: "GothamChess"
+        - ucid: UCweCc7bSMX5J4jEH7HFImng
+          name: "GMHikaru"
+        - ucid: UCOVfq3NNYjlYCz1iou69FwQ
+          name: "Anna Cramling"
+        - ucid: UCL5YbN5WLFD8dLIegT5QAbA
+          name: "agadmator"
+        - ucid: UCHP9CdeguNUI-_nBv_UXBhw
+          name: "Daniel Naroditsky"
+        - ucid: UCAM1MwY63aDinDWKVSfTs0g
+          name: "Eric Rosen"
 
 - title: FIDE
   id: chess_channel_UC9B47GnzCRFHTT1BIBWvStQ

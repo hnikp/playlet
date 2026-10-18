@@ -1,0 +1,325 @@
+import "pkg:/source/utils/Types.bs"
+
+' Ranks the recent videos of several channels into a single "Top recent" feed.
+' A video scores high when it does well compared to the usual reach of its own
+' channel (views relative to the channel's median), decayed by its age. Items come
+' from Invidious (viewCount, published) or from the built-in backend (lines such
+' as "871k views • 1 day ago"), so both shapes are parsed.
+namespace FeedRanking
+
+    const DEFAULT_MAX_AGE_HOURS = 504 ' 21 days
+    const DEFAULT_PER_CHANNEL = 3
+    const DEFAULT_LIMIT = 30
+    const DEFAULT_HALF_LIFE_HOURS = 48
+
+    ' Returns the view count of the item, or invalid if unknown.
+    function ParseViews(item as object) as dynamic
+        if not IsAssociativeArray(item)
+            return invalid
+        end if
+
+        if IsNumber(item.viewCount)
+            return item.viewCount
+        end if
+
+        for each text in TextsOf(item, ["viewCountText"])
+            views = ParseViewsText(text)
+            if views <> invalid
+                return views
+            end if
+        end for
+
+        return invalid
+    end function
+
+    ' Parses "871k views", "1.2M views", "2,345 views", "1 view", "No views".
+    function ParseViewsText(text as string) as dynamic
+        lower = LCase(text)
+        if lower.InStr("no views") <> -1
+            return 0
+        end if
+
+        index = lower.InStr("view")
+        if index <= 0
+            return invalid
+        end if
+
+        tokens = lower.Left(index).Trim().Split(" ")
+        if tokens.Count() = 0
+            return invalid
+        end if
+        token = tokens[tokens.Count() - 1].Replace(",", "")
+        if token = ""
+            return invalid
+        end if
+
+        multiplier = 1
+        suffix = token.Right(1)
+        if suffix = "k"
+            multiplier = 1000
+        else if suffix = "m"
+            multiplier = 1000000
+        else if suffix = "b"
+            multiplier = 1000000000
+        end if
+        if multiplier <> 1
+            token = token.Left(token.Len() - 1)
+        end if
+
+        if not IsNumericToken(token)
+            return invalid
+        end if
+
+        return Val(token) * multiplier
+    end function
+
+    ' Returns the age of the item in hours (float), or invalid if unknown.
+    ' Prefers the "published" timestamp, then "N units ago" texts
+    ' (including "Streamed 20 hours ago" and "Premiered 2 days ago").
+    function ParseAgeHours(item as object, nowSeconds as dynamic) as dynamic
+        if not IsAssociativeArray(item)
+            return invalid
+        end if
+
+        if IsNumber(item.published) and item.published > 0
+            ageHours = (nowSeconds - item.published) / 3600.0
+            if ageHours < 0
+                ageHours = 0
+            end if
+            return ageHours
+        end if
+
+        regex = CreateObject("roRegex", "(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago", "i")
+        for each text in TextsOf(item, ["publishedText"])
+            match = regex.Match(text)
+            if match.Count() >= 3
+                amount = match[1].ToInt()
+                unit = LCase(match[2])
+                hoursPerUnit = {
+                    "second": 1.0 / 3600.0
+                    "minute": 1.0 / 60.0
+                    "hour": 1.0
+                    "day": 24.0
+                    "week": 24.0 * 7
+                    "month": 24.0 * 30
+                    "year": 24.0 * 365
+                }
+                return amount * hoursPerUnit[unit]
+            end if
+        end for
+
+        return invalid
+    end function
+
+    function IsUpcoming(item as object) as boolean
+        if not IsAssociativeArray(item)
+            return false
+        end if
+
+        if item.isUpcoming = true
+            return true
+        end if
+
+        for each text in TextsOf(item, ["publishedText", "viewCountText"])
+            if text.InStr("Scheduled for") <> -1 or text.InStr("Premieres") <> -1 or LCase(text).InStr("waiting") <> -1
+                return true
+            end if
+        end for
+
+        return false
+    end function
+
+    function IsShort(item as object) as boolean
+        if ValidString(item.type) = "shortVideo"
+            return true
+        end if
+
+        lengthSeconds = item.lengthSeconds
+        if not IsNumber(lengthSeconds) or lengthSeconds <= 0
+            lengthSeconds = ParseLengthText(ValidString(item.lengthText))
+        end if
+
+        return lengthSeconds > 0 and lengthSeconds < 61
+    end function
+
+    ' Parses "30:51" or "1:02:03" into seconds. Returns 0 if unknown.
+    function ParseLengthText(text as string) as integer
+        if text = "" or text.InStr(":") = -1
+            return 0
+        end if
+
+        seconds = 0
+        for each part in text.Trim().Split(":")
+            if not IsNumericToken(part) or part.InStr(".") <> -1
+                return 0
+            end if
+            seconds = seconds * 60 + part.ToInt()
+        end for
+        return seconds
+    end function
+
+    ' itemsByChannel: an array of arrays of videos, one per channel.
+    ' options: nowSeconds, maxAgeHours, perChannel, limit, halfLifeHours.
+    ' Returns the top items (unmodified), best first.
+    function Rank(itemsByChannel as object, options as object) as object
+        options = ValidAssociativeArray(options)
+        nowSeconds = options.nowSeconds
+        if not IsNumber(nowSeconds)
+            nowSeconds = CreateObject("roDateTime").AsSeconds()
+        end if
+        maxAgeHours = NumberOption(options, "maxAgeHours", FeedRanking.DEFAULT_MAX_AGE_HOURS)
+        perChannel = NumberOption(options, "perChannel", FeedRanking.DEFAULT_PER_CHANNEL)
+        limit = NumberOption(options, "limit", FeedRanking.DEFAULT_LIMIT)
+        halfLifeHours = NumberOption(options, "halfLifeHours", FeedRanking.DEFAULT_HALF_LIFE_HOURS)
+        if halfLifeHours <= 0
+            halfLifeHours = FeedRanking.DEFAULT_HALF_LIFE_HOURS
+        end if
+
+        merged = []
+        for each channelItems in ValidArray(itemsByChannel)
+            candidates = []
+            knownViews = []
+            for each item in ValidArray(channelItems)
+                if not IsAssociativeArray(item) or not IsString(item.videoId)
+                    continue for
+                end if
+                ' The live row of the page shows live videos.
+                if item.liveNow = true or IsUpcoming(item) or IsShort(item)
+                    continue for
+                end if
+
+                views = ParseViews(item)
+                if views <> invalid
+                    knownViews.Push(views)
+                end if
+                candidates.Push({ item: item, views: views })
+            end for
+
+            ' The median is computed before the age filter, so it represents
+            ' the usual reach of the channel.
+            median = ComputeMedian(knownViews)
+            if median < 1
+                median = 1
+            end if
+
+            scored = []
+            for each candidate in candidates
+                ageHours = ParseAgeHours(candidate.item, nowSeconds)
+                if ageHours = invalid or ageHours > maxAgeHours
+                    continue for
+                end if
+
+                ratio = 1.0
+                if candidate.views <> invalid
+                    ratio = candidate.views / median
+                end if
+                score = Sqr(ratio) * (0.5 ^ (ageHours / halfLifeHours))
+                scored.Push({ item: candidate.item, score: score })
+            end for
+
+            scored = SortByScoreDescending(scored)
+            for i = 0 to scored.Count() - 1
+                if i >= perChannel
+                    exit for
+                end if
+                merged.Push(scored[i])
+            end for
+        end for
+
+        merged = SortByScoreDescending(merged)
+
+        result = []
+        seen = {}
+        for each entry in merged
+            if result.Count() >= limit
+                exit for
+            end if
+            videoId = entry.item.videoId
+            if seen.DoesExist(videoId)
+                continue for
+            end if
+            seen[videoId] = true
+            result.Push(entry.item)
+        end for
+
+        return result
+    end function
+
+    function ComputeMedian(values as object) as float
+        if values.Count() = 0
+            return 0
+        end if
+
+        sorted = []
+        for each value in values
+            ' Insertion sort, ascending
+            index = sorted.Count()
+            while index > 0 and sorted[index - 1] > value
+                index -= 1
+            end while
+            InsertAt(sorted, index, value)
+        end for
+
+        middle = sorted.Count() \ 2
+        if sorted.Count() mod 2 = 1
+            return sorted[middle]
+        end if
+        return (sorted[middle - 1] + sorted[middle]) / 2.0
+    end function
+
+    ' Stable insertion sort on entries with a "score" field, highest first.
+    function SortByScoreDescending(entries as object) as object
+        sorted = []
+        for each entry in entries
+            index = sorted.Count()
+            while index > 0 and sorted[index - 1].score < entry.score
+                index -= 1
+            end while
+            InsertAt(sorted, index, entry)
+        end for
+        return sorted
+    end function
+
+    function InsertAt(array as object, index as integer, value as dynamic)
+        array.Push(value)
+        i = array.Count() - 1
+        while i > index
+            array[i] = array[i - 1]
+            i -= 1
+        end while
+        array[index] = value
+    end function
+
+    function NumberOption(options as object, key as string, defaultValue as dynamic) as dynamic
+        value = options[key]
+        if IsNumber(value)
+            return value
+        end if
+        return defaultValue
+    end function
+
+    ' Returns the given string fields of the item, followed by its "lines".
+    function TextsOf(item as object, fields as object) as object
+        texts = []
+        for each field in fields
+            if IsString(item[field]) and item[field] <> ""
+                texts.Push(item[field])
+            end if
+        end for
+        for each line in ValidArray(item.lines)
+            if IsString(line)
+                texts.Push(line)
+            end if
+        end for
+        return texts
+    end function
+
+    function IsNumericToken(token as string) as boolean
+        if token = ""
+            return false
+        end if
+        regex = CreateObject("roRegex", "^\d+(\.\d+)?$", "")
+        return regex.IsMatch(token)
+    end function
+
+end namespace
