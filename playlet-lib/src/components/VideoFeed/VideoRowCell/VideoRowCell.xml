@@ -22,11 +22,6 @@
                 width="350"
                 height="196"
                 failedBitmapUri="pkg:/images/thumbnail-missing.jpg">
-                <!-- thumbnail preview: one storyboard sheet scaled so a tile covers the thumbnail, clipped to
-                     the current tile (see ShowPreviewFrame) -->
-                <Poster
-                    id="previewPoster"
-                    visible="false" />
                 <Rectangle
                     id="durationRect"
                     width="60"
@@ -68,6 +63,16 @@
                 height="25"
                 font="font:SmallestSystemFont" />
         </LayoutGroup>
+        <!-- thumbnail preview, over the thumbnail (top-left of the LayoutGroup): one storyboard sheet scaled so a
+             tile covers the thumbnail, moved so the current tile is at 0,0 (see ShowPreviewFrame). Outside the
+             LayoutGroup on purpose: it would lay out the whole (unclipped) sheet and push the cell's content away. -->
+        <Group
+            id="previewGroup"
+            clippingRect="[0,0,350,196]">
+            <Poster
+                id="previewPoster"
+                visible="false" />
+        </Group>
         <Timer id="previewTimer" duration="0.8" repeat="true" />
     </children>
 </component>

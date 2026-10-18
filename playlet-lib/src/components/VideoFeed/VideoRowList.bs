@@ -439,10 +439,11 @@ end function
 ' Restarts the preview delay for the newly focused item (only videos with a known duration: not live/upcoming)
 function SchedulePreview(item as object) as void
     StopPreview()
-    if item = invalid or item.type <> "video" or item.liveNow or item.isUpcoming or ValidInt(item.lengthSeconds) <= 0
+    if item = invalid or item.type <> "video" or item.liveNow or item.isUpcoming
         return
     end if
     if m.preferences["misc.thumbnail_preview"] <> true
+        LogDebug("Thumbnail preview off:", m.preferences["misc.thumbnail_preview"])
         return
     end if
 
@@ -459,8 +460,10 @@ end function
 function OnPreviewTimerFire() as void
     item = m.previewNode
     if item = invalid or not m.top.hasFocus() or not m.top.visible
+        LogDebug("Thumbnail preview skipped: focus=", m.top.hasFocus(), " visible=", m.top.visible)
         return
     end if
+    LogDebug("Thumbnail preview for", item.videoId)
     ' no previews over a fullscreen video (the list isn't visible anyway)
     if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue) and VideoQueueUtils.IsVideoPlayerFullScreen(m.videoQueue)
         return

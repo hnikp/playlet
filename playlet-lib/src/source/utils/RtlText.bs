@@ -12,6 +12,8 @@ namespace RtlText
     const FONT_REGULAR_FILE = "libpkg:/fonts/Vazirmatn-Regular.ttf"
     const FONT_BOLD_FILE = "libpkg:/fonts/Vazirmatn-Bold.ttf"
     const FONT_FAMILY = "Vazirmatn"
+    ' Vazirmatn looks larger (and its lines are taller) than the system font at the same size
+    const FONT_SCALE = 0.9
 
     const ZWNJ = &h200C
     const ZWJ = &h200D
@@ -374,9 +376,7 @@ namespace RtlText
         end if
         text = ValidString(text)
         if not ContainsArabicScript(text)
-            if defaultFont <> invalid
-                label.font = defaultFont
-            end if
+            SetDefaultFont(label, defaultFont)
             label.horizAlign = "left"
             label.text = text
             return
@@ -402,7 +402,7 @@ namespace RtlText
         maxWidth = Int(label.width * 0.95)
         prepared = Prepare(text, GetMeasureFont(size, bold), maxWidth, maxLines)
 
-        label.font = GetLabelFont(size, bold)
+        SetRtlFont(label, size, bold)
         if prepared.isRtl
             label.horizAlign = "right"
         else
@@ -419,7 +419,7 @@ namespace RtlText
             return
         end if
         if prepared.hasArabicScript = true
-            label.font = GetLabelFont(size, bold)
+            SetRtlFont(label, size, bold)
             if prepared.isRtl = true
                 label.horizAlign = "right"
             else
@@ -428,9 +428,33 @@ namespace RtlText
             label.text = prepared.text
             return
         end if
-        label.font = defaultFont
+        SetDefaultFont(label, defaultFont)
         label.horizAlign = "left"
         label.text = ValidString(text)
+    end function
+
+    ' Vazirmatn's lines are much taller than the system font's (~38px vs ~28px at size 18), which pushes the
+    ' labels below a multi-line title out of their cell: tighten the line spacing while it is used.
+    function SetRtlFont(label as object, size as integer, bold as boolean) as void
+        if not label.hasField("rtlDefaultLineSpacing")
+            label.addField("rtlDefaultLineSpacing", "float", false)
+            label.rtlDefaultLineSpacing = label.lineSpacing
+        end if
+        label.font = GetLabelFont(size, bold)
+        label.lineSpacing = label.rtlDefaultLineSpacing - Int(ScaledFontSize(size) * 0.5)
+    end function
+
+    function SetDefaultFont(label as object, defaultFont as dynamic) as void
+        if defaultFont <> invalid
+            label.font = defaultFont
+        end if
+        if label.hasField("rtlDefaultLineSpacing")
+            label.lineSpacing = label.rtlDefaultLineSpacing
+        end if
+    end function
+
+    function ScaledFontSize(size as integer) as integer
+        return Int(size * FONT_SCALE + 0.5)
     end function
 
     ' A SceneGraph Font node for the bundled font, cached per thread.
@@ -449,7 +473,7 @@ namespace RtlText
             else
                 font.uri = FONT_REGULAR_URI
             end if
-            font.size = size
+            font.size = ScaledFontSize(size)
             cache[key] = font
         end if
         return font
@@ -482,7 +506,7 @@ namespace RtlText
                 registry.Register(FONT_BOLD_FILE)
                 m.__rtlFontRegistry = registry
             end if
-            measurer = registry.GetFont(FONT_FAMILY, size, bold, false)
+            measurer = registry.GetFont(FONT_FAMILY, ScaledFontSize(size), bold, false)
         end if
 
         if measurer = invalid
