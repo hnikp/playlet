@@ -1,23 +1,23 @@
 {
-  inputHash: 'af99e8f104e2a8163a0f45beff1bc4ca',
+  inputHash: '670a4483b914a4619c83fd1594f47198',
   outputs: [
     {
       outputFilePath: 'images/channel-poster_fhd.png',
-      outputHash: '7f94819bed521fff63522919f9f4a2eb',
+      outputHash: '782ff33eb07011be76d0f7d6d4c72e59',
       width: 540,
       height: 405,
       background: '#EBEBEB',
     },
     {
       outputFilePath: 'images/channel-poster_hd.png',
-      outputHash: '5e2b7d5c725287edb8aef46a93527fce',
+      outputHash: '1e50dacb3aede27821c9af64aa9a5fcf',
       width: 290,
       height: 218,
       background: '#EBEBEB',
     },
     {
       outputFilePath: 'images/channel-poster_sd.png',
-      outputHash: 'da190c2d9c813384e8f5eb744d818bed',
+      outputHash: '30c6f28548b13ed5bc02e606b4bdc493',
       width: 246,
       height: 140,
       background: '#EBEBEB',

@@ -1,23 +1,23 @@
 {
-  inputHash: 'f0505e2ab32829450aafc724ff01d444',
+  inputHash: 'd2f9a76a1684448fe33a4625fc34882e',
   outputs: [
     {
       outputFilePath: 'images/splash-screen_fhd.jpg',
-      outputHash: '6ce1a2ffcfebbe16182814842c47a6c0',
+      outputHash: '939bb2304b93482e9c33638e5b3bb116',
       width: 1920,
       height: 1080,
       background: '#242424',
     },
     {
       outputFilePath: 'images/splash-screen_hd.jpg',
-      outputHash: 'd355c7abf907f6c034e63b0b718bf87f',
+      outputHash: 'e43675cff6422903a6849e7b0e83fe62',
       width: 1280,
       height: 720,
       background: '#242424',
     },
     {
       outputFilePath: 'images/splash-screen_sd.jpg',
-      outputHash: '43e0876cafebec08e667b8122e20a01b',
+      outputHash: '5dac8a9956936f3539169ea7612df221',
       width: 720,
       height: 480,
       background: '#242424',
