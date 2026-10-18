@@ -1712,5 +1712,9 @@
         <source>Clear sky</source>
         <translation>Clear sky</translation>
     </message>
+    <message>
+        <source>1 like</source>
+        <translation>1 like</translation>
+    </message>
 </context>
 </TS>

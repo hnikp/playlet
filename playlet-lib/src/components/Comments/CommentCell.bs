@@ -37,8 +37,12 @@ function CommentsFooterText(content as object) as string
     if content.isPinned
         parts.Push(Tr(Locale.Comments.Pinned))
     end if
-    if content.likeCountText <> "" and content.likeCountText <> "0"
-        parts.Push(Tr(Locale.Comments.NLikes).Replace("%1", content.likeCountText))
+    ' YouTube sends a blank (whitespace) count for no likes
+    likes = content.likeCountText.Trim()
+    if likes = "1"
+        parts.Push(Tr(Locale.Comments.OneLike))
+    else if likes <> "" and likes <> "0"
+        parts.Push(Tr(Locale.Comments.NLikes).Replace("%1", likes))
     end if
     if content.replyCount = 1
         parts.Push(Tr(Locale.Comments.OneReply))

@@ -510,6 +510,7 @@ namespace Locale
         NewestFirst = "Newest first"
         PressLeftRightToSort = "Left/Right to sort"
         NLikes = "%1 likes"
+        OneLike = "1 like"
         NReplies = "%1 replies"
         OneReply = "1 reply"
         Pinned = "Pinned"
