@@ -1,0 +1,78 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.label = m.top.findNode("weatherLabel")
+    m.cityLabel = m.top.findNode("cityLabel")
+    if not m.global.hasField("weather")
+        m.global.addField("weather", "assocarray", false)
+    end if
+    m.refreshTimer = m.top.findNode("refreshTimer")
+end function
+
+function OnNodeReady()
+    for each key in ["weather.enabled", "weather.location", "weather.units"]
+        m.preferences.observeFieldScoped(key, FuncName(Refresh))
+    end for
+    DisposableObserveField(m.refreshTimer, "fire", FuncName(Refresh))
+    m.refreshTimer.control = "start"
+    Refresh()
+end function
+
+function Refresh() as void
+    if m.weatherJob <> invalid
+        m.weatherJob.cancel = true
+        m.weatherJob = invalid
+    end if
+
+    location = ValidString(m.preferences["weather.location"]).Trim()
+    if m.preferences["weather.enabled"] <> true or StringUtils.IsNullOrEmpty(location)
+        SetWeather({ text: "", city: "" })
+        return
+    end if
+
+    m.weatherJob = JobSystem.CreateCallback(OnWeatherJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.WeatherJob, {
+        location: location
+        units: m.preferences["weather.units"]
+    }, m.weatherJob)
+end function
+
+function OnWeatherJobDone(event as object) as void
+    callback = event.getRoSGNode()
+    JobSystem.UnobserveCallback(callback)
+    if m.weatherJob = invalid or not m.weatherJob.isSameNode(callback)
+        return
+    end if
+    m.weatherJob = invalid
+
+    info = event.getInfo()
+    if info.cancel
+        return
+    end if
+    if not info.success
+        ' keep the last reading on a network hiccup
+        LogWarn("Weather unavailable:", info.error)
+        return
+    end if
+    SetWeather(info.data)
+end function
+
+function SetWeather(weather as object)
+    m.label.text = weather.text
+    m.cityLabel.text = ValidString(weather.city)
+    m.global.weather = weather
+end function
+
+function OnDispose()
+    m.refreshTimer.control = "stop"
+    if m.preferences <> invalid
+        for each key in ["weather.enabled", "weather.location", "weather.units"]
+            m.preferences.unobserveFieldScoped(key)
+        end for
+    end if
+end function

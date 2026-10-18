@@ -327,6 +327,16 @@ namespace Locale
         PreviewSoundDescription = "Play video previews with sound"
         PreviewTimeLimit = "Preview time limit"
         PreviewTimeLimitDescription = "Stop a video preview after this many minutes (0 = no limit)"
+        Weather = "Weather"
+        WeatherDescription = "Weather shown under the clock on the main pages"
+        ShowWeather = "Show weather"
+        ShowWeatherDescription = "Show the temperature, sky and chance of rain under the clock"
+        WeatherCity = "City"
+        WeatherCityDescription = "City to show the weather for, for example München or Tehran"
+        TemperatureUnit = "Temperature unit"
+        TemperatureUnitDescription = "Show temperatures in Celsius or Fahrenheit"
+        Celsius = "Celsius"
+        Fahrenheit = "Fahrenheit"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"
@@ -523,5 +533,25 @@ namespace Locale
         VideoQueue = "Video queue"
         PictureInPicture = "Picture-in-picture"
         LiveChat = "Live chat"
+    end enum
+
+    @locale
+    enum Weather
+        ClearSky = "Clear sky"
+        MainlyClear = "Mostly clear"
+        PartlyCloudy = "Partly cloudy"
+        Cloudy = "Cloudy"
+        Fog = "Fog"
+        Drizzle = "Drizzle"
+        FreezingRain = "Freezing rain"
+        LightRain = "Light rain"
+        Rain = "Rain"
+        HeavyRain = "Heavy rain"
+        Snow = "Snow"
+        Showers = "Showers"
+        SnowShowers = "Snow showers"
+        Thunderstorm = "Thunderstorm"
+        RainChance = "Rain %1%"
+        CityNotFound = "City not found: %1"
     end enum
 end namespace

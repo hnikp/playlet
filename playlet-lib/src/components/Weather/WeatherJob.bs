@@ -1,0 +1,65 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/WeatherUtils.bs"
+
+' Looks up the city with Open-Meteo's geocoding API, then fetches its current weather and the chance of
+' rain over the next hours. Outputs { text, city } for the Weather labels.
+@job("WeatherJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    ' count goes in the URL: as a query param key it would shadow the params AA's Count() method
+    request = HttpClient.Get("https://geocoding-api.open-meteo.com/v1/search?count=1")
+    request.QueryParam("name", input.location)
+    request.QueryParam("format", "json")
+    request.CacheForSeconds(86400)
+    request.Cancellation(JobGetCancellation())
+    response = request.Await()
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+    if not response.IsSuccess()
+        JobError("Geocoding failed: " + response.ErrorMessage())
+        return
+    end if
+
+    json = response.Json()
+    if not IsAssociativeArray(json) or not IsArray(json.results) or json.results.Count() = 0
+        ' a typo in the city name should be visible, not just silently show nothing
+        JobSuccessData({ text: Tr(Locale.Weather.CityNotFound).Replace("%1", input.location), city: "" })
+        return
+    end if
+    place = json.results[0]
+
+    fahrenheit = input.units = "fahrenheit"
+    request = HttpClient.Get("https://api.open-meteo.com/v1/forecast")
+    request.QueryParam("latitude", place.latitude)
+    request.QueryParam("longitude", place.longitude)
+    request.QueryParam("current", "temperature_2m,weather_code")
+    request.QueryParam("hourly", "precipitation_probability")
+    request.QueryParam("forecast_hours", WeatherUtils.RAIN_CHANCE_HOURS)
+    request.QueryParam("timezone", "auto")
+    if fahrenheit
+        request.QueryParam("temperature_unit", "fahrenheit")
+    end if
+    request.CacheForSeconds(600)
+    request.Cancellation(JobGetCancellation())
+    response = request.Await()
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+    if not response.IsSuccess()
+        JobError("Forecast failed: " + response.ErrorMessage())
+        return
+    end if
+
+    text = WeatherUtils.Format(response.Json(), fahrenheit)
+    if text = ""
+        JobError("Invalid forecast response")
+        return
+    end if
+    JobSuccessData({ text: text, city: ValidString(place.name) })
+end function

@@ -1608,5 +1608,109 @@
         <source>Live now</source>
         <translation>Live now</translation>
     </message>
+    <message>
+        <source>Weather</source>
+        <translation>Weather</translation>
+    </message>
+    <message>
+        <source>Weather shown under the clock on the main pages</source>
+        <translation>Weather shown under the clock on the main pages</translation>
+    </message>
+    <message>
+        <source>Show weather</source>
+        <translation>Show weather</translation>
+    </message>
+    <message>
+        <source>Show the temperature, sky and chance of rain under the clock</source>
+        <translation>Show the temperature, sky and chance of rain under the clock</translation>
+    </message>
+    <message>
+        <source>City</source>
+        <translation>City</translation>
+    </message>
+    <message>
+        <source>City to show the weather for, for example München or Tehran</source>
+        <translation>City to show the weather for, for example München or Tehran</translation>
+    </message>
+    <message>
+        <source>Temperature unit</source>
+        <translation>Temperature unit</translation>
+    </message>
+    <message>
+        <source>Show temperatures in Celsius or Fahrenheit</source>
+        <translation>Show temperatures in Celsius or Fahrenheit</translation>
+    </message>
+    <message>
+        <source>Celsius</source>
+        <translation>Celsius</translation>
+    </message>
+    <message>
+        <source>Fahrenheit</source>
+        <translation>Fahrenheit</translation>
+    </message>
+    <message>
+        <source>Mostly clear</source>
+        <translation>Mostly clear</translation>
+    </message>
+    <message>
+        <source>Partly cloudy</source>
+        <translation>Partly cloudy</translation>
+    </message>
+    <message>
+        <source>Cloudy</source>
+        <translation>Cloudy</translation>
+    </message>
+    <message>
+        <source>Fog</source>
+        <translation>Fog</translation>
+    </message>
+    <message>
+        <source>Drizzle</source>
+        <translation>Drizzle</translation>
+    </message>
+    <message>
+        <source>Freezing rain</source>
+        <translation>Freezing rain</translation>
+    </message>
+    <message>
+        <source>Light rain</source>
+        <translation>Light rain</translation>
+    </message>
+    <message>
+        <source>Rain</source>
+        <translation>Rain</translation>
+    </message>
+    <message>
+        <source>Heavy rain</source>
+        <translation>Heavy rain</translation>
+    </message>
+    <message>
+        <source>Snow</source>
+        <translation>Snow</translation>
+    </message>
+    <message>
+        <source>Showers</source>
+        <translation>Showers</translation>
+    </message>
+    <message>
+        <source>Snow showers</source>
+        <translation>Snow showers</translation>
+    </message>
+    <message>
+        <source>Thunderstorm</source>
+        <translation>Thunderstorm</translation>
+    </message>
+    <message>
+        <source>Rain %1%</source>
+        <translation>Rain %1%</translation>
+    </message>
+    <message>
+        <source>City not found: %1</source>
+        <translation>City not found: %1</translation>
+    </message>
+    <message>
+        <source>Clear sky</source>
+        <translation>Clear sky</translation>
+    </message>
 </context>
 </TS>

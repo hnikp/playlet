@@ -60,6 +60,7 @@
 
             <Group scale="[0.92,0.92]" scaleRotateCenter="[640,360]">
                 <Clock />
+                <Weather />
             </Group>
             <VideoContainer id="VideoContainer" />
             <Group id="Notifications" scale="[0.92,0.92]" scaleRotateCenter="[640,360]" />

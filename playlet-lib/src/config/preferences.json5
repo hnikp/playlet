@@ -193,6 +193,44 @@
     ],
   },
   {
+    displayText: "Weather",
+    key: "weather",
+    description: "Weather shown under the clock on the main pages",
+    children: [
+      {
+        displayText: "Show weather",
+        key: "weather.enabled",
+        description: "Show the temperature, sky and chance of rain under the clock",
+        type: "boolean",
+        defaultValue: true,
+      },
+      {
+        displayText: "City",
+        key: "weather.location",
+        description: "City to show the weather for, for example München or Tehran",
+        type: "string",
+        defaultValue: "München",
+      },
+      {
+        displayText: "Temperature unit",
+        key: "weather.units",
+        description: "Show temperatures in Celsius or Fahrenheit",
+        type: "radio",
+        defaultValue: "celsius",
+        options: [
+          {
+            displayText: "Celsius",
+            value: "celsius",
+          },
+          {
+            displayText: "Fahrenheit",
+            value: "fahrenheit",
+          },
+        ],
+      },
+    ],
+  },
+  {
     displayText: "Invidious",
     key: "invidious",
     description: "Invidious preferences",

@@ -1,0 +1,89 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace WeatherUtils
+    ' The rain chance shown is the highest over this many hours, starting with the current one
+    const RAIN_CHANCE_HOURS = 3
+
+    ' Formats an Open-Meteo forecast response (current temperature_2m + weather_code, hourly
+    ' precipitation_probability) as "12°C · Cloudy · Rain 40%". Returns "" if the response is unusable.
+    function Format(forecast as dynamic, fahrenheit as boolean) as string
+        if not IsAssociativeArray(forecast) or not IsAssociativeArray(forecast.current)
+            return ""
+        end if
+        temperature = forecast.current.temperature_2m
+        if not IsNumber(temperature)
+            return ""
+        end if
+
+        unit = "C"
+        if fahrenheit
+            unit = "F"
+        end if
+        ' Cint rounds half away from zero; Int would floor -0.4 to -1
+        parts = [`${Cint(temperature)}°${unit}`]
+
+        condition = ConditionText(forecast.current.weather_code)
+        if condition <> ""
+            parts.push(condition)
+        end if
+
+        rainChance = MaxRainChance(forecast.hourly)
+        if rainChance >= 0
+            parts.push(Tr(Locale.Weather.RainChance).Replace("%1", `${rainChance}`))
+        end if
+
+        return parts.Join(" · ")
+    end function
+
+    function MaxRainChance(hourly as dynamic) as integer
+        if not IsAssociativeArray(hourly) or not IsArray(hourly.precipitation_probability)
+            return -1
+        end if
+        result = -1
+        for each value in hourly.precipitation_probability
+            if IsNumber(value) and value > result
+                result = value
+            end if
+        end for
+        return result
+    end function
+
+    ' WMO weather interpretation codes, as used by Open-Meteo
+    function ConditionText(code as dynamic) as string
+        if not IsNumber(code)
+            return ""
+        end if
+        code = Cint(code)
+        if code = 0
+            return Tr(Locale.Weather.ClearSky)
+        else if code = 1
+            return Tr(Locale.Weather.MainlyClear)
+        else if code = 2
+            return Tr(Locale.Weather.PartlyCloudy)
+        else if code = 3
+            return Tr(Locale.Weather.Cloudy)
+        else if code = 45 or code = 48
+            return Tr(Locale.Weather.Fog)
+        else if code >= 51 and code <= 55
+            return Tr(Locale.Weather.Drizzle)
+        else if code = 56 or code = 57 or code = 66 or code = 67
+            return Tr(Locale.Weather.FreezingRain)
+        else if code = 61
+            return Tr(Locale.Weather.LightRain)
+        else if code = 63
+            return Tr(Locale.Weather.Rain)
+        else if code = 65
+            return Tr(Locale.Weather.HeavyRain)
+        else if code >= 71 and code <= 77
+            return Tr(Locale.Weather.Snow)
+        else if code >= 80 and code <= 82
+            return Tr(Locale.Weather.Showers)
+        else if code = 85 or code = 86
+            return Tr(Locale.Weather.SnowShowers)
+        else if code >= 95
+            return Tr(Locale.Weather.Thunderstorm)
+        end if
+        return ""
+    end function
+end namespace

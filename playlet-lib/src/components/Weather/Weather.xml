@@ -1,0 +1,28 @@
+<!-- Current weather under the main clock: temperature, condition and chance of rain, and the city under it, for the
+     city in the weather.* preferences (Open-Meteo, no API key). Refreshes every 15 minutes and when the preferences
+     change. Also published as m.global.weather ({ text, city }) for the player overlay. -->
+<component name="Weather" extends="Group" includes="AutoBind,Disposable">
+    <interface>
+        <field id="preferences" type="node" bind="/Preferences" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+    </interface>
+    <children>
+        <Label
+            id="weatherLabel"
+            translation="[734,58]"
+            width="500"
+            horizAlign="right"
+            color="#DDDDDD">
+            <Font role="font" uri="font:SystemFontFile" size="16" />
+        </Label>
+        <Label
+            id="cityLabel"
+            translation="[734,78]"
+            width="500"
+            horizAlign="right"
+            color="#AAAAAA">
+            <Font role="font" uri="font:SystemFontFile" size="14" />
+        </Label>
+        <Timer id="refreshTimer" duration="900" repeat="true" />
+    </children>
+</component>

@@ -96,6 +96,13 @@ function Initialize()
     m.endTimeLabel = m.top.findNode("endTimeLabel")
     ' translated once: code-assigned strings don't get the automatic XML lookup.
     m.endsAtText = Tr(Locale.VideoPlayer.EndsAt)
+    m.weatherLabel = m.top.findNode("weatherLabel")
+    m.weatherCityLabel = m.top.findNode("weatherCityLabel")
+    if not m.global.hasField("weather")
+        m.global.addField("weather", "assocarray", false)
+    end if
+    m.global.observeFieldScoped("weather", FuncName(OnWeatherChange))
+    OnWeatherChange()
     m.bifDisplay = m.top.findNode("bifDisplay")
     m.trickPlayBar = m.top.findNode("trickPlayBar")
     m.spinner = m.top.findNode("spinner")
@@ -949,7 +956,7 @@ function OnDuration(event as object) as void
     ApplyTransport()
 end function
 
-' "Ends at H:MM" under the clock: now + what's left at the current playback speed. Live has no end.
+' "Ends at H:MM" above the right end of the trackbar: now + what's left at the current playback speed. Live has no end.
 function UpdateEndTime() as void
     durationMs = m.transport.durationMs
     if m.transport.isLive or durationMs <= 0
@@ -965,6 +972,15 @@ function UpdateEndTime() as void
         remainingSeconds = 0
     end if
     m.endTimeLabel.text = m.endsAtText + " " + ClockUtils.FormatEpochSeconds(NowSeconds() + Int(remainingSeconds))
+end function
+
+function OnWeatherChange() as void
+    weather = m.global.weather
+    if not IsAssociativeArray(weather)
+        return
+    end if
+    m.weatherLabel.text = ValidString(weather.text)
+    m.weatherCityLabel.text = ValidString(weather.city)
 end function
 
 ' Current wall-clock epoch seconds, off the cached roDateTime.
@@ -1544,6 +1560,7 @@ function OnClose() as void
     m.top.unobserveField("playStartInfo")
     m.top.unobserveField("streamingSegment")
     m.top.unobserveField("close")
+    m.global.unobserveFieldScoped("weather")
     content = m.top.content
     if content <> invalid
         content.unobserveField("title")
