@@ -8,7 +8,8 @@
             root="bind:./AppRoot"
             stack="bind:./Stack"
             videoQueue="bind:./VideoQueue">
-            <Group id="Stack">
+            <!-- Scaled toward the screen centre so the UI stays inside TV overscan -->
+            <Group id="Stack" scale="[0.92,0.92]" scaleRotateCenter="[640,360]">
                 <AppRoot id="AppRoot">
                     <AppScreens id="AppScreens" />
                     <NavBar id="NavBar"
@@ -57,9 +58,11 @@
                 </AppRoot>
             </Group>
 
-            <Clock />
+            <Group scale="[0.92,0.92]" scaleRotateCenter="[640,360]">
+                <Clock />
+            </Group>
             <VideoContainer id="VideoContainer" />
-            <Group id="Notifications" />
+            <Group id="Notifications" scale="[0.92,0.92]" scaleRotateCenter="[640,360]" />
 
             <!--  No render nodes -->
             <VideoQueue id="VideoQueue"
