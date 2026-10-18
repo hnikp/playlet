@@ -359,6 +359,339 @@ namespace InnertubeService
         return result
     end function
 
+    ' A topic page (only "music" for now) is made of shelves from several pages, in this order:
+    ' the TV topic page personalised for the user (when an access token is given, ids "tv_me_N"),
+    ' the same page logged out (charts, new releases, ids "tv_N"), then the web "destination"
+    ' channel (genres, moods, ids "web_N"). Empty shelves are dropped, and shelves with the same
+    ' title are kept once. A page that fails is skipped (an invalid access token only loses the
+    ' personalised shelves).
+    ' Returns { shelves: [{ id, title, items, continuation? }] } or { error }.
+    function GetTopicShelves(topic as string, options = invalid as object) as object
+        cancellation = OptionUtils.Get(options, "cancellation")
+        accessToken = ValidString(OptionUtils.Get(options, "accessToken"))
+        onBehalfOfUser = ValidString(OptionUtils.Get(options, "onBehalfOfUser"))
+        disableShorts = ValidBool(OptionUtils.Get(options, "disableShorts"))
+
+        if LCase(topic) <> "music"
+            return {
+                error: `Unknown topic: ${topic}`
+            }
+        end if
+
+        tvBrowseId = "FEtopics_music"
+        webBrowseId = "UC-9-kyTW8ZkZNDHQJ6FgpwQ" ' Music
+
+        fetches = []
+        if accessToken <> ""
+            fetches.Push(FetchTvTopicShelves(tvBrowseId, "tv_me_", {
+                cancellation: cancellation
+                accessToken: accessToken
+                onBehalfOfUser: onBehalfOfUser
+                disableShorts: disableShorts
+            }))
+        end if
+        fetches.Push(FetchTvTopicShelves(tvBrowseId, "tv_", {
+            cancellation: cancellation
+            disableShorts: disableShorts
+        }))
+        fetches.Push(FetchWebTopicShelves(webBrowseId, "web_", {
+            cancellation: cancellation
+            disableShorts: disableShorts
+        }))
+
+        shelfLists = []
+        errors = []
+        for each fetched in fetches
+            if fetched.error <> invalid
+                LogWarnNoTelemetry("Failed to get topic shelves:", fetched.error)
+                errors.Push(ValidString(fetched.error))
+            else
+                shelfLists.Push(fetched.shelves)
+            end if
+        end for
+
+        if shelfLists.Count() = 0
+            return {
+                error: errors.Join(`\n`)
+            }
+        end if
+
+        return {
+            shelves: MergeTopicShelves(shelfLists)
+        }
+    end function
+
+    ' Merges lists of shelves in order: drops shelves without items, and keeps only the first
+    ' shelf of each title (case-insensitive). Shelves without a title are always kept.
+    function MergeTopicShelves(shelfLists as object) as object
+        merged = []
+        seenTitles = {}
+        for each shelfList in ValidArray(shelfLists)
+            for each shelf in ValidArray(shelfList)
+                if not IsAssociativeArray(shelf) or ValidArray(shelf.items).Count() = 0
+                    continue for
+                end if
+
+                titleKey = LCase(ValidString(shelf.title).Trim())
+                if titleKey <> ""
+                    if seenTitles.DoesExist(titleKey)
+                        continue for
+                    end if
+                    seenTitles[titleKey] = true
+                end if
+
+                merged.Push(shelf)
+            end for
+        end for
+        return merged
+    end function
+
+    ' The next items of a TV topic shelf, from its horizontalListRenderer continuation.
+    ' Pass the access token for a personalised ("tv_me_") shelf.
+    ' Returns { items, continuation? } or { error }.
+    function GetTopicShelfContinuation(continuation as string, options = invalid as object) as object
+        cancellation = OptionUtils.Get(options, "cancellation")
+        accessToken = ValidString(OptionUtils.Get(options, "accessToken"))
+        onBehalfOfUser = ValidString(OptionUtils.Get(options, "onBehalfOfUser"))
+        disableShorts = ValidBool(OptionUtils.Get(options, "disableShorts"))
+
+        requestOptions = {
+            continuation: continuation
+        }
+        if accessToken <> ""
+            requestOptions.accessToken = accessToken
+            requestOptions.onBehalfOfUser = onBehalfOfUser
+        end if
+
+        request = Innertube.CreateBrowseRequest("", Innertube.ClientType.Tv, requestOptions)
+        if accessToken <> ""
+            request.Header("Authorization", "Bearer " + accessToken)
+        end if
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return {
+                error: response.ErrorMessage()
+            }
+        end if
+
+        responseData = response.Json()
+        error = Innertube.ParseResponseDataForError(responseData)
+        if error <> ""
+            return {
+                error: error
+            }
+        end if
+
+        feeds = Innertube.ParseResponseDataForFeeds(responseData, {
+            request: request
+            disableShorts: disableShorts
+        })
+
+        shelfItems = []
+        nextContinuation = ""
+        for each feed in feeds
+            shelfItems.Append(ValidArray(feed.items))
+            if not StringUtils.IsNullOrEmpty(feed.continuation)
+                nextContinuation = feed.continuation
+            end if
+        end for
+
+        result = {
+            items: shelfItems
+        }
+        if nextContinuation <> ""
+            result.continuation = nextContinuation
+        end if
+        return result
+    end function
+
+    ' Shelves of a TV browse page: contents.tvBrowseRenderer...sectionListRenderer.contents[].shelfRenderer
+    ' Ids are idPrefix + the shelf's index on the page (empty shelves included, so ids stay stable).
+    function FetchTvTopicShelves(browseId as string, idPrefix as string, options as object) as object
+        accessToken = ValidString(options.accessToken)
+
+        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.Tv, options)
+        if accessToken <> ""
+            request.Header("Authorization", "Bearer " + accessToken)
+        end if
+        request.Cancellation(options.cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return {
+                error: response.ErrorMessage()
+            }
+        end if
+
+        responseData = response.Json()
+        error = Innertube.ParseResponseDataForError(responseData)
+        if error <> ""
+            return {
+                error: error
+            }
+        end if
+
+        sections = ObjectUtils.Dig(responseData, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "content", "sectionListRenderer", "contents"])
+        if not IsArray(sections)
+            return {
+                error: `Node 'contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents' not found (${browseId})`
+            }
+        end if
+
+        topicShelves = []
+        shelfIndex = 0
+        for each section in sections
+            shelfRenderer = invalid
+            if IsAssociativeArray(section)
+                shelfRenderer = section["shelfRenderer"]
+            end if
+            if not IsAssociativeArray(shelfRenderer)
+                continue for
+            end if
+
+            topicShelves.Push(CreateTopicShelf(idPrefix + shelfIndex.ToStr(), GetTopicShelfTitle(shelfRenderer), shelfRenderer["content"], {
+                request: request
+                disableShorts: options.disableShorts
+                browseId: browseId
+            }))
+            shelfIndex += 1
+        end for
+
+        return {
+            shelves: topicShelves
+        }
+    end function
+
+    ' Shelves of a web channel page (the same browse as GetTrending), from the selected tab:
+    ' richGridRenderer.contents[].richSectionRenderer.content.richShelfRenderer, or
+    ' sectionListRenderer.contents[].itemSectionRenderer.contents[].shelfRenderer
+    function FetchWebTopicShelves(browseId as string, idPrefix as string, options as object) as object
+        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.Web, {})
+        request.Cancellation(options.cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return {
+                error: response.ErrorMessage()
+            }
+        end if
+
+        responseData = response.Json()
+        error = Innertube.ParseResponseDataForError(responseData)
+        if error <> ""
+            return {
+                error: error
+            }
+        end if
+
+        tabContent = invalid
+        tabs = ObjectUtils.Dig(responseData, ["contents", "twoColumnBrowseResultsRenderer", "tabs"])
+        for each tabItem in ValidArray(tabs)
+            tabRenderer = invalid
+            if IsAssociativeArray(tabItem)
+                tabRenderer = tabItem["tabRenderer"]
+            end if
+            if IsAssociativeArray(tabRenderer) and ValidBool(tabRenderer["selected"])
+                tabContent = tabRenderer["content"]
+                exit for
+            end if
+        end for
+
+        sections = []
+        sections.Append(ValidArray(ObjectUtils.Dig(tabContent, ["richGridRenderer", "contents"])))
+        sections.Append(ValidArray(ObjectUtils.Dig(tabContent, ["sectionListRenderer", "contents"])))
+
+        shelfNodes = []
+        for each section in sections
+            if not IsAssociativeArray(section)
+                continue for
+            end if
+            richSectionContent = ObjectUtils.Dig(section, ["richSectionRenderer", "content"])
+            if IsAssociativeArray(richSectionContent)
+                shelfNodes.Push(richSectionContent)
+            end if
+            shelfNodes.Append(ValidArray(ObjectUtils.Dig(section, ["itemSectionRenderer", "contents"])))
+        end for
+
+        topicShelves = []
+        shelfIndex = 0
+        for each shelfNode in shelfNodes
+            if not IsAssociativeArray(shelfNode)
+                continue for
+            end if
+
+            title = ""
+            content = invalid
+            richShelfRenderer = shelfNode["richShelfRenderer"]
+            shelfRenderer = shelfNode["shelfRenderer"]
+            if IsAssociativeArray(richShelfRenderer)
+                title = Innertube.ParseText(richShelfRenderer["title"]).Trim()
+                content = richShelfRenderer["contents"]
+            else if IsAssociativeArray(shelfRenderer)
+                title = GetTopicShelfTitle(shelfRenderer)
+                content = shelfRenderer["content"]
+            else
+                continue for
+            end if
+
+            topicShelves.Push(CreateTopicShelf(idPrefix + shelfIndex.ToStr(), title, content, {
+                request: request
+                disableShorts: options.disableShorts
+                browseId: browseId
+            }))
+            shelfIndex += 1
+        end for
+
+        return {
+            shelves: topicShelves
+        }
+    end function
+
+    ' Parses a shelf's content (e.g. a horizontalListRenderer, or a richShelfRenderer's contents)
+    ' with the feed parser, into { id, title, items, continuation? }.
+    function CreateTopicShelf(id as string, title as string, content as dynamic, parseContext as object) as object
+        feeds = Innertube.ParseResponseDataForFeeds([content], {
+            request: parseContext.request
+            disableShorts: parseContext.disableShorts
+            browseId: parseContext.browseId
+            noContainers: true
+        })
+
+        shelf = {
+            id: id
+            title: title
+            items: []
+        }
+        for each feed in feeds
+            shelf.items.Append(ValidArray(feed.items))
+            if not StringUtils.IsNullOrEmpty(feed.continuation)
+                shelf.continuation = feed.continuation
+            end if
+        end for
+        return shelf
+    end function
+
+    ' The title of a shelfRenderer: its title, or the title in its header (on TV, the avatarLockup
+    ' of a shelfHeaderRenderer, possibly inside a heroCarouselHeaderRenderer for carousels).
+    function GetTopicShelfTitle(shelfRenderer as object) as string
+        paths = [
+            ["title"]
+            ["headerRenderer", "shelfHeaderRenderer", "avatarLockup", "avatarLockupRenderer", "title"]
+            ["headerRenderer", "shelfHeaderRenderer", "title"]
+            ["headerRenderer", "heroCarouselHeaderRenderer", "header", "shelfHeaderRenderer", "avatarLockup", "avatarLockupRenderer", "title"]
+            ["headerRenderer", "heroCarouselHeaderRenderer", "header", "shelfHeaderRenderer", "title"]
+        ]
+        for each path in paths
+            title = Innertube.ParseText(ObjectUtils.Dig(shelfRenderer, path)).Trim()
+            if title <> ""
+                return title
+            end if
+        end for
+        return ""
+    end function
+
     function GetHome(options = invalid as object) as object
         return GetBrowseAuthenticatedPage("FEwhat_to_watch", options)
     end function

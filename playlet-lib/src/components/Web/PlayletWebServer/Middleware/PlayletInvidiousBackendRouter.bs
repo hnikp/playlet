@@ -1,6 +1,7 @@
 import "pkg:/components/Services/Innertube/CommentsEndpoint.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
+import "pkg:/source/utils/TimeUtils.bs"
 
 namespace Http
 
@@ -12,6 +13,12 @@ namespace Http
             m.innertube = server.sceneNodes.innertube
             m.loungeService = server.sceneNodes.loungeService
             m.preferences = server.sceneNodes.preferences
+
+            ' Topic shelves (with their items), per topic and user, so that the rows of a
+            ' topic page don't each fetch the whole topic again.
+            m.topicShelvesCache = {}
+            ' Keys hold access tokens, which are case-sensitive.
+            m.topicShelvesCache.SetModeCaseSensitive()
         end function
 
         @get("/playlet-invidious-backend/authorize_token")
@@ -581,6 +588,8 @@ namespace Http
                 return m.GetChannel(context)
             else if route.StartsWith("/playlet-invidious-backend/api/v1/comments/")
                 return m.GetComments(context)
+            else if route.StartsWith("/playlet-invidious-backend/api/v1/topics/")
+                return m.GetTopic(context)
             else if route.StartsWith("/playlet-invidious-backend/channel")
                 return m.RedirectChannel(context)
             end if
@@ -1074,6 +1083,197 @@ namespace Http
             return true
         end function
 
+
+        ' /api/v1/topics/:topic -> { shelves: [{ id, title }] }
+        ' /api/v1/topics/:topic/shelves/:id?continuation=... -> { videos, continuation? }
+        ' Authentication is optional: with a token, the topic includes the user's personalised shelves.
+        function GetTopic(context as object) as boolean
+            request = context.request
+            response = context.response
+            route = request.route
+
+            topicPath = route.Mid("/playlet-invidious-backend/api/v1/topics/".Len())
+            if topicPath.InStr("?") > 0
+                topicPath = topicPath.Left(topicPath.InStr("?"))
+            end if
+            pathParts = topicPath.Split("/")
+            if pathParts.Count() = 0
+                pathParts = [""]
+            end if
+            topic = pathParts[0]
+
+            if pathParts.Count() = 1
+                return m.GetTopicShelfList(context, topic)
+            else if pathParts.Count() = 3 and pathParts[1] = "shelves"
+                return m.GetTopicShelf(context, topic, pathParts[2])
+            end if
+
+            response.Json({
+                "error": `Unknown topic route: ${route}`
+            })
+            response.http_code = 404
+            return true
+        end function
+
+        function GetTopicShelfList(context as object, topic as string) as boolean
+            request = context.request
+            response = context.response
+
+            result = m.GetCachedTopicShelves(topic, request, false)
+            if result.error <> invalid
+                response.Json(result)
+                response.http_code = m.GetTopicErrorHttpCode(result.error)
+                return true
+            end if
+
+            shelfList = []
+            for each shelf in result.shelves
+                shelfList.Push({
+                    "id": shelf.id
+                    "title": shelf.title
+                })
+            end for
+
+            response.Json({
+                "shelves": shelfList
+            })
+            return true
+        end function
+
+        function GetTopicShelf(context as object, topic as string, shelfId as string) as boolean
+            request = context.request
+            response = context.response
+
+            continuation = request.query.continuation
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options = {
+                    "disableShorts": m.preferences["content_feed.disable_shorts"]
+                }
+                ' Only the personalised shelves need the user's token to continue.
+                if shelfId.StartsWith("tv_me_")
+                    accessToken = m.GetAccessToken(request)
+                    if accessToken <> invalid
+                        options.accessToken = accessToken
+                        activeIdentifyToken = request.query.activeIdentifyToken
+                        if not StringUtils.IsNullOrEmpty(activeIdentifyToken)
+                            options.onBehalfOfUser = activeIdentifyToken
+                        end if
+                    end if
+                end if
+
+                result = InnertubeService.GetTopicShelfContinuation(continuation, options)
+                if result.error <> invalid
+                    response.Json(result)
+                    response.http_code = 500
+                    return true
+                end if
+
+                m.RespondWithTopicShelfItems(response, result)
+                return true
+            end if
+
+            shelf = m.FindTopicShelf(m.GetCachedTopicShelves(topic, request, false), shelfId)
+            if shelf = invalid
+                ' The cache may hold an older version of the topic: fetch it again once.
+                result = m.GetCachedTopicShelves(topic, request, true)
+                if result.error <> invalid
+                    response.Json(result)
+                    response.http_code = m.GetTopicErrorHttpCode(result.error)
+                    return true
+                end if
+                shelf = m.FindTopicShelf(result, shelfId)
+            end if
+
+            if shelf = invalid
+                response.Json({
+                    "error": `Shelf '${shelfId}' not found in topic '${topic}'`
+                })
+                response.http_code = 404
+                return true
+            end if
+
+            m.RespondWithTopicShelfItems(response, shelf)
+            return true
+        end function
+
+        function GetTopicErrorHttpCode(error as dynamic) as integer
+            if ValidString(error).StartsWith("Unknown topic")
+                return 404
+            end if
+            return 500
+        end function
+
+        function RespondWithTopicShelfItems(response as object, shelf as object) as void
+            responseBody = {
+                "videos": ValidArray(shelf.items)
+            }
+            if not StringUtils.IsNullOrEmpty(shelf.continuation)
+                responseBody.continuation = shelf.continuation
+            end if
+            response.Json(responseBody)
+        end function
+
+        function FindTopicShelf(result as object, shelfId as string) as object
+            if result.error <> invalid
+                return invalid
+            end if
+            for each shelf in result.shelves
+                if shelf.id = shelfId
+                    return shelf
+                end if
+            end for
+            return invalid
+        end function
+
+        ' Topic shelves, cached for 10 minutes per topic, shorts preference, token and identity.
+        ' Errors aren't cached.
+        function GetCachedTopicShelves(topic as string, request as object, forceRefresh as boolean) as object
+            disableShorts = ValidBool(m.preferences["content_feed.disable_shorts"])
+            accessToken = m.GetAccessToken(request)
+            activeIdentifyToken = ValidString(request.query.activeIdentifyToken)
+
+            shortsKey = "shorts"
+            if disableShorts
+                shortsKey = "noshorts"
+            end if
+            cacheKey = LCase(topic) + "|" + shortsKey + "|" + ValidString(accessToken) + "|" + activeIdentifyToken
+            nowSeconds = TimeUtils.Now().AsSeconds()
+
+            if not forceRefresh
+                cached = m.topicShelvesCache[cacheKey]
+                if cached <> invalid and cached.expiresAt > nowSeconds
+                    return cached.result
+                end if
+            end if
+
+            options = {
+                "disableShorts": disableShorts
+            }
+            if accessToken <> invalid
+                options.accessToken = accessToken
+                if activeIdentifyToken <> ""
+                    options.onBehalfOfUser = activeIdentifyToken
+                end if
+            end if
+
+            result = InnertubeService.GetTopicShelves(topic, options)
+            if result.error <> invalid
+                return result
+            end if
+
+            ' Drop expired entries, so tokens that were refreshed don't pile up.
+            for each key in m.topicShelvesCache.Keys()
+                if m.topicShelvesCache[key].expiresAt <= nowSeconds
+                    m.topicShelvesCache.Delete(key)
+                end if
+            end for
+
+            m.topicShelvesCache[cacheKey] = {
+                expiresAt: nowSeconds + 600
+                result: result
+            }
+            return result
+        end function
 
         function GetAccessToken(request as object) as dynamic
             accessToken = request.headers["authorization"]

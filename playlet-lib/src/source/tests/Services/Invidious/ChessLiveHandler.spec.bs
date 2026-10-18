@@ -1,0 +1,128 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class ChessLiveHandlerTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function CreateService() as object
+            return new Invidious.InvidiousService({
+                preferences: { "backend.selected": "playlet" }
+                apiDefinitions: {
+                    search: { url: "/api/v1/search", paginationType: "Pages" }
+                }
+            })
+        end function
+
+        function LiveVideo(videoId as string, title as string, author = "Chess Channel" as string) as object
+            return { type: "video", videoId: videoId, title: title, author: author, liveNow: true }
+        end function
+
+        function VideoIds(items as object) as object
+            result = []
+            for each item in items
+                result.Push(item.videoId)
+            end for
+            return result
+        end function
+
+        function JsonResponse(body as object) as object
+            return new HttpClient.Response({
+                statusCode: 200
+                headers: {}
+                text: FormatJson(body)
+            })
+        end function
+
+        @describe("Invidious.FilterChessLiveItems")
+
+        @it("keeps live chess videos")
+        function _()
+            items = [
+                m.LiveVideo("a", "Titled Tuesday LIVE", "GMHikaru")
+                m.LiveVideo("b", "Candidates 2026 Round 5", "FIDE")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["a", "b"])
+        end function
+
+        @it("drops games that only have chess in their name, in the title or the author")
+        function _()
+            items = [
+                m.LiveVideo("auto", "AUTO CHESS ranked grind")
+                m.LiveVideo("autochess", "Autochess live")
+                m.LiveVideo("magic", "Magic Chess: Go Go live", "MLBB")
+                m.LiveVideo("rush", "Chess Rush tournament")
+                m.LiveVideo("dota", "Dota Underlords is back")
+                m.LiveVideo("tft", "Climbing to Challenger", "TFT Pro")
+                m.LiveVideo("teamfight", "Teamfight Tactics set 15")
+                m.LiveVideo("ok", "Chess960 blitz")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
+        end function
+
+        @it("doesn't drop a title where tft is only part of a word")
+        function _()
+            items = [m.LiveVideo("a", "Giftft chess giveaway")]
+            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["a"])
+        end function
+
+        @it("drops videos that aren't live, shorts, and items that aren't videos")
+        function _()
+            items = [
+                { type: "video", videoId: "past", title: "Chess stream (replay)", liveNow: false }
+                { type: "video", videoId: "unknown", title: "Chess stream" }
+                m.LiveVideo("short", "Insane chess trap #Shorts")
+                { type: "video", videoId: "flagged", title: "Chess", liveNow: true, isShort: true }
+                { type: "channel", videoId: "channel", title: "Chess", liveNow: true }
+                invalid
+                m.LiveVideo("ok", "Chess live")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
+        end function
+
+        @describe("Invidious.InvidiousService.ChessLiveHandler")
+
+        @it("filters an Invidious search response (an array)")
+        function _()
+            response = m.JsonResponse([
+                m.LiveVideo("a", "Chess live")
+                m.LiveVideo("b", "Magic Chess live")
+            ])
+            result = m.CreateService().ChessLiveHandler({ response: response })
+            m.assertEqual(m.VideoIds(result.items), ["a"])
+        end function
+
+        @it("fails like the default handler for a failed response")
+        function _()
+            response = new HttpClient.Response({ statusCode: 500, headers: {}, text: "" })
+            m.assertInvalid(m.CreateService().ChessLiveHandler({ response: response }))
+        end function
+
+        @describe("Invidious.InvidiousService.MakeRequest")
+
+        @it("uses the feed source's response handler over the endpoint's")
+        function _()
+            httpServer = {
+                ProcessRequestLocal: function(_method as string, _uri as string, _headers as object, _body as string) as object
+                    responseBody = CreateObject("roByteArray")
+                    responseBody.FromAsciiString(FormatJson([
+                        { type: "video", videoId: "a", title: "Chess live", liveNow: true }
+                        { type: "video", videoId: "b", title: "Auto Chess live", liveNow: true }
+                    ]))
+                    return { http_code: 200, headers: {}, body: responseBody }
+                end function
+            }
+            result = m.CreateService().MakeRequest({ endpoint: "search", responseHandler: "ChessLiveHandler" }, { httpServer: httpServer })
+            m.assertTrue(result.success)
+            m.assertEqual(m.VideoIds(result.result.items), ["a"])
+        end function
+
+    end class
+
+end namespace

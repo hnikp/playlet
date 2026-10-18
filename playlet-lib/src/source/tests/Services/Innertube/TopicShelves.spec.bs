@@ -1,0 +1,152 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class TopicShelvesTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function MakeShelf(id as string, title as string, itemCount = 1 as integer) as object
+            items = []
+            for i = 1 to itemCount
+                items.Push({ type: "video", videoId: `${id}_${i}` })
+            end for
+            return { id: id, title: title, items: items }
+        end function
+
+        function ShelfIds(merged as object) as object
+            result = []
+            for each shelf in merged
+                result.Push(shelf.id)
+            end for
+            return result
+        end function
+
+        @describe("InnertubeService.MergeTopicShelves")
+
+        @it("keeps the order of the lists, then of the shelves in each list")
+        function _()
+            merged = InnertubeService.MergeTopicShelves([
+                [m.MakeShelf("tv_me_0", "Recently played"), m.MakeShelf("tv_me_1", "Artist mixes for you")]
+                [m.MakeShelf("tv_0", "Recommended"), m.MakeShelf("tv_1", "Top charts")]
+                [m.MakeShelf("web_0", "Deutschrap")]
+            ])
+            m.assertEqual(m.ShelfIds(merged), ["tv_me_0", "tv_me_1", "tv_0", "tv_1", "web_0"])
+        end function
+
+        @it("keeps the first shelf of each title, ignoring case and surrounding spaces")
+        function _()
+            merged = InnertubeService.MergeTopicShelves([
+                [m.MakeShelf("tv_me_0", "Recommended")]
+                [m.MakeShelf("tv_0", "recommended "), m.MakeShelf("tv_1", "New releases")]
+                [m.MakeShelf("web_0", "NEW RELEASES"), m.MakeShelf("web_1", "Charts")]
+            ])
+            m.assertEqual(m.ShelfIds(merged), ["tv_me_0", "tv_1", "web_1"])
+        end function
+
+        @it("drops shelves without items, so they don't hide a later shelf with the same title")
+        function _()
+            merged = InnertubeService.MergeTopicShelves([
+                [m.MakeShelf("tv_0", "Top charts", 0), { id: "tv_1", title: "Broken" }]
+                [m.MakeShelf("web_0", "Top charts")]
+            ])
+            m.assertEqual(m.ShelfIds(merged), ["web_0"])
+        end function
+
+        @it("keeps every shelf without a title")
+        function _()
+            merged = InnertubeService.MergeTopicShelves([
+                [m.MakeShelf("tv_0", ""), m.MakeShelf("tv_1", "")]
+            ])
+            m.assertEqual(m.ShelfIds(merged), ["tv_0", "tv_1"])
+        end function
+
+        @it("merges nothing into an empty list")
+        function _()
+            m.assertEqual(InnertubeService.MergeTopicShelves([]), [])
+            m.assertEqual(InnertubeService.MergeTopicShelves(invalid), [])
+        end function
+
+        @describe("InnertubeService.GetTopicShelfTitle")
+
+        @it("reads the title of a TV shelf from its header's avatar lockup")
+        function _()
+            title = InnertubeService.GetTopicShelfTitle({
+                headerRenderer: {
+                    shelfHeaderRenderer: {
+                        avatarLockup: {
+                            avatarLockupRenderer: {
+                                title: { runs: [{ text: "Similar to " }, { text: "Sima Bina" }] }
+                            }
+                        }
+                    }
+                }
+            })
+            m.assertEqual(title, "Similar to Sima Bina")
+        end function
+
+        @it("reads the title of a TV carousel shelf from its hero carousel header")
+        function _()
+            title = InnertubeService.GetTopicShelfTitle({
+                headerRenderer: {
+                    heroCarouselHeaderRenderer: {
+                        header: {
+                            shelfHeaderRenderer: {
+                                avatarLockup: {
+                                    avatarLockupRenderer: {
+                                        title: { runs: [{ text: "Recommended" }] }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+            m.assertEqual(title, "Recommended")
+        end function
+
+        @it("reads the title of a web shelf")
+        function _()
+            m.assertEqual(InnertubeService.GetTopicShelfTitle({ title: { simpleText: "Charts" } }), "Charts")
+            m.assertEqual(InnertubeService.GetTopicShelfTitle({}), "")
+        end function
+
+        @describe("InnertubeService.CreateTopicShelf")
+
+        @it("carries the continuation of a TV shelf's horizontal list")
+        function _()
+            shelf = InnertubeService.CreateTopicShelf("tv_0", "Top charts", {
+                horizontalListRenderer: {
+                    items: []
+                    continuations: [{ nextContinuationData: { continuation: "next-items" } }]
+                }
+            }, { request: invalid, disableShorts: false, browseId: "FEtopics_music" })
+            m.assertEqual(shelf.id, "tv_0")
+            m.assertEqual(shelf.title, "Top charts")
+            m.assertEqual(shelf.items, [])
+            m.assertEqual(shelf.continuation, "next-items")
+        end function
+
+        @it("has no continuation when the shelf has none")
+        function _()
+            shelf = InnertubeService.CreateTopicShelf("web_0", "Charts", [], { request: invalid, disableShorts: false, browseId: "UC-9-kyTW8ZkZNDHQJ6FgpwQ" })
+            m.assertEqual(shelf.items, [])
+            m.assertFalse(shelf.DoesExist("continuation"))
+        end function
+
+        @describe("InnertubeService.GetTopicShelves")
+
+        @it("fails for an unknown topic")
+        function _()
+            result = InnertubeService.GetTopicShelves("cooking")
+            m.assertEqual(result.error, "Unknown topic: cooking")
+        end function
+
+    end class
+
+end namespace

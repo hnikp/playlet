@@ -227,3 +227,22 @@ auth_recommended:
     recommended:
       type: boolean
       default: true
+
+# Topic shelves (e.g. the Music page). Implemented only by Playlet backend: the shelves of
+# a topic are listed by /api/v1/topics/{topic}, and each shelf is a row.
+# The response is { videos, continuation }, see InvidiousService.TopicShelfHandler.
+# Not cached here: the backend caches the topic's shelves in memory for 10 minutes, so
+# the rows stay consistent with the shelf list.
+topic_shelf:
+  title: Topic shelf
+  url: /api/v1/topics/{topic}/shelves/{shelf}
+  responseHandler: TopicShelfHandler
+  paginationType: Continuation
+
+# Same as topic_shelf, with the user's personalised shelves.
+topic_shelf_auth:
+  title: Topic shelf
+  url: /api/v1/topics/{topic}/shelves/{shelf}
+  authenticated: true
+  responseHandler: TopicShelfHandler
+  paginationType: Continuation

@@ -389,8 +389,12 @@ namespace Invidious
 
             response = m.SendRequest(request, httpServer)
 
+            ' A feed source (e.g. a row in a layout yaml) can override its endpoint's handler,
+            ' e.g. to filter a search ("ChessLiveHandler").
             responseHandler = invalid
-            if IsString(endpoint.responseHandler) and m.DoesExist(endpoint.responseHandler)
+            if IsString(feedSource.responseHandler) and feedSource.responseHandler.EndsWith("Handler") and m.DoesExist(feedSource.responseHandler)
+                responseHandler = feedSource.responseHandler
+            else if IsString(endpoint.responseHandler) and m.DoesExist(endpoint.responseHandler)
                 responseHandler = endpoint.responseHandler
             else
                 responseHandler = "DefaultHandler"
@@ -691,6 +695,41 @@ namespace Invidious
             })
         end function
 
+        ' Live chess streams, from a search for live "chess" videos: keeps the live videos, without
+        ' the games that only have "chess" in their name (Auto Chess, Magic Chess...) and shorts.
+        ' It only filters the response, so it works on both backends.
+        function ChessLiveHandler(context as object) as object
+            result = m.DefaultHandler(context)
+            if result = invalid or not IsArray(result.items)
+                return result
+            end if
+
+            result.items = Invidious.FilterChessLiveItems(result.items)
+            return result
+        end function
+
+        ' Topic shelves (Playlet backend only) respond with { videos, continuation }.
+        function TopicShelfHandler(context as object) as object
+            response = context.response
+
+            if not response.IsSuccess()
+                return invalid
+            end if
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            result = {
+                items: ValidArray(json.videos)
+            }
+            if not StringUtils.IsNullOrEmpty(json.continuation)
+                result.continuation = json.continuation
+            end if
+            return result
+        end function
+
         function GetCategorySearchQueryParams(categoryType as string) as object
             if categoryType = "music"
                 return { q: "music", date: "week" }
@@ -876,6 +915,35 @@ namespace Invidious
 
     ' Whether a /videos response is a live video still missing the live timeline the
     ' innertube path gets: the built-in instance's responses carry it already.
+    ' Keeps the live videos of a chess search, dropping shorts and games that aren't chess but have
+    ' it in their name (matched in the title or the author, case-insensitive).
+    function FilterChessLiveItems(items as object) as object
+        notChessRegex = CreateObject("roRegex", "auto ?chess|magic ?chess|chess ?rush|dota underlords|teamfight|\btft\b", "i")
+        shortsRegex = CreateObject("roRegex", "#shorts?\b", "i")
+
+        filtered = []
+        for each item in ValidArray(items)
+            if not IsAssociativeArray(item) or not ValidBool(item.liveNow)
+                continue for
+            end if
+            if item.type <> invalid and item.type <> "video"
+                continue for
+            end if
+
+            title = ValidString(item.title)
+            author = ValidString(item.author)
+            if notChessRegex.IsMatch(title) or notChessRegex.IsMatch(author)
+                continue for
+            end if
+            if ValidBool(item.isShort) or shortsRegex.IsMatch(title)
+                continue for
+            end if
+
+            filtered.Push(item)
+        end for
+        return filtered
+    end function
+
     function NeedsLiveStreamInfo(metadata as object) as boolean
         return ValidBool(metadata.liveNow) and IsArray(metadata.adaptiveFormats) and StringUtils.IsNullOrEmpty(metadata.liveHeadUrl)
     end function
