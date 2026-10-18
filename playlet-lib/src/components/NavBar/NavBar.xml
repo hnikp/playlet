@@ -29,20 +29,20 @@
             <Poster
                 id="LogoFav"
                 width="42"
-                height="42"
-                translation="[16, 48]"
+                height="55"
+                translation="[16, 35]"
                 uri="pkg:/images/logo-fav.png" />
             <Poster
                 id="Logo"
-                width="106"
-                height="42"
-                translation="[16, 48]"
+                width="123"
+                height="58"
+                translation="[0, 31]"
                 opacity="0"
                 uri="pkg:/images/logo-dark.png">
                 <AppVersionLabel
                     fontUri="font:BoldSystemFontFile"
                     fontSize="16"
-                    translation="[0, 48]" />
+                    translation="[16, 65]" />
             </Poster>
 
             <MarkupList

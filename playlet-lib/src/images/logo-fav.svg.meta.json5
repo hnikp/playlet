@@ -1,11 +1,11 @@
 {
-  inputHash: '78a363159c2f2eec73a0a221c20cf6ca',
+  inputHash: 'ff8b517752d85ed60d55ed13d9697772',
   outputs: [
     {
       outputFilePath: 'images/logo-fav.png',
-      outputHash: '9e78e6975e1bb64f5a996a3bc46f663a',
+      outputHash: '20baa5fc92e66b9b29700a0958e0762b',
       width: 100,
-      height: 100,
+      height: 131,
     },
   ],
 }
