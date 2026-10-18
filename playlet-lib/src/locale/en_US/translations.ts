@@ -1481,8 +1481,8 @@
         <translation>Newest first</translation>
     </message>
     <message>
-        <source>Press Options (*) to sort</source>
-        <translation>Press Options (*) to sort</translation>
+        <source>Left/Right to sort</source>
+        <translation>Left/Right to sort</translation>
     </message>
     <message>
         <source>%1 likes</source>

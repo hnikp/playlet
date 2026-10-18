@@ -498,7 +498,7 @@ namespace Locale
     enum Comments
         TopComments = "Top comments"
         NewestFirst = "Newest first"
-        PressOptionsToSort = "Press Options (*) to sort"
+        PressLeftRightToSort = "Left/Right to sort"
         NLikes = "%1 likes"
         NReplies = "%1 replies"
         OneReply = "1 reply"

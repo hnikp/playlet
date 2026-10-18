@@ -255,7 +255,7 @@ function UpdateHeader() as void
     else
         sortText = Tr(Locale.Comments.TopComments)
     end if
-    m.subtitleLabel.text = sortText + " • " + Tr(Locale.Comments.PressOptionsToSort)
+    m.subtitleLabel.text = sortText + " • " + Tr(Locale.Comments.PressLeftRightToSort)
 end function
 
 function GetCurrentState() as object
@@ -305,7 +305,8 @@ function OnKeyEvent(key as string, press as boolean) as boolean
             else
                 m.top.closed = true
             end if
-        else if key = RemoteKeys.Options and not m.showingReplies
+        else if (key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Options) and not m.showingReplies
+            ' Left/Right: during fullscreen playback Roku OS takes Options (*) for its own panel
             ToggleSort()
         end if
     end if

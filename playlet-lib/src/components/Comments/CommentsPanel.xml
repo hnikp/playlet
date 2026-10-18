@@ -1,6 +1,6 @@
 <!-- Read-only comments for a video: a panel on the right side of the screen, usable over the video page or the
      player. Set videoId, append it, call @.BindNode() and focus it; it sets "closed" when the user presses Back.
-     OK on a comment shows its full text and replies; Options (*) switches between top and newest comments. -->
+     OK on a comment shows its full text and replies; Left/Right (or Options, where the OS lets it through) switches between top and newest comments. -->
 <component name="CommentsPanel" extends="Group" includes="AutoBind,Focus,Disposable">
     <interface>
         <field id="videoId" type="string" onChange="OnVideoIdSet" />
