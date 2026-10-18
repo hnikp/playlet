@@ -1,10 +1,12 @@
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
+    m.titleLabel = m.top.FindNode("titleLabel")
 end function
 
 function OnContentSet() as void
@@ -13,7 +15,8 @@ function OnContentSet() as void
         return
     end if
 
-    m.top.title = content.title
+    ' (not content.titlePrepared: that is wrapped for the feed cells' width)
+    RtlText.ApplyToLabel(m.titleLabel, content.title, "font:SmallestBoldSystemFont", true, 18)
     m.top.thumbnailUri = content.thumbnail
 
     SetDurationText(content.lengthText)
