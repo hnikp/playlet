@@ -2,8 +2,9 @@
     <!-- Two modes: first-load overlay (title + spinner) and mid-stream buffering (spinner alone). -->
     <interface>
         <field id="mode" type="integer" value="0" /> <!-- 0=none 1=loading 2=buffering -->
-        <field id="title" type="string" alias="loadingTitleLabel.text" />
-        <field id="secondaryTitle" type="string" alias="loadingSecondaryTitleLabel.text" />
+        <!-- not aliased to the labels: Persian/Arabic titles must go through RtlText first. -->
+        <field id="title" type="string" onChange="OnTitleChange" />
+        <field id="secondaryTitle" type="string" onChange="OnTitleChange" />
     </interface>
     <children>
         <!-- Title + secondary title overlay; shown only in loading mode. Static wrapped title (up to 3 lines),

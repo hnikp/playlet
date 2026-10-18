@@ -1,3 +1,4 @@
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' Renders purely from `mode`:
@@ -13,6 +14,11 @@ end enum
 
 function Init()
     m.loadingGroup = m.top.findNode("loadingTitleArea")
+    m.titleLabel = m.top.findNode("loadingTitleLabel")
+    m.secondaryTitleLabel = m.top.findNode("loadingSecondaryTitleLabel")
+    ' kept to switch back from the Persian-capable font (RtlText)
+    m.titleFont = m.titleLabel.font
+    m.secondaryTitleFont = m.secondaryTitleLabel.font
     m.spinner = m.top.findNode("spinner")
     ' blendColor lives on the BusySpinner's poster child, not the spinner node.
     if m.spinner <> invalid and m.spinner.poster <> invalid
@@ -20,6 +26,11 @@ function Init()
     end if
     m.top.ObserveField("mode", FuncName(OnMode))
     OnMode()
+end function
+
+function OnTitleChange() as void
+    RtlText.ApplyToLabel(m.titleLabel, m.top.title, m.titleFont, true, 30)
+    RtlText.ApplyToLabel(m.secondaryTitleLabel, m.top.secondaryTitle, m.secondaryTitleFont, false, 24)
 end function
 
 function OnMode() as void

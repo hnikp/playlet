@@ -23,9 +23,18 @@ namespace Tests
             spinner = m.top.findNode("spinner")
             m.assertTrue(spinner.visible)
             m.assertEqual(spinner.control, "start")
-            ' title/secondary title pass through (aliased).
+            ' Latin titles pass through unchanged.
             m.assertEqual(m.top.findNode("loadingTitleLabel").text, "Rick Astley")
             m.assertEqual(m.top.findNode("loadingSecondaryTitleLabel").text, "RickAstleyVEVO")
+        end function
+
+        @it("shapes Persian titles like the player title")
+        function _()
+            title = "سلام دنیا"
+            m.top.title = title
+            label = m.top.findNode("loadingTitleLabel")
+            m.assertNotEqual(label.text, title)
+            m.assertEqual(label.horizAlign, "right")
         end function
 
         @it("buffering shows the spinner alone (no title overlay)")
