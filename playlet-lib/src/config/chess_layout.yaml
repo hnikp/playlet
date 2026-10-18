@@ -1,0 +1,137 @@
+# Rows of the Chess page (FeedScreen): live chess streams, then the latest
+# uploads of well-known chess channels. Channel names are not translated.
+# "Live now" uses ChessLiveHandler (instead of the search endpoint's handler) to
+# drop non-chess games (Auto Chess, Magic Chess...).
+- title: Live now
+  id: chess_live
+  feedSources:
+    - id: inv_search_chess_live
+      title: Live now
+      apiType: Invidious
+      endpoint: search
+      responseHandler: ChessLiveHandler
+      queryParams:
+        q: chess
+        features: live
+        sort: views
+        type: video
+
+- title: FIDE
+  id: chess_channel_UC9B47GnzCRFHTT1BIBWvStQ
+  feedSources:
+    - id: inv_channel_videos_UC9B47GnzCRFHTT1BIBWvStQ
+      title: FIDE
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UC9B47GnzCRFHTT1BIBWvStQ
+      queryParams:
+        sort_by: newest
+
+- title: "Chess.com"
+  id: chess_channel_UC5kS0l76kC0xOzMPtOmSFGw
+  feedSources:
+    - id: inv_channel_videos_UC5kS0l76kC0xOzMPtOmSFGw
+      title: "Chess.com"
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UC5kS0l76kC0xOzMPtOmSFGw
+      queryParams:
+        sort_by: newest
+
+- title: Saint Louis Chess Club
+  id: chess_channel_UCM-ONC2bCHytG2mYtKDmIeA
+  feedSources:
+    - id: inv_channel_videos_UCM-ONC2bCHytG2mYtKDmIeA
+      title: Saint Louis Chess Club
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCM-ONC2bCHytG2mYtKDmIeA
+      queryParams:
+        sort_by: newest
+
+- title: chess24
+  id: chess_channel_UCkTCNuQ2mGfW6-SpHpaze_g
+  feedSources:
+    - id: inv_channel_videos_UCkTCNuQ2mGfW6-SpHpaze_g
+      title: chess24
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCkTCNuQ2mGfW6-SpHpaze_g
+      queryParams:
+        sort_by: newest
+
+- title: GothamChess
+  id: chess_channel_UCQHX6ViZmPsWiYSFAyS0a3Q
+  feedSources:
+    - id: inv_channel_videos_UCQHX6ViZmPsWiYSFAyS0a3Q
+      title: GothamChess
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCQHX6ViZmPsWiYSFAyS0a3Q
+      queryParams:
+        sort_by: newest
+
+- title: GMHikaru
+  id: chess_channel_UCweCc7bSMX5J4jEH7HFImng
+  feedSources:
+    - id: inv_channel_videos_UCweCc7bSMX5J4jEH7HFImng
+      title: GMHikaru
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCweCc7bSMX5J4jEH7HFImng
+      queryParams:
+        sort_by: newest
+
+- title: Anna Cramling
+  id: chess_channel_UCOVfq3NNYjlYCz1iou69FwQ
+  feedSources:
+    - id: inv_channel_videos_UCOVfq3NNYjlYCz1iou69FwQ
+      title: Anna Cramling
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCOVfq3NNYjlYCz1iou69FwQ
+      queryParams:
+        sort_by: newest
+
+- title: agadmator
+  id: chess_channel_UCL5YbN5WLFD8dLIegT5QAbA
+  feedSources:
+    - id: inv_channel_videos_UCL5YbN5WLFD8dLIegT5QAbA
+      title: agadmator
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCL5YbN5WLFD8dLIegT5QAbA
+      queryParams:
+        sort_by: newest
+
+- title: Daniel Naroditsky
+  id: chess_channel_UCHP9CdeguNUI-_nBv_UXBhw
+  feedSources:
+    - id: inv_channel_videos_UCHP9CdeguNUI-_nBv_UXBhw
+      title: Daniel Naroditsky
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCHP9CdeguNUI-_nBv_UXBhw
+      queryParams:
+        sort_by: newest
+
+- title: Eric Rosen
+  id: chess_channel_UCAM1MwY63aDinDWKVSfTs0g
+  feedSources:
+    - id: inv_channel_videos_UCAM1MwY63aDinDWKVSfTs0g
+      title: Eric Rosen
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCAM1MwY63aDinDWKVSfTs0g
+      queryParams:
+        sort_by: newest

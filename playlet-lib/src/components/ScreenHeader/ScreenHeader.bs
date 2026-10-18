@@ -1,0 +1,14 @@
+function Init()
+    m.icon = m.top.FindNode("icon")
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.accentBar = m.top.FindNode("accentBar")
+end function
+
+function OnTitleChange() as void
+    m.titleLabel.text = Tr(m.top.title)
+end function
+
+function OnAccentColorChange() as void
+    m.icon.blendColor = m.top.accentColor
+    m.accentBar.color = m.top.accentColor
+end function

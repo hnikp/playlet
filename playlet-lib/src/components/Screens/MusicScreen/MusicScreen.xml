@@ -1,0 +1,4 @@
+<!-- The Music page: topic shelves from the built-in backend, then the rows of music_layout.yaml.
+     A separate component because the nav bar creates one screen per component name. -->
+<component name="MusicScreen" extends="FeedScreen">
+</component>

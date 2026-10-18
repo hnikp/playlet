@@ -1,0 +1,4 @@
+<!-- The Chess page: live chess streams, then the latest uploads of chess channels (chess_layout.yaml).
+     A separate component because the nav bar creates one screen per component name. -->
+<component name="ChessScreen" extends="FeedScreen">
+</component>

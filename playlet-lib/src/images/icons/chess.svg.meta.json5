@@ -1,0 +1,11 @@
+{
+  inputHash: 'dc617d7ffbb40d7bb6534c24476c3d82',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/chess.png',
+      outputHash: '34225752d997d4181f36f9b8d9d42b9f',
+      width: 48,
+      height: 48,
+    },
+  ],
+}

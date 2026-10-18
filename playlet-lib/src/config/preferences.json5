@@ -121,10 +121,6 @@
             enabled: true,
           },
           {
-            id: "category_music",
-            enabled: true,
-          },
-          {
             id: "category_news",
             enabled: true,
           },

@@ -1592,5 +1592,21 @@
         <source>Original</source>
         <translation>Original</translation>
     </message>
+    <message>
+        <source>Chess</source>
+        <translation>Chess</translation>
+    </message>
+    <message>
+        <source>Persian music – new</source>
+        <translation>Persian music – new</translation>
+    </message>
+    <message>
+        <source>Persian music – popular</source>
+        <translation>Persian music – popular</translation>
+    </message>
+    <message>
+        <source>Live now</source>
+        <translation>Live now</translation>
+    </message>
 </context>
 </TS>

@@ -1,0 +1,37 @@
+# Static rows of the Music page (FeedScreen). On the built-in backend, the
+# topic shelves from TopicShelvesJob are shown before these rows.
+- title: Persian music – new
+  id: persian_music_new
+  feedSources:
+    - id: inv_search_persian_music_new
+      title: Persian music – new
+      apiType: Invidious
+      endpoint: search
+      queryParams:
+        q: آهنگ جدید
+        date: week
+        sort: date
+        type: video
+
+- title: Persian music – popular
+  id: persian_music_popular
+  feedSources:
+    - id: inv_search_persian_music_popular
+      title: Persian music – popular
+      apiType: Invidious
+      endpoint: search
+      queryParams:
+        q: persian music
+        date: month
+        sort: views
+        type: video
+
+- title: Music
+  id: category_music
+  feedSources:
+    - id: inv_category_music
+      title: Music
+      apiType: Invidious
+      endpoint: category_feed
+      queryParams:
+        type: Music

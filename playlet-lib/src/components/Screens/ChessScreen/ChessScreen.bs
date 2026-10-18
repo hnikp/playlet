@@ -1,0 +1,9 @@
+import "pkg:/source/utils/Locale.bs"
+
+' Runs after FeedScreen's Init
+function Init()
+    m.top.feedFile = "libpkg:/config/chess_layout.yaml"
+    m.top.headerTitle = Tr(Locale.NavBar.Chess)
+    m.top.headerIcon = "pkg:/images/icons/chess.png"
+    m.top.accentColor = "#6FA34AFF"
+end function

@@ -1,0 +1,39 @@
+<!-- A root screen with a header and rows from a yaml layout (feedFile), like HomeScreen but without the
+     home layout preference. With dynamicTopic (e.g. "music"), the topic's shelves from the built-in
+     backend (TopicShelvesJob) are shown before the layout's rows. Used by MusicScreen and ChessScreen. -->
+<component name="FeedScreen" extends="Group" includes="AutoBind,Focus,ContextMenuProvider">
+    <interface>
+        <field id="navBar" type="node" bind="/NavBar" />
+        <field id="invidious" type="node" bind="/Invidious" />
+        <field id="preferences" type="node" bind="/Preferences" />
+        <field id="profilesService" type="node" bind="/ProfilesService" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+        <field id="feedFile" type="string" />
+        <field id="dynamicTopic" type="string" />
+        <field id="headerTitle" type="string" onChange="OnHeaderChange" />
+        <field id="headerIcon" type="uri" onChange="OnHeaderChange" />
+        <field id="accentColor" type="color" value="#FF1C30FF" onChange="OnHeaderChange" />
+        <function name="Refresh" />
+    </interface>
+    <children>
+        <ScreenHeader
+            id="header"
+            translation="[90,18]" />
+        <VideoRowList
+            itemComponentName="RowCell"
+            id="rowList"
+            translation="[0,80]"
+            numRows="2"
+            rowitemSize="[[350,196]]"
+            rowItemSpacing="[[25,0]]"
+            itemSize="[1280,326]"
+            itemSpacing="[0,65]"
+            rowLabelOffset="[[90,20]]"
+            focusXOffset="[90]"
+            showRowLabel="[true]"
+            rowFocusAnimationStyle="floatingfocus"
+            variableWidthItems="true"
+            focusBitmapUri="pkg:/images/focus-glow-padding-30.$$RES$$.9.png"
+        />
+    </children>
+</component>

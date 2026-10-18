@@ -1,0 +1,93 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Lists the shelves of a topic page (e.g. "music") on the built-in backend:
+' GET <instance>/api/v1/topics/<topic> -> { shelves: [{ id, title }] }
+' With a YouTube profile the request is authenticated, so the shelves are personalised.
+' Output: { shelves: [{ id, title }], authenticated: bool }. The Invidious backend has no
+' topic pages: it gets no shelves.
+@job("TopicShelvesJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    invidiousNode = input.invidious
+    preferencesNode = input.preferences
+    profilesServiceNode = input.profilesService
+    topic = input.topic
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if preferencesNode["backend.selected"] <> "playlet" or not IsString(topic) or topic = ""
+        JobSuccessData({ shelves: [], authenticated: false })
+        return
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+    url = service.GetInstance()
+    headers = invalid
+    activeIdentifyToken = ""
+
+    profile = invalid
+    if profilesServiceNode <> invalid
+        profile = profilesServiceNode.currentProfile
+    end if
+    if profile <> invalid and profile.type = "youtube"
+        auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+        if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+            url = auth.serverUrl
+            headers = service.GetAuthenticationHeaders(auth.token)
+            activeIdentifyToken = ValidString(auth.activeIdentifyToken)
+        else
+            LogWarn("No usable access token for topic shelves, loading them logged out:", auth.state)
+        end if
+    end if
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    request = HttpClient.Get(`${url}/api/v1/topics/${topic}`)
+    if headers <> invalid
+        request.Headers(headers)
+    end if
+    if activeIdentifyToken <> ""
+        request.QueryParam("activeIdentifyToken", activeIdentifyToken)
+    end if
+    request.Cancellation(JobGetCancellation())
+    response = request.Await()
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if not response.IsSuccess()
+        JobError(`Failed to list ${topic} shelves: ${response.ErrorMessage()}`)
+        return
+    end if
+
+    json = response.Json()
+    if not IsAssociativeArray(json)
+        JobError(`Failed to list ${topic} shelves: invalid response`)
+        return
+    end if
+
+    shelves = []
+    for each shelf in ValidArray(json.shelves)
+        if IsAssociativeArray(shelf) and IsString(shelf.id) and shelf.id <> "" and IsString(shelf.title)
+            shelves.Push({ id: shelf.id, title: shelf.title })
+        end if
+    end for
+
+    JobSuccessData({
+        shelves: shelves
+        authenticated: headers <> invalid
+    })
+end function

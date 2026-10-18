@@ -9,6 +9,7 @@ namespace Locale
         Settings = "Settings"
         Remote = "Remote"
         Info = "Info"
+        Chess = "Chess"
     end enum
 
     @locale
@@ -58,6 +59,9 @@ namespace Locale
         Podcasts = "Podcasts"
         Courses = "Courses"
         RelatedVideos = "Related videos"
+        PersianMusicNew = "Persian music – new"
+        PersianMusicPopular = "Persian music – popular"
+        LiveNow = "Live now"
     end enum
 
     @locale

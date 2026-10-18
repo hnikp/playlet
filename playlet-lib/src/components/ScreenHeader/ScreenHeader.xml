@@ -1,0 +1,31 @@
+<!-- Page header shown top-left on the root screens (Home, Music, Chess): the page icon tinted
+     with the page's accent colour, the page name, and a short accent bar under the name. -->
+<component name="ScreenHeader" extends="Group">
+    <interface>
+        <!-- translated with Tr() -->
+        <field id="title" type="string" onChange="OnTitleChange" />
+        <field id="iconUri" type="uri" alias="icon.uri" />
+        <field id="accentColor" type="color" value="#FF1C30FF" onChange="OnAccentColorChange" />
+    </interface>
+    <children>
+        <Poster
+            id="icon"
+            width="36"
+            height="36"
+            blendColor="#FF1C30FF" />
+        <Label
+            id="titleLabel"
+            translation="[50,0]"
+            height="36"
+            vertAlign="center"
+            color="#FFFFFF">
+            <Font role="font" uri="font:BoldSystemFontFile" size="30" />
+        </Label>
+        <Rectangle
+            id="accentBar"
+            translation="[50,42]"
+            width="48"
+            height="4"
+            color="#FF1C30FF" />
+    </children>
+</component>

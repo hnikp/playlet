@@ -1,0 +1,169 @@
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/Screens/HomeScreen/HomeScreenUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.top.focusable = true
+    m.header = m.top.FindNode("header")
+    m.rowList = m.top.FindNode("rowList")
+    m.rowList.screen = m.top
+    m.staticFeeds = []
+end function
+
+function OnNodeReady()
+    SetNavigation(invalid, RemoteKeys.Back, m.navBar)
+    SetNavigation(invalid, RemoteKeys.Left, m.navBar)
+
+    m.rowList@.BindNode()
+
+    if m.top.dynamicTopic <> ""
+        ' Topic shelves depend on the profile (personalised when logged in) and on the backend
+        m.profilesService.observeFieldScoped("currentProfileChanged", FuncName(QueueTopicShelvesJob))
+        m.preferences.observeFieldScoped("backend.selected", FuncName(LoadFeeds))
+    end if
+
+    LoadFeeds()
+end function
+
+function OnHeaderChange() as void
+    m.header.title = m.top.headerTitle
+    m.header.iconUri = m.top.headerIcon
+    m.header.accentColor = m.top.accentColor
+end function
+
+' The layout's rows right away, then the topic shelves before them once TopicShelvesJob is done.
+function LoadFeeds() as void
+    m.staticFeeds = []
+    if m.top.feedFile <> ""
+        ' No home layout preference here: an empty preferences object returns the whole layout
+        m.staticFeeds = HomeScreenUtils.GetFeed(m.top.feedFile, {})
+    end if
+    ' With topic shelves coming, the rows are set once they arrive: replacing rows that are loading cancels
+    ' their requests (logged as errors).
+    if m.top.dynamicTopic = "" or m.preferences["backend.selected"] <> "playlet"
+        m.rowList.feeds = m.staticFeeds
+    end if
+
+    QueueTopicShelvesJob()
+end function
+
+function QueueTopicShelvesJob() as void
+    CancelTopicShelvesJob()
+    if m.top.dynamicTopic = ""
+        return
+    end if
+
+    m.topicShelvesJob = JobSystem.CreateCallback(OnTopicShelvesJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.TopicShelvesJob, {
+        invidious: m.invidious
+        preferences: m.preferences
+        profilesService: m.profilesService
+        topic: m.top.dynamicTopic
+    }, m.topicShelvesJob)
+end function
+
+function CancelTopicShelvesJob()
+    if m.topicShelvesJob <> invalid
+        JobSystem.UnobserveCallback(m.topicShelvesJob)
+        m.topicShelvesJob.cancel = true
+        m.topicShelvesJob = invalid
+    end if
+end function
+
+function OnTopicShelvesJobDone(event as object) as void
+    callbackNode = event.getRoSGNode()
+    JobSystem.UnobserveCallback(callbackNode)
+    if m.topicShelvesJob = invalid or not m.topicShelvesJob.isSameNode(callbackNode)
+        return
+    end if
+    m.topicShelvesJob = invalid
+
+    info = event.getInfo()
+    if not info.success
+        if not info.cancel
+            LogWarn("Topic shelves:", info.error)
+            ShowStaticFeeds()
+        end if
+        return
+    end if
+
+    data = info.data
+    if not IsAssociativeArray(data)
+        ShowStaticFeeds()
+        return
+    end if
+    shelves = ValidArray(data.shelves)
+    if shelves.Count() = 0
+        ShowStaticFeeds()
+        return
+    end if
+
+    topic = m.top.dynamicTopic
+    endpoint = "topic_shelf"
+    if data.authenticated = true
+        endpoint = "topic_shelf_auth"
+    end if
+
+    feeds = []
+    for each shelf in shelves
+        ' some shelves have no title (e.g. a carousel): name the row after the page
+        rowTitle = ValidString(shelf.title)
+        if rowTitle = ""
+            rowTitle = m.top.headerTitle
+        end if
+        feeds.Push({
+            title: rowTitle
+            feedSources: [{
+                id: `topic_${topic}_${shelf.id}`
+                title: rowTitle
+                apiType: "Invidious"
+                endpoint: endpoint
+                pathParams: {
+                    topic: topic
+                    shelf: shelf.id
+                }
+            }]
+        })
+    end for
+    feeds.Append(m.staticFeeds)
+
+    m.rowList.feeds = feeds
+end function
+
+' The layout's rows, unless rows are already showing (a refresh that found no shelves keeps them)
+function ShowStaticFeeds() as void
+    if not IsArray(m.rowList.feeds) or m.rowList.feeds.Count() = 0
+        m.rowList.feeds = m.staticFeeds
+    end if
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+    NodeSetFocus(m.rowList, true)
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+    return false
+end function
+
+function Refresh(_unused as dynamic)
+    m.rowList@.Refresh()
+    QueueTopicShelvesJob()
+end function
+
+function GetContextMenuOptionsForItem(_rowItem as object) as object
+    refreshOption = ContextMenuUtils.CreateOption(Tr(Locale.Buttons.Refresh), m.top, "Refresh", [invalid])
+    return [refreshOption]
+end function

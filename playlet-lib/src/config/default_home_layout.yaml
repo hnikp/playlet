@@ -14,16 +14,6 @@
       apiType: Invidious
       endpoint: auth_recommended
 
-- title: Music
-  id: category_music
-  feedSources:
-    - id: inv_category_music
-      title: Music
-      apiType: Invidious
-      endpoint: category_feed
-      queryParams:
-        type: Music
-
 - title: Live
   id: trending_livestreams
   feedSources:

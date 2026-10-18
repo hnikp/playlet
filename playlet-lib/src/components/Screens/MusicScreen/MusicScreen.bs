@@ -1,0 +1,10 @@
+import "pkg:/source/utils/Locale.bs"
+
+' Runs after FeedScreen's Init
+function Init()
+    m.top.feedFile = "libpkg:/config/music_layout.yaml"
+    m.top.dynamicTopic = "music"
+    m.top.headerTitle = Tr(Locale.Feed.Music)
+    m.top.headerIcon = "pkg:/images/icons/music.png"
+    m.top.accentColor = "#E0409AFF"
+end function

@@ -6,10 +6,16 @@
         <field id="feedFile" type="string" value="libpkg:/config/default_home_layout.yaml" />
     </interface>
     <children>
+        <ScreenHeader
+            id="header"
+            translation="[90,18]"
+            title="Home"
+            iconUri="pkg:/images/icons/home.png"
+            accentColor="#FF1C30FF" />
         <VideoRowList
             itemComponentName="RowCell"
             id="rowList"
-            translation="[0,50]"
+            translation="[0,80]"
             numRows="2"
             rowitemSize="[[350,196]]"
             rowItemSpacing="[[25,0]]"

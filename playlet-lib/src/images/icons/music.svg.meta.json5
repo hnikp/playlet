@@ -1,0 +1,11 @@
+{
+  inputHash: '2064461cd8b443d0a001bfbb774e4912',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/music.png',
+      outputHash: 'cc5e11881b9750227760460604622d77',
+      width: 48,
+      height: 48,
+    },
+  ],
+}
