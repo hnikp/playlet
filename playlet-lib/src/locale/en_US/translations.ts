@@ -1149,6 +1149,14 @@
         <translation>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</translation>
     </message>
     <message>
+        <source>Playlet Fork is based on Playlet by Brahim Hadriche. It adds some UI enhancements to the original app: a video details page, comments, a player menu, thumbnail previews, category rows on the home screen and better Persian/Arabic text.</source>
+        <translation>Playlet Fork is based on Playlet by Brahim Hadriche. It adds some UI enhancements to the original app: a video details page, comments, a player menu, thumbnail previews, category rows on the home screen and better Persian/Arabic text.</translation>
+    </message>
+    <message>
+        <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd%.</source>
+        <translation>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd%.</translation>
+    </message>
+    <message>
         <source>Latest (default)</source>
         <translation>Latest (default)</translation>
     </message>

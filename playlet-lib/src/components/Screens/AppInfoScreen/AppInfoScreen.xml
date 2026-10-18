@@ -3,8 +3,15 @@
         <field id="applicationInfo" type="node" bind="/ApplicationInfo" />
     </interface>
     <children>
-        <LabelList
+        <Label
             translation="[130,92]"
+            width="900"
+            wrap="true"
+            maxLines="4"
+            font="font:SmallSystemFont"
+            text="Playlet Fork is based on Playlet by Brahim Hadriche. It adds some UI enhancements to the original app: a video details page, comments, a player menu, thumbnail previews, category rows on the home screen and better Persian/Arabic text." />
+        <LabelList
+            translation="[130,240]"
             itemSize="[1020,48]"
             font="font:SmallestBoldSystemFont"
             drawFocusFeedback="false">

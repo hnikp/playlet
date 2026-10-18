@@ -403,6 +403,8 @@ namespace Locale
         InstanceDescriptionWeb = "Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%"
         ThankYou = "Thank you for using Playlet."
         FeedbackLinks = "You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%."
+        ForkIntro = "Playlet Fork is based on Playlet by Brahim Hadriche. It adds some UI enhancements to the original app: a video details page, comments, a player menu, thumbnail previews, category rows on the home screen and better Persian/Arabic text."
+        ForkFeedbackLinks = "You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd%."
         PlayletLibVersionLatestDefault = "Latest (default)"
         Apply = "Apply"
         PlayletLibVersionChangeDialog1 = "Are you sure you want to change the Playlet Library version to %1?"

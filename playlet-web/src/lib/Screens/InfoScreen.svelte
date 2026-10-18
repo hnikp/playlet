@@ -16,10 +16,6 @@
       displayText: "Playlet Library Version",
     },
     {
-      key: "lib_version_latest",
-      displayText: "Playlet Library Latest Version",
-    },
-    {
       key: "lib_url",
       displayText: "Playlet Library URL",
     },
@@ -42,6 +38,7 @@
   ];
 
   const host = `http://${getHost()}`;
+  const forkRepoUrl = "https://github.com/hnikp/playlet";
   const internalStateLinks = [
     {
       displayText: "App state",
@@ -63,10 +60,6 @@
 
   function linkFor(key, value) {
     switch (key) {
-      case "app_version":
-      case "lib_version":
-      case "lib_version_latest":
-        return `https://github.com/iBicha/playlet/releases/tag/v${encodeURIComponent(value)}`;
       case "lib_url":
         return /^https?:\/\//.test(value) ? value : undefined;
       case "app_git_commit_hash":
@@ -74,7 +67,7 @@
         if (value === "unknown") {
           return undefined;
         }
-        return `https://github.com/iBicha/playlet/commit/${encodeURIComponent(value)}`;
+        return `${forkRepoUrl}/commit/${encodeURIComponent(value)}`;
       default:
         return undefined;
     }
@@ -97,11 +90,12 @@
   let invidiousInfo = {};
   let preferencesInfo = {};
   let profilesInfo = {};
-  const feedbackTitle = encodeURIComponent("[Feedback] Playlet");
-  let githubUrlIssue = "https://github.com/iBicha/playlet/issues/new";
-  let mailToUrl = "mailto:brahim.hadriche@gmail.com";
+  const feedbackTitle = encodeURIComponent("[Feedback] Playlet Fork");
+  let githubUrlIssue = `${forkRepoUrl}/issues/new`;
+  const forkIntro =
+    "Playlet Fork is based on Playlet by Brahim Hadriche. It adds some UI enhancements to the original app: a video details page, comments, a player menu, thumbnail previews, category rows on the home screen and better Persian/Arabic text.";
   const feedbackMessageRaw =
-    "You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.";
+    "You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd%.";
 
   playletStateStore.subscribe((value) => {
     appInfo = value.app || {};
@@ -110,7 +104,6 @@
     preferencesInfo = value.preferences || {};
     profilesInfo = value.profiles || {};
     githubUrlIssue = createGithubIssueUrl();
-    mailToUrl = createMailToUrl();
   });
 
   function createFeedbackBody() {
@@ -158,13 +151,8 @@ ${JSON.stringify(profilesInfo, null, 2)}
       );
     }
 
-    const url = `https://github.com/iBicha/playlet/issues/new?title=${feedbackTitle}&body=${bodyEncoded}`;
+    const url = `${forkRepoUrl}/issues/new?title=${feedbackTitle}&body=${bodyEncoded}`;
     return url;
-  }
-
-  function createMailToUrl() {
-    const body = encodeURIComponent(createFeedbackBody());
-    return `mailto:brahim.hadriche@gmail.com?subject=${feedbackTitle}&body=${body}`;
   }
 
   async function exportRegistry() {
@@ -247,19 +235,14 @@ ${JSON.stringify(profilesInfo, null, 2)}
 
 <div class={visibility ? "" : "hidden"}>
   <div class="text-base text-center m-8">
-    {$translate("Thank you for using Playlet.")}
+    {$translate(forkIntro)}
     <br />
     {@html $translate(feedbackMessageRaw)
       .replace(
         "%IssueStart%",
         `<a class="link" href="${githubUrlIssue}" target="_blank" rel="noopener noreferrer">`
       )
-      .replace("%IssueEnd%", "</a>")
-      .replace(
-        "%EmailStart%",
-        `<a class="link" href="${mailToUrl}" target="_blank" rel="noopener noreferrer">`
-      )
-      .replace("%EmailEnd%", "</a>")}
+      .replace("%IssueEnd%", "</a>")}
   </div>
   <div class="overflow-x-auto">
     <table class="table">
