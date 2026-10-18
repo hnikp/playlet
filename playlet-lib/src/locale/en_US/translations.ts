@@ -937,6 +937,22 @@
         <translation>Misc. preferences</translation>
     </message>
     <message>
+        <source>Browsing</source>
+        <translation>Browsing</translation>
+    </message>
+    <message>
+        <source>Home screen and how videos open</source>
+        <translation>Home screen and how videos open</translation>
+    </message>
+    <message>
+        <source>What a video&apos;s thumbnail shows when it stays focused</source>
+        <translation>What a video&apos;s thumbnail shows when it stays focused</translation>
+    </message>
+    <message>
+        <source>Preview type</source>
+        <translation>Preview type</translation>
+    </message>
+    <message>
         <source>Edit home screen</source>
         <translation>Edit home screen</translation>
     </message>

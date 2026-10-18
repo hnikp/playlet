@@ -306,6 +306,10 @@ namespace Locale
 
         Miscellaneous = "Miscellaneous"
         MiscellaneousPreferences = "Misc. preferences"
+        Browsing = "Browsing"
+        BrowsingPreferences = "Home screen and how videos open"
+        ThumbnailPreviewPreferences = "What a video's thumbnail shows when it stays focused"
+        PreviewType = "Preview type"
         EditHomeScreen = "Edit home screen"
         EditHomeScreenDescription = "Enable/disable and reorder sections on the home screen"
         QueueNotifications = "Queue notifications"

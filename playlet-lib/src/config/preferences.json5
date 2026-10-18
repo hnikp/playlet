@@ -34,6 +34,13 @@
         type: "boolean",
         defaultValue: false,
       },
+      {
+        displayText: "Queue notifications",
+        key: "misc.queue_notifications",
+        description: "Show a notification when a video is added to the queue",
+        type: "boolean",
+        defaultValue: true,
+      },
     ],
   },
   {
@@ -71,6 +78,121 @@
         description: "Disable short videos.",
         type: "boolean",
         defaultValue: false,
+      },
+    ],
+  },
+  {
+    displayText: "Browsing",
+    key: "browsing",
+    description: "Home screen and how videos open",
+    children: [
+      {
+        displayText: "Edit home screen",
+        key: "misc.home_screen_layout",
+        description: "Enable/disable and reorder sections on the home screen",
+        type: "array",
+        defaultValue: [
+          {
+            id: "subscriptions",
+            enabled: true,
+          },
+          {
+            id: "recommended",
+            enabled: true,
+          },
+          {
+            id: "popular",
+            enabled: true,
+          },
+          {
+            id: "playlists",
+            enabled: true,
+          },
+          {
+            id: "watch_history",
+            enabled: true,
+          },
+          {
+            id: "trending_livestreams",
+            enabled: true,
+          },
+          {
+            id: "trending_gaming",
+            enabled: true,
+          },
+          {
+            id: "category_music",
+            enabled: true,
+          },
+          {
+            id: "category_news",
+            enabled: true,
+          },
+          {
+            id: "category_movies",
+            enabled: true,
+          },
+        ],
+        visibility: "tv",
+        rokuComponent: "EditHomeScreenControl",
+      },
+      {
+        displayText: "Edit home screen",
+        key: "misc.home_screen_layout",
+        description: "Enable/disable and reorder sections on the home screen",
+        visibility: "web",
+        svelteComponent: "EditHomeScreenControl",
+      },
+      {
+        displayText: "Open video page on select",
+        key: "misc.ok_opens_video_details",
+        description: "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away",
+        type: "boolean",
+        defaultValue: true,
+      },
+    ],
+  },
+  {
+    displayText: "Thumbnail preview",
+    key: "thumbnail_preview",
+    description: "What a video's thumbnail shows when it stays focused",
+    children: [
+      {
+        displayText: "Preview type",
+        key: "misc.thumbnail_preview_mode",
+        description: "When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing",
+        type: "radio",
+        defaultValue: "video",
+        options: [
+          {
+            displayText: "Off",
+            value: "off",
+          },
+          {
+            displayText: "Frames",
+            value: "frames",
+          },
+          {
+            displayText: "Video",
+            value: "video",
+          },
+        ],
+      },
+      {
+        displayText: "Preview sound",
+        key: "misc.thumbnail_preview_sound",
+        description: "Play video previews with sound",
+        type: "boolean",
+        defaultValue: true,
+      },
+      {
+        displayText: "Preview time limit",
+        key: "misc.thumbnail_preview_limit",
+        description: "Stop a video preview after this many minutes (0 = no limit)",
+        type: "number",
+        min: 0,
+        max: 30,
+        defaultValue: 5,
       },
     ],
   },
@@ -231,121 +353,6 @@
           { displayText: "Português", value: "pt_BR" },
           { displayText: "Русский", value: "ru_RU" },
         ],
-      },
-    ],
-  },
-  {
-    displayText: "Miscellaneous",
-    key: "misc",
-    description: "Misc. preferences",
-    children: [
-      {
-        displayText: "Edit home screen",
-        key: "misc.home_screen_layout",
-        description: "Enable/disable and reorder sections on the home screen",
-        type: "array",
-        defaultValue: [
-          {
-            id: "subscriptions",
-            enabled: true,
-          },
-          {
-            id: "recommended",
-            enabled: true,
-          },
-          {
-            id: "popular",
-            enabled: true,
-          },
-          {
-            id: "playlists",
-            enabled: true,
-          },
-          {
-            id: "watch_history",
-            enabled: true,
-          },
-          {
-            id: "trending_livestreams",
-            enabled: true,
-          },
-          {
-            id: "trending_gaming",
-            enabled: true,
-          },
-          {
-            id: "category_music",
-            enabled: true,
-          },
-          {
-            id: "category_news",
-            enabled: true,
-          },
-          {
-            id: "category_movies",
-            enabled: true,
-          },
-        ],
-        visibility: "tv",
-        rokuComponent: "EditHomeScreenControl",
-      },
-      {
-        displayText: "Edit home screen",
-        key: "misc.home_screen_layout",
-        description: "Enable/disable and reorder sections on the home screen",
-        visibility: "web",
-        svelteComponent: "EditHomeScreenControl",
-      },
-      {
-        displayText: "Queue notifications",
-        key: "misc.queue_notifications",
-        description: "Show a notification when a video is added to the queue",
-        type: "boolean",
-        defaultValue: true,
-      },
-      {
-        displayText: "Open video page on select",
-        key: "misc.ok_opens_video_details",
-        description: "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away",
-        type: "boolean",
-        defaultValue: true,
-      },
-      {
-        displayText: "Thumbnail preview",
-        key: "misc.thumbnail_preview_mode",
-        description: "When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing",
-        type: "radio",
-        defaultValue: "video",
-        options: [
-          {
-            displayText: "Off",
-            value: "off",
-          },
-          {
-            displayText: "Frames",
-            value: "frames",
-          },
-          {
-            displayText: "Video",
-            value: "video",
-          },
-        ],
-      },
-      {
-        displayText: "Preview sound",
-        key: "misc.thumbnail_preview_sound",
-        description: "Play video previews with sound",
-        type: "boolean",
-        defaultValue: true,
-      },
-      {
-        displayText: "Preview time limit",
-        key: "misc.thumbnail_preview_limit",
-        description: "Stop a video preview after this many minutes (0 = no limit)",
-        type: "number",
-        min: 0,
-        max: 30,
-        defaultValue: 5,
       },
     ],
   },
