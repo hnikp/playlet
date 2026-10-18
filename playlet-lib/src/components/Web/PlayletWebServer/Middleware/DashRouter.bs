@@ -60,8 +60,9 @@ namespace Http
             m.reportedLiveHeadFailure = false
         end function
 
-        ' Returns the metadata of video load `videoLoadId`, or invalid when the player holds
-        ' another load. A new load also resets the live state.
+        ' Returns the metadata of video load `videoLoadId`, or invalid when neither the player
+        ' nor a feed thumbnail's video preview (videoQueue.previewContent) holds that load.
+        ' A new load also resets the live state.
         function GetMetadata(videoLoadId as string) as dynamic
             if m.cachedVideoLoadId = videoLoadId
                 return m.cachedMetadata
@@ -69,7 +70,10 @@ namespace Http
 
             content = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content"])
             if content = invalid or ValidString(content.videoLoadId) <> videoLoadId
-                return invalid
+                content = ObjectUtils.DigUnsafe(m.videoQueueNode, ["previewContent"])
+                if content = invalid or ValidString(content.videoLoadId) <> videoLoadId
+                    return invalid
+                end if
             end if
             metadata = content.metadata
             m.cachedMetadata = metadata

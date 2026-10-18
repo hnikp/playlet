@@ -1,10 +1,10 @@
-import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
-import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/VideoPlayer/VideoMetadataLoader.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
+import "pkg:/source/utils/PreviewStreamUtils.bs"
 
 enum StreamSource
     None = ""
@@ -51,54 +51,18 @@ function ExecuteJob() as void
     contentNode.backend = backendId
 
     cancellation = JobGetCancellation()
-    if backend = "playlet"
-
-        sessionData = GetSessionData(innertubeNode, cancellation)
-        if sessionData.cancel = true
-            JobCancel()
-            return
-        end if
-        if sessionData.error <> invalid
-            JobError(sessionData.error)
-            return
-        end if
-
-        accessToken = invalid
-        onBehalfOfUser = invalid
-        profileNode = invalid
-        profile = profilesService.currentProfile
-        if profile <> invalid and profile.type = "youtube"
-            auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
-            if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth
-                JobError(Locale.Dialogs.ProfileNeedsReauthMessage)
-                return
-            end if
-            if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
-                accessToken = auth.token
-                onBehalfOfUser = auth.activeIdentifyToken
-                profileNode = profile
-            end if
-        end if
-
-        metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
-            "cancellation": cancellation
-            "credentialTransferToken": loungeServiceNode.credentialTransferToken
-            "visitorData": sessionData.visitorData
-            "livingRoomPoTokenId": sessionData.livingRoomPoTokenId
-            "accessToken": accessToken
-            "onBehalfOfUser": onBehalfOfUser
-            "profileNode": profileNode
-            "profilesService": profilesService
-        })
-        if IsAssociativeArray(metadata)
-            contentNode.addFields({
-                potAttached: ValidBool(metadata.potAttached)
-                potSource: ValidString(metadata.potSource)
-                loggedIn: not StringUtils.IsNullOrEmpty(accessToken)
-            })
-        end if
-    else
-        metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+    loaded = VideoMetadataLoader.Load(contentNode.videoId, backend, service, innertubeNode, loungeServiceNode, profilesService, cancellation)
+    if loaded.cancel = true
+        JobCancel()
+        return
+    end if
+    if loaded.error <> invalid
+        JobError(loaded.error)
+        return
+    end if
+    metadata = loaded.metadata
+    if loaded.playletFields <> invalid
+        contentNode.addFields(loaded.playletFields)
     end if
 
     if JobIsCancelled()
@@ -194,55 +158,6 @@ function ExecuteJob() as void
     if metadata.liveNow = true
         contentNode.Live = true
     end if
-end function
-
-function GetSessionData(innertubeNode as object, cancellation as object) as object
-    sessionData = innertubeNode.sessionData
-    if SessionDataComplete(sessionData)
-        return sessionData
-    end if
-
-    callback = innertubeNode.callFunc("EnsureSessionDataJob", invalid)
-
-    port = CreateObject("roMessagePort")
-    MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "sessionData", port)
-    MessagePortUtils.ObserveFieldScopedExSafe(callback, "done", port)
-    CancellationUtils.ObserveCancellationScoped(cancellation, port)
-
-    cancelled = false
-    while not SessionDataComplete(innertubeNode.sessionData) and callback.done <> true
-        message = wait(30000, port)
-        if message = invalid
-            exit while
-        end if
-        if CancellationUtils.IsCancellationEvent(cancellation, message)
-            cancelled = true
-            exit while
-        end if
-    end while
-
-    innertubeNode.unobserveFieldScoped("sessionData")
-    callback.unobserveFieldScoped("done")
-    CancellationUtils.UnobserveCancellationScoped(cancellation)
-
-    if cancelled
-        return {
-            cancel: true
-        }
-    end if
-
-    sessionData = innertubeNode.sessionData
-    if SessionDataComplete(sessionData)
-        return sessionData
-    end if
-
-    return {
-        error: "Failed to get session data. Please try again later."
-    }
-end function
-
-function SessionDataComplete(sessionData as object) as boolean
-    return IsAssociativeArray(sessionData) and not StringUtils.IsNullOrEmpty(sessionData.visitorData) and not StringUtils.IsNullOrEmpty(sessionData.livingRoomPoTokenId)
 end function
 
 function SwitchBackendToPlaylet(preferencesNode as object) as void
@@ -461,13 +376,6 @@ function AddUrls(streamUrls as object, url as string, urlLocal as dynamic, urlFi
             streamUrls.push(urlLocal)
         end if
     end if
-end function
-
-function AddInstanceToUrlIfNeeded(url as dynamic, instance as string) as dynamic
-    if IsString(url) and url.StartsWith("/")
-        return instance + url
-    end if
-    return url
 end function
 
 function SetCaptions(metadata as object, service as object, contentNode as object) as void

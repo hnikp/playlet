@@ -1,0 +1,98 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/VideoPlayer/VideoMetadataLoader.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/PreviewStreamUtils.bs"
+import "pkg:/source/utils/StoryboardUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Resolves what a focused feed thumbnail plays in its video preview (VideoRowList): a muxed mp4
+' stream, else a DASH manifest from Playlet's local web server, plus storyboard frames to fall
+' back on. Returns { url, streamFormat, frames } (url/streamFormat invalid when only frames are
+' usable, frames invalid without a usable storyboard); for "dash", also { videoLoadId, metadata },
+' which VideoRowList hands to the DASH router via VideoQueue.previewContent.
+' Previews are frequent and best effort: no telemetry, no dialogs, no player cache files.
+@job("VideoPreviewJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+    videoId = ValidString(input.videoId)
+    preferencesNode = input.preferences
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if videoId = ""
+        PreviewJobError("videoId is missing")
+        return
+    end if
+
+    service = new Invidious.InvidiousService(input.invidious)
+    instance = service.GetInstance()
+    backend = ValidString(preferencesNode["backend.selected"])
+    if backend = "invidious" and StringUtils.IsNullOrEmpty(preferencesNode["invidious.instance"])
+        ' VideoContentJob switches the backend to playlet (with a dialog); a preview only borrows it
+        backend = "playlet"
+    end if
+
+    loaded = VideoMetadataLoader.Load(videoId, backend, service, input.innertube, input.loungeService, input.profilesService, JobGetCancellation())
+    if loaded.cancel = true or JobIsCancelled()
+        JobCancel()
+        return
+    end if
+    if loaded.error <> invalid
+        PreviewJobError(loaded.error)
+        return
+    end if
+
+    metadata = loaded.metadata
+    if not IsAssociativeArray(metadata)
+        PreviewJobError("Failed to get video metadata")
+        return
+    end if
+    if metadata.error <> invalid
+        PreviewJobError(metadata.error)
+        return
+    end if
+
+    videoLoadId = StringUtils.RandomId()
+    stream = PreviewStreamUtils.PickPreviewStream(metadata, instance, ValidInt(input.playletServerPort), videoLoadId)
+    ' Same shape as VideoContentNode.previewStoryboard ({ frames: [...] }, see StoryboardPreviewJob)
+    frames = StoryboardUtils.GetPreviewFrames(metadata.storyboards, instance, 8, 160)
+
+    if stream = invalid and frames = invalid
+        PreviewJobError("No preview stream or storyboard")
+        return
+    end if
+
+    result = {
+        url: invalid
+        streamFormat: invalid
+        frames: frames
+    }
+    if stream <> invalid
+        result.url = stream.url
+        result.streamFormat = stream.streamFormat
+        if stream.streamFormat = "dash"
+            result.videoLoadId = videoLoadId
+            result.metadata = metadata
+        end if
+    end if
+    JobSuccessData(result)
+end function
+
+' JobError, minus its LogError (which reports to telemetry): a failed preview is expected
+' (live, DRM, rate limits) and only logged.
+function PreviewJobError(error as dynamic) as void
+    error = ErrorUtils.Format(error)
+    LogInfo(`[VideoPreviewJob]${error}`)
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.error = error
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function

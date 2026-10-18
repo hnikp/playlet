@@ -1,0 +1,44 @@
+namespace Tests
+    @SGNode("PlayletWebServer")
+    @suite
+    class DashRouterPreviewTests extends Rooibos.BaseTestSuite
+        @describe("GetMetadata")
+
+        @it("Prefers the player's content")
+        function _()
+            router = m.CreateRouter("load1", "load1")
+            m.assertEqual(router.GetMetadata("load1").title, "player")
+        end function
+
+        @it("Falls back to the thumbnail preview's content")
+        function _()
+            router = m.CreateRouter("load1", "load2")
+            m.assertEqual(router.GetMetadata("load2").title, "preview")
+            ' cached, then the player's load is still found
+            m.assertEqual(router.GetMetadata("load2").title, "preview")
+            m.assertEqual(router.GetMetadata("load1").title, "player")
+        end function
+
+        @it("Returns invalid for an unknown load")
+        function _()
+            router = m.CreateRouter("load1", "load2")
+            m.assertInvalid(router.GetMetadata("load3"))
+
+            router = new Http.DashRouter({ sceneNodes: { videoQueue: {} } })
+            m.assertInvalid(router.GetMetadata("load3"))
+        end function
+
+        function CreateRouter(playerLoadId as string, previewLoadId as string) as object
+            playerContent = CreateObject("roSGNode", "ContentNode")
+            playerContent.addFields({ videoLoadId: playerLoadId, metadata: { title: "player" } })
+            previewContent = CreateObject("roSGNode", "ContentNode")
+            previewContent.addFields({ videoLoadId: previewLoadId, metadata: { title: "preview" } })
+            videoQueue = {
+                player: { content: playerContent }
+                previewContent: previewContent
+            }
+            return new Http.DashRouter({ sceneNodes: { videoQueue: videoQueue } })
+        end function
+
+    end class
+end namespace

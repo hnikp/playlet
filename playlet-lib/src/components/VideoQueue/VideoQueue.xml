@@ -20,6 +20,9 @@
         <field id="setQueueAndIndex" type="assocarray" onChange="OnSetQueueAndIndex" />
 
         <field id="player" type="node" />
+        <!-- set by VideoRowList while a thumbnail video preview plays a DASH stream:
+        a ContentNode with videoLoadId and metadata, read by DashRouter -->
+        <field id="previewContent" type="node" />
         <field id="nowPlaying" type="node" />
 
         <field id="innertube" type="node" />

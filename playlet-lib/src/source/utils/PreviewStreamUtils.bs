@@ -1,0 +1,114 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+' Prefixes instance-relative urls (starting with "/") with the Invidious instance.
+' Shared by VideoContentJob and PreviewStreamUtils.
+function AddInstanceToUrlIfNeeded(url as dynamic, instance as string) as dynamic
+    if IsString(url) and url.StartsWith("/")
+        return instance + url
+    end if
+    return url
+end function
+
+' Picks what to play in a feed thumbnail's video preview (VideoPreviewJob).
+namespace PreviewStreamUtils
+
+    ' Muxed 360p mp4 (itag 18), the smallest stream that has audio and video in one file.
+    const PREFERRED_ITAG = "18"
+    const PREVIEW_DASH_QUALITY = "360p"
+
+    ' Returns { url, streamFormat: "mp4" } for the lowest resolution muxed stream (preferring itag 18),
+    ' else { url, streamFormat: "dash", needsMetadata: true } for a DASH manifest from Playlet's local
+    ' web server (which reads the metadata back by videoLoadId), else invalid (no stream, live, DRM).
+    function PickPreviewStream(metadata as dynamic, instance as string, playletServerPort as integer, videoLoadId as string) as object
+        if not IsAssociativeArray(metadata)
+            return invalid
+        end if
+        if ValidBool(metadata.liveNow) or not StringUtils.IsNullOrEmpty(metadata.drmParams)
+            return invalid
+        end if
+
+        best = invalid
+        if IsArray(metadata.formatStreams)
+            for each stream in metadata.formatStreams
+                if not IsAssociativeArray(stream) or StringUtils.IsNullOrEmpty(stream.url)
+                    continue for
+                end if
+                if PreviewStreamUtils.ItagString(stream.itag) = PREFERRED_ITAG
+                    best = stream
+                    exit for
+                end if
+                if best = invalid or PreviewStreamUtils.StreamHeight(stream) < PreviewStreamUtils.StreamHeight(best)
+                    best = stream
+                end if
+            end for
+        end if
+
+        if best <> invalid
+            return {
+                url: AddInstanceToUrlIfNeeded(best.url, instance)
+                streamFormat: "mp4"
+            }
+        end if
+
+        if not PreviewStreamUtils.HasAdaptiveFormats(metadata)
+            return invalid
+        end if
+
+        ' Same url as VideoContentJob's AddDashUrls, filtered to the lowest quality
+        dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
+            v: metadata.videoId
+            "videoLoadId": videoLoadId
+            quality: PREVIEW_DASH_QUALITY
+        })
+        return {
+            url: dashUrl
+            streamFormat: "dash"
+            needsMetadata: true
+        }
+    end function
+
+    ' itag is a string from the built-in backend and Innertube, possibly a number from Invidious.
+    function ItagString(itag as dynamic) as string
+        if IsString(itag)
+            return itag
+        end if
+        if itag <> invalid and GetInterface(itag, "ifToStr") <> invalid
+            return itag.ToStr()
+        end if
+        return ""
+    end function
+
+    ' Video height from Innertube's height, or Invidious' resolution ("360p") or size ("640x360").
+    ' Unknown heights sort last.
+    function StreamHeight(stream as object) as integer
+        if stream.height <> invalid and GetInterface(stream.height, "ifInt") <> invalid and stream.height > 0
+            return stream.height
+        end if
+        for each key in ["resolution", "qualityLabel"]
+            value = ValidString(stream[key]).ToInt()
+            if value > 0
+                return value
+            end if
+        end for
+        sizeParts = ValidString(stream.size).Split("x")
+        if sizeParts.Count() = 2 and sizeParts[1].ToInt() > 0
+            return sizeParts[1].ToInt()
+        end if
+        return 100000
+    end function
+
+    function HasAdaptiveFormats(metadata as object) as boolean
+        if not IsArray(metadata.adaptiveFormats)
+            return false
+        end if
+        for each fmt in metadata.adaptiveFormats
+            if IsAssociativeArray(fmt) and not StringUtils.IsNullOrEmpty(fmt.url)
+                return true
+            end if
+        end for
+        return false
+    end function
+
+end namespace

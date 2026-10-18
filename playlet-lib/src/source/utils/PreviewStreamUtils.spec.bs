@@ -1,0 +1,84 @@
+namespace Tests
+
+    @suite
+    class PreviewStreamUtilsTests extends Rooibos.BaseTestSuite
+
+        @describe("PreviewStreamUtils.PickPreviewStream")
+
+        @it("Prefers itag 18 (string) over a lower resolution stream")
+        function _()
+            metadata = m.Metadata([
+                { itag: "17", url: "https://v.example/17", width: 176, height: 144 }
+                { itag: "18", url: "https://v.example/18", width: 640, height: 360 }
+                { itag: "22", url: "https://v.example/22", width: 1280, height: 720 }
+            ], [])
+            stream = PreviewStreamUtils.PickPreviewStream(metadata, "https://invidious.example", 8888, "load1")
+            m.assertEqual(stream.url, "https://v.example/18")
+            m.assertEqual(stream.streamFormat, "mp4")
+        end function
+
+        @it("Matches a numeric itag 18 and prefixes instance-relative urls")
+        function _()
+            metadata = m.Metadata([
+                { itag: 22, url: "/videoplayback?itag=22", resolution: "720p" }
+                { itag: 18, url: "/videoplayback?itag=18", resolution: "360p" }
+            ], [])
+            stream = PreviewStreamUtils.PickPreviewStream(metadata, "https://invidious.example", 8888, "load1")
+            m.assertEqual(stream.url, "https://invidious.example/videoplayback?itag=18")
+            m.assertEqual(stream.streamFormat, "mp4")
+        end function
+
+        @it("Skips streams without a url and picks the lowest resolution")
+        function _()
+            metadata = m.Metadata([
+                { itag: "18", url: "", height: 360 }
+                { itag: "22", url: "https://v.example/22", size: "1280x720" }
+                { itag: "43", url: "https://v.example/43", size: "640x360" }
+            ], [])
+            stream = PreviewStreamUtils.PickPreviewStream(metadata, "", 8888, "load1")
+            m.assertEqual(stream.url, "https://v.example/43")
+            m.assertEqual(stream.streamFormat, "mp4")
+        end function
+
+        @it("Falls back to a 360p DASH manifest without muxed streams")
+        function _()
+            metadata = m.Metadata([{ itag: "18", url: invalid }], [{ itag: "134", url: "https://v.example/134" }])
+            stream = PreviewStreamUtils.PickPreviewStream(metadata, "", 8888, "load1")
+            m.assertEqual(stream.streamFormat, "dash")
+            m.assertTrue(stream.needsMetadata)
+            m.assertTrue(stream.url.StartsWith("http://127.0.0.1:8888/api/dash?"), stream.url)
+            m.assertTrue(stream.url.InStr("v=abc") <> -1, stream.url)
+            m.assertTrue(stream.url.InStr("videoLoadId=load1") <> -1, stream.url)
+            m.assertTrue(stream.url.InStr("quality=360p") <> -1, stream.url)
+        end function
+
+        @it("Returns invalid without any playable stream")
+        function _()
+            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(m.Metadata([], []), "", 8888, "load1"))
+            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(m.Metadata(invalid, [{ itag: "134", url: "" }]), "", 8888, "load1"))
+            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(invalid, "", 8888, "load1"))
+        end function
+
+        @it("Returns invalid for live and DRM videos")
+        function _()
+            live = m.Metadata([{ itag: "18", url: "https://v.example/18" }], [{ itag: "134", url: "https://v.example/134" }])
+            live.liveNow = true
+            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(live, "", 8888, "load1"))
+
+            drm = m.Metadata([], [{ itag: "134", url: "https://v.example/134" }])
+            drm.drmParams = "params"
+            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(drm, "", 8888, "load1"))
+        end function
+
+        function Metadata(formatStreams as dynamic, adaptiveFormats as dynamic) as object
+            return {
+                videoId: "abc"
+                liveNow: false
+                formatStreams: formatStreams
+                adaptiveFormats: adaptiveFormats
+            }
+        end function
+
+    end class
+
+end namespace
