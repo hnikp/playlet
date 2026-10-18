@@ -501,6 +501,16 @@ class DashManifest
                         xml.Node("Label", { "id": id })
                         xml.Text(displayName)
                         xml.End()
+                    else if firstFormat.isDrc = true or firstFormat.isVoiceBoost = true
+                        ' Single-language videos have no audioTrack: name the re-mixes so they can be told apart
+                        ' from the regular mix in the player's audio menu
+                        displayName = "Stable Volume"
+                        if firstFormat.isVoiceBoost = true
+                            displayName = "Voice Boost"
+                        end if
+                        xml.Node("Label", { "id": id })
+                        xml.Text(displayName)
+                        xml.End()
                     end if
                 end if
 

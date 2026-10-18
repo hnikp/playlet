@@ -71,6 +71,9 @@ function ClosePlayerMenu(refocus as boolean) as void
         return
     end if
     m.playerMenu.visible = false
+    ' The menu is a child of the player: focusing the player while the menu's list still holds focus is a no-op on
+    ' the device (keys kept going to the hidden menu). Release the list's focus first.
+    NodeSetFocus(m.playerMenu.findNode("list"), false)
     if refocus and m.container.fullscreen
         NodeSetFocus(m.top, true)
     end if
@@ -316,7 +319,8 @@ function GetAudioTracks() as object
             name = ValidString(track.Language)
         end if
         if name = ""
-            name = id
+            ' single-language videos: the regular mix has neither (its re-mixes are labelled by DashManifest)
+            name = Tr(Locale.PlayerMenu.OriginalAudio)
         end if
         ' The device's track ids carry the DASH roles (DashManifest.GetTrackRoles), e.g.
         ' "dash/a~AAC~es~alternate_dub~~0~Spanish" or "dash/a~AAC~en-US~main~~0~English (US) original"

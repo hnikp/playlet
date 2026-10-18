@@ -501,6 +501,7 @@ namespace Locale
         Captions = "Captions"
         AudioTrack = "Audio track"
         Dubbed = "%1 (dubbed)"
+        OriginalAudio = "Original"
         CaptionsOff = "Off"
         On = "On"
         VideoQueue = "Video queue"

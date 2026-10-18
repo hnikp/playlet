@@ -1540,5 +1540,9 @@
         <source>%1 (dubbed)</source>
         <translation>%1 (dubbed)</translation>
     </message>
+    <message>
+        <source>Original</source>
+        <translation>Original</translation>
+    </message>
 </context>
 </TS>

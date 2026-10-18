@@ -180,9 +180,15 @@ namespace RtlText
             paragraphDir = "R"
         end if
 
-        ' W7: European numbers preceded by left-to-right text behave as left-to-right
+        ' W7: European numbers preceded by left-to-right text behave as left-to-right.
+        ' Extension: text like "<persian author>   2,986 views   14 hours ago" is a list of segments (separated by
+        ' 2+ spaces or "•"); a number starting a segment takes the direction of the segment's first word, so
+        ' "2,986 views" stays together instead of the number joining the Persian text.
         lastStrong = paragraphDir
         for i = 0 to n - 1
+            if IsSegmentSeparator(cps, i)
+                lastStrong = SegmentDirection(types, i + 1, lastStrong)
+            end if
             if types[i] = "R" or types[i] = "L"
                 lastStrong = types[i]
             else if types[i] = "EN" and lastStrong = "L"
@@ -593,6 +599,24 @@ namespace RtlText
             return "N"
         end if
         return "L"
+    end function
+
+    function IsSegmentSeparator(cps as object, index as integer) as boolean
+        c = cps[index]
+        if c = &h2022
+            return true
+        end if
+        return c = &h20 and index + 1 < cps.Count() and cps[index + 1] = &h20
+    end function
+
+    ' The direction of the first strong character from index (to the end), or fallback
+    function SegmentDirection(types as object, index as integer, fallback as string) as string
+        for i = index to types.Count() - 1
+            if types[i] = "R" or types[i] = "L"
+                return types[i]
+            end if
+        end for
+        return fallback
     end function
 
     ' N1: numbers count as right-to-left when resolving neutrals

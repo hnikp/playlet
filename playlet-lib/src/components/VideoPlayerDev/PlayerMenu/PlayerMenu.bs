@@ -3,6 +3,7 @@ import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerMenuItems.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -53,7 +54,7 @@ function Render() as void
     end if
 
     if m.page = ""
-        m.titleLabel.text = ValidString(state.title)
+        RtlText.ApplyToLabel(m.titleLabel, ValidString(state.title), "font:MediumBoldSystemFont", true, 24)
         items = PlayerMenuItems.RootItems(state)
     else
         items = PlayerMenuItems.SubItems(m.page, state)

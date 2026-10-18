@@ -113,6 +113,13 @@ namespace Tests
             m.assertEqual(RtlText.ToVisualLine(text), "12:30 " + m.Cps([&h0627]))
         end function
 
+        @it("Keeps a number with the English words of its segment")
+        function _()
+            ' "<a b>   2,986 views   14 hours ago" -> the English segments stay in reading order, left of <b a>
+            text = m.Cps([&h0627, &h0628]) + "   2,986 views   14 hours ago"
+            m.assertEqual(RtlText.ToVisualLine(text), "2,986 views   14 hours ago   " + m.Cps([&h0628, &h0627]))
+        end function
+
         @it("Mirrors brackets in right-to-left runs")
         function _()
             ' "(<a b>)" -> "(<b a>)" after mirroring
