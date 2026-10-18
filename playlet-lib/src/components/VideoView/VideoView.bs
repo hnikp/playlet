@@ -16,6 +16,7 @@ import "pkg:/source/utils/Types.bs"
 const RELATED_SCROLL_OFFSET = 300
 
 function Init()
+    m.disposed = false
     m.container = m.top.findNode("container")
     m.scrollAnimation = m.top.findNode("scrollAnimation")
     m.containerTranslation = m.top.findNode("containerTranslation")
@@ -81,7 +82,7 @@ end function
 
 function OnContentSet() as void
     content = m.top.content
-    if content = invalid
+    if content = invalid or m.disposed
         return
     end if
 
@@ -333,6 +334,8 @@ function CancelDetailsJob()
 end function
 
 function OnDispose()
+    ' the content node is shared with the feed it was opened from: changes to it must not reach a closed page
+    m.disposed = true
     CloseCommentsPanel()
     CancelDetailsJob()
     DisposeObservers()

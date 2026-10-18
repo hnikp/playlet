@@ -16,13 +16,17 @@ import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 add the option to remove a row if it does not have any content
 ' E.g. Subscriptions, Watch History and Playlists can be empty
-' Thumbnail preview: after focus stays on a video this long, its storyboard frames are loaded and animated
+' Thumbnail preview: after focus stays on a video this long, its storyboard frames (or the video itself) are
+' loaded and shown in the thumbnail
 const PREVIEW_DELAY_SECONDS = 2
 
 function Init()
     m.pendingLoadJobs = {}
     m.previewNode = invalid
     m.previewJob = invalid
+    ' the single Video node used for in-thumbnail playback (created on first use), and the item it plays for
+    m.previewVideo = invalid
+    m.previewVideoItem = invalid
 end function
 
 function OnNodeReady()
@@ -34,6 +38,7 @@ function OnNodeReady()
 
     DisposableObserveFieldScoped(m.profilesService, "currentProfileChanged", FuncName(OnCurrentProfileChanged))
     DisposableObserveFieldScoped(m.invidious, "subscriptionChanged", FuncName(OnSubscriptionChanged))
+    DisposableObserveFieldScoped(m.videoQueue, "player", FuncName(OnVideoPlayerChange))
     InitializeLongPress(["OK"])
 end function
 
@@ -87,6 +92,8 @@ function OnRowItemFocused(event as object) as void
 end function
 
 function OnRowItemSelected(index as object) as void
+    ' the preview video must be gone before the real player starts (Roku can't decode two videos)
+    StopPreview()
     content = m.top.content
     if content = invalid
         return
@@ -135,6 +142,7 @@ function OnRowItemSelected(index as object) as void
 end function
 
 function OnRowItemLongPressed(index as object) as void
+    StopPreview()
     content = m.top.content
     if content = invalid
         return
@@ -442,8 +450,9 @@ function SchedulePreview(item as object) as void
     if item = invalid or item.type <> "video" or item.liveNow or item.isUpcoming
         return
     end if
-    if m.preferences["misc.thumbnail_preview"] <> true
-        LogDebug("Thumbnail preview off:", m.preferences["misc.thumbnail_preview"])
+    mode = m.preferences["misc.thumbnail_preview_mode"]
+    if mode <> "frames" and mode <> "video"
+        LogDebug("Thumbnail preview off:", mode)
         return
     end if
 
@@ -469,6 +478,15 @@ function OnPreviewTimerFire() as void
         return
     end if
 
+    ' Roku can't decode two videos: with a player open (e.g. picture-in-picture) only frames are shown
+    if m.preferences["misc.thumbnail_preview_mode"] = "video" and not VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue)
+        QueueVideoPreviewJob(item)
+    else
+        QueueStoryboardPreviewJob(item)
+    end if
+end function
+
+function QueueStoryboardPreviewJob(item as object)
     m.previewJob = JobSystem.CreateCallback(OnPreviewJobDone)
     JobSystem.QueueJob(m.jobQueue, Jobs.StoryboardPreviewJob, {
         invidious: m.invidious
@@ -488,6 +506,151 @@ function OnPreviewJobDone(event as object) as void
     end if
 end function
 
+function QueueVideoPreviewJob(item as object)
+    m.previewJob = JobSystem.CreateCallback(OnVideoPreviewJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.VideoPreviewJob, {
+        invidious: m.invidious
+        innertube: m.innertube
+        preferences: m.preferences
+        profilesService: m.profilesService
+        loungeService: m.loungeService
+        playletServerPort: m.webServer.port
+        videoId: item.videoId
+    }, m.previewJob)
+end function
+
+function OnVideoPreviewJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    ' a stale job (focus moved on, StopPreview cancelled it) must not start anything
+    if m.previewJob = invalid or not m.previewJob.isSameNode(event.getRoSGNode())
+        return
+    end if
+    m.previewJob = invalid
+
+    info = event.getInfo()
+    if info.cancel
+        return
+    end if
+
+    item = m.previewNode
+    if item = invalid or not m.top.hasFocus() or not m.top.visible
+        return
+    end if
+
+    if not info.success
+        LogDebug("No video thumbnail preview, falling back to frames:", info.error)
+        QueueStoryboardPreviewJob(item)
+        return
+    end if
+
+    data = info.data
+    ' frames show while the video buffers, and stay if it fails
+    if IsAssociativeArray(data.frames)
+        item.previewStoryboard = data.frames
+    end if
+
+    ' only frames were usable; a player may also have opened while the job ran
+    if StringUtils.IsNullOrEmpty(data.url) or VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue)
+        return
+    end if
+    PlayPreviewVideo(item, data)
+end function
+
+function GetPreviewVideo() as object
+    if m.previewVideo = invalid
+        player = CreateObject("roSGNode", "Video")
+        player.enableUI = false
+        if player.hasField("enableTrickPlay")
+            player.enableTrickPlay = false
+        end if
+        ' only hides the captions of this node; globalCaptionMode is a device-wide setting, left alone
+        player.suppressCaptions = true
+        player.loop = false
+        player.ObserveFieldScoped("state", FuncName(OnPreviewVideoState))
+        m.previewVideo = player
+        m.top.previewPlayer = player
+    end if
+    return m.previewVideo
+end function
+
+function PlayPreviewVideo(item as object, data as object) as void
+    player = GetPreviewVideo()
+    player.mute = not (m.preferences["misc.thumbnail_preview_sound"] = true)
+
+    streamContent = CreateObject("roSGNode", "ContentNode")
+    streamContent.url = data.url
+    streamContent.streamFormat = data.streamFormat
+
+    m.previewVideoItem = item
+    if data.streamFormat = "dash"
+        ' the local web server builds the DASH manifest from this (VideoQueue.previewContent)
+        dashSource = CreateObject("roSGNode", "ContentNode")
+        dashSource.addFields({ videoLoadId: data.videoLoadId, metadata: data.metadata })
+        m.videoQueue.previewContent = dashSource
+    end if
+
+    player.content = streamContent
+    ' VideoRowCell picks the node up and places it over the thumbnail
+    item.previewVideoActive = true
+    player.control = "play"
+
+    limitMinutes = m.preferences["misc.thumbnail_preview_limit"]
+    if IsNumber(limitMinutes) and limitMinutes > 0
+        if m.previewLimitTimer = invalid
+            m.previewLimitTimer = CreateObject("roSGNode", "Timer")
+            m.previewLimitTimer.repeat = false
+            m.previewLimitTimer.ObserveFieldScoped("fire", FuncName(OnPreviewLimitTimerFire))
+        end if
+        m.previewLimitTimer.duration = limitMinutes * 60
+        m.previewLimitTimer.control = "start"
+    end if
+end function
+
+function OnPreviewVideoState() as void
+    if m.previewVideoItem = invalid
+        return
+    end if
+    state = m.previewVideo.state
+    if state = "error"
+        LogDebug("Video thumbnail preview error:", m.previewVideo.errorMsg)
+        ' frames (if any) keep animating
+        StopPreviewVideo()
+    else if state = "finished"
+        StopPreview()
+    end if
+end function
+
+function OnPreviewLimitTimerFire()
+    StopPreview()
+end function
+
+' A real player opened (e.g. from the web app or a cast): it can't share the decoder with the preview
+function OnVideoPlayerChange() as void
+    if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue)
+        StopPreviewVideo()
+    end if
+end function
+
+' Synchronous on purpose: the preview video must be stopped before a real player starts
+function StopPreviewVideo() as void
+    if m.previewLimitTimer <> invalid
+        m.previewLimitTimer.control = "stop"
+    end if
+    if m.previewVideoItem = invalid
+        return
+    end if
+    player = m.previewVideo
+    player.control = "stop"
+    player.content = invalid
+    parent = player.getParent()
+    if parent <> invalid
+        parent.removeChild(player)
+    end if
+    m.previewVideoItem.previewVideoActive = false
+    m.previewVideoItem = invalid
+    m.videoQueue.previewContent = invalid
+end function
+
 ' Stops the preview of the previously focused item and frees its frames (VideoRowCell stops animating)
 function StopPreview() as void
     if m.previewTimer <> invalid
@@ -497,6 +660,7 @@ function StopPreview() as void
         m.previewJob.cancel = true
         m.previewJob = invalid
     end if
+    StopPreviewVideo()
     if m.previewNode <> invalid
         m.previewNode.previewStoryboard = {}
         m.previewNode = invalid

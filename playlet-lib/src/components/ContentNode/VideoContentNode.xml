@@ -29,6 +29,10 @@
         <field id="percentDurationWatched" type="float" />
         <!-- thumbnail preview frames, set while the item has focus (see StoryboardPreviewJob, VideoRowCell) -->
         <field id="previewStoryboard" type="assocarray" />
+        <!-- true while this item's video plays inside its thumbnail. A flag, not the Video node: a node field
+             would make every change of the playing Video a change of this item for its observers
+             (VideoView reloaded its details in a loop). The node is VideoRowList.previewPlayer. -->
+        <field id="previewVideoActive" type="boolean" />
         <!-- Persian/Arabic title and author prepared for VideoRowCell's labels (see RtlText.PrepareForLabel) -->
         <field id="titlePrepared" type="assocarray" />
         <field id="authorPrepared" type="assocarray" />

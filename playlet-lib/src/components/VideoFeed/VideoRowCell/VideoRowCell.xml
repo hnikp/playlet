@@ -65,7 +65,9 @@
         </LayoutGroup>
         <!-- thumbnail preview, over the thumbnail (top-left of the LayoutGroup): one storyboard sheet scaled so a
              tile covers the thumbnail, moved so the current tile is at 0,0 (see ShowPreviewFrame). Outside the
-             LayoutGroup on purpose: it would lay out the whole (unclipped) sheet and push the cell's content away. -->
+             LayoutGroup on purpose: it would lay out the whole (unclipped) sheet and push the cell's content away.
+             In video preview mode VideoRowList's Video node is appended here too, above the poster
+             (see OnPreviewVideoChange). -->
         <Group
             id="previewGroup"
             clippingRect="[0,0,350,196]">

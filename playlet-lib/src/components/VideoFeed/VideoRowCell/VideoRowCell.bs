@@ -16,11 +16,13 @@ function Init()
     m.progressRect = m.top.FindNode("progressRect")
     m.titleLabel = m.top.FindNode("titleLabel")
     m.authorLabel = m.top.FindNode("authorLabel")
+    m.previewGroup = m.top.FindNode("previewGroup")
     m.previewPoster = m.top.FindNode("previewPoster")
     m.previewTimer = m.top.FindNode("previewTimer")
     m.previewTimer.ObserveField("fire", FuncName(OnPreviewTimerFire))
     m.previewPoster.ObserveField("loadStatus", FuncName(OnPreviewLoadStatus))
     m.previewContent = invalid
+    m.previewVideo = invalid
 end function
 
 function OnContentSet() as void
@@ -106,19 +108,25 @@ function SetDurationLabel(text as string, bgColor as string, bgOpacity as float,
     rect.opacity = bgOpacity
 end function
 
-' Cells are recycled: follow the preview field of the current content node only
+' Cells are recycled: follow the preview fields of the current content node only
 function ObservePreview(content as object) as void
     if m.previewContent <> invalid
         if content <> invalid and m.previewContent.isSameNode(content)
             return
         end if
         m.previewContent.unobserveFieldScoped("previewStoryboard")
+        m.previewContent.unobserveFieldScoped("previewVideoActive")
     end if
     m.previewContent = content
     if content <> invalid and content.hasField("previewStoryboard")
         content.observeFieldScoped("previewStoryboard", FuncName(OnPreviewChange))
     end if
+    if content <> invalid and content.hasField("previewVideoActive")
+        content.observeFieldScoped("previewVideoActive", FuncName(OnPreviewVideoChange))
+    end if
     OnPreviewChange()
+    ' also drops another item's video when the cell is recycled
+    OnPreviewVideoChange()
 end function
 
 function OnPreviewChange() as void
@@ -176,6 +184,76 @@ end function
 function OnPreviewLoadStatus() as void
     if m.previewFrames <> invalid and m.previewPoster.loadStatus = "ready"
         m.previewPoster.visible = true
+    end if
+end function
+
+' The cell is a descendant of its VideoRowList, which owns the preview's Video node
+function FindPreviewPlayer() as dynamic
+    node = m.top.getParent()
+    while node <> invalid
+        if node.hasField("previewPlayer")
+            return node.previewPlayer
+        end if
+        node = node.getParent()
+    end while
+    return invalid
+end function
+
+' The Video node (owned by VideoRowList) is placed over the frames, covering the thumbnail
+function OnPreviewVideoChange() as void
+    newVideo = invalid
+    content = m.previewContent
+    if content <> invalid and content.hasField("previewVideoActive") and content.previewVideoActive = true
+        newVideo = FindPreviewPlayer()
+    end if
+
+    if m.previewVideo <> invalid
+        if newVideo <> invalid and m.previewVideo.isSameNode(newVideo)
+            return
+        end if
+        DetachPreviewVideo()
+    end if
+    if newVideo = invalid
+        return
+    end if
+
+    m.previewVideo = newVideo
+    ' an unstarted Video may draw black: hidden until it plays (frames show meanwhile)
+    newVideo.visible = false
+    newVideo.width = THUMBNAIL_WIDTH
+    newVideo.height = THUMBNAIL_HEIGHT
+    newVideo.translation = [0, 0]
+    ' another cell may still hold it (recycling order is not guaranteed)
+    oldParent = newVideo.getParent()
+    if oldParent <> invalid
+        oldParent.removeChild(newVideo)
+    end if
+    ' appended after previewPoster, so drawn above it
+    m.previewGroup.appendChild(newVideo)
+    newVideo.observeFieldScoped("state", FuncName(OnPreviewVideoState))
+    OnPreviewVideoState()
+end function
+
+function OnPreviewVideoState() as void
+    if m.previewVideo = invalid or m.previewVideo.state <> "playing"
+        return
+    end if
+    m.previewVideo.visible = true
+    ' the frames are covered now
+    m.previewTimer.control = "stop"
+end function
+
+function DetachPreviewVideo() as void
+    previewVideo = m.previewVideo
+    m.previewVideo = invalid
+    previewVideo.unobserveFieldScoped("state")
+    parent = previewVideo.getParent()
+    if parent <> invalid and parent.isSameNode(m.previewGroup)
+        m.previewGroup.removeChild(previewVideo)
+    end if
+    ' e.g. the video failed: the frames take over again
+    if m.previewFrames <> invalid
+        m.previewTimer.control = "start"
     end if
 end function
 

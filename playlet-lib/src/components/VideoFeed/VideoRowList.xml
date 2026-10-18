@@ -2,12 +2,18 @@
     <interface>
         <field id="appController" type="node" bind="/AppController" />
         <field id="invidious" type="node" bind="/Invidious" />
+        <!-- innertube, loungeService, webServer (port): input of VideoPreviewJob -->
+        <field id="innertube" type="node" bind="/Innertube" />
+        <field id="loungeService" type="node" bind="/LoungeService" />
+        <field id="webServer" type="node" bind="/WebServer" />
         <field id="profilesService" type="node" bind="/ProfilesService" />
         <field id="videoQueue" type="node" bind="/VideoQueue" />
         <field id="bookmarksService" type="node" bind="/BookmarksService" />
         <field id="jobQueue" type="node" bind="/JobQueue" />
         <field id="preferences" type="node" bind="/Preferences" />
         <field id="screen" type="node" />
+        <!-- the thumbnail preview's Video node, picked up by VideoRowCell (see VideoContentNode.previewVideoActive) -->
+        <field id="previewPlayer" type="node" />
         <field id="feeds" type="array" onChange="OnFeedsChange" />
         <!-- 
             someContentReady is a field specifically for the search screen.
