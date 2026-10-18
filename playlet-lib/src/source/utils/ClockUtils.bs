@@ -1,0 +1,30 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace ClockUtils
+
+    ' "H:MM a.m./p.m." (12-hour, no leading zero on the hour), the format of the Clock component.
+    ' dateTime must already be in local time.
+    function FormatTime(dateTime as object) as string
+        hours = dateTime.GetHours()
+        minutes = dateTime.GetMinutes()
+        if hours >= 12
+            ampm = "p.m."
+        else
+            ampm = "a.m."
+        end if
+        hours12 = hours mod 12
+        if hours12 = 0
+            hours12 = 12
+        end if
+        return hours12.ToStr() + ":" + minutes.ToStr("%02d") + " " + ampm
+    end function
+
+    ' The local time of an epoch (UTC) seconds value, formatted like FormatTime.
+    function FormatEpochSeconds(epochSeconds as integer) as string
+        dateTime = CreateObject("roDateTime")
+        dateTime.FromSeconds(epochSeconds)
+        dateTime.ToLocalTime()
+        return ClockUtils.FormatTime(dateTime)
+    end function
+
+end namespace

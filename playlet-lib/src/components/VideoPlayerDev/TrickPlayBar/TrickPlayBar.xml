@@ -23,12 +23,14 @@
         <field id="chapterText" type="string" alias="chapterLabel.text" />
     </interface>
     <children>
+        <!-- bundled bar: the OS osd_sliderControl_small.9.png is missing on some firmware (Roku OS 15.3),
+             which left only the playhead dot. -->
         <Poster id="trackBg"
-            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/osd_sliderControl_small.9.png"
-            width="1144" height="12" opacity="0.3" loadDisplayMode="noScale" />
+            uri="pkg:/images/icons/player/bar.png"
+            width="1144" height="12" opacity="0.4" loadDisplayMode="noScale" />
         <!-- same asset tinted red, clipped to progress width in code. -->
         <Poster id="trackFill"
-            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/osd_sliderControl_small.9.png"
+            uri="pkg:/images/icons/player/bar.png"
             width="1144" height="12" blendColor="0xFF1C30FF" clippingRect="[0,0,0,12]" loadDisplayMode="noScale" />
         <!-- the cursor: a 12px dot that swells half-again while the bar tier holds focus. PositionPlayhead
              moves it; the grow/shrink animations scale it about its center. -->
@@ -54,8 +56,8 @@
             color="0xFEFEFEFF" horizAlign="left" vertAlign="top">
             <Font role="font" uri="font:SystemFontFile" size="24" />
         </Label>
-        <!-- right label. VOD: counts down. LIVE: offset M:SS (hidden at edge). -->
-        <Label id="remainingLabel" translation="[1024, 24]" width="120" height="24"
+        <!-- right label. VOD: "-remaining / total". LIVE: offset M:SS (hidden at edge). -->
+        <Label id="remainingLabel" translation="[744, 24]" width="400" height="24"
             color="0xFEFEFEFF" horizAlign="right" vertAlign="top">
             <Font role="font" uri="font:SystemFontFile" size="24" />
         </Label>

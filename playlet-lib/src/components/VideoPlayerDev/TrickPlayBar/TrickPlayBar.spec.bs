@@ -94,11 +94,11 @@ namespace Tests
             m.top.transportMode = TransportController.Mode.Idle
         end function
 
-        @it("formats current/remaining as M:SS")
+        @it("formats current, and remaining / total, as M:SS")
         function _()
             m.top.positionMs = 65000 ' 1:05
             m.assertEqual(m.top.findNode("currentLabel").text, "01:05")
-            m.assertEqual(m.top.findNode("remainingLabel").text, "02:15") ' 135s left
+            m.assertEqual(m.top.findNode("remainingLabel").text, "-02:15 / 03:20") ' 135s left of 200s
         end function
 
         @describe("TrickPlayBar — glyph swap (handle child)")

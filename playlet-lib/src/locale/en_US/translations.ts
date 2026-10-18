@@ -985,6 +985,10 @@
         <translation>Rewind live TV</translation>
     </message>
     <message>
+        <source>Ends at</source>
+        <translation>Ends at</translation>
+    </message>
+    <message>
         <source>Video load error</source>
         <translation>Video load error</translation>
     </message>

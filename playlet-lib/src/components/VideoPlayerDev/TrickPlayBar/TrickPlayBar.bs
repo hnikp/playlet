@@ -67,7 +67,7 @@ function RenderVodBar() as void
     m.trackFill.clippingRect = [0, 0, fillW, 12]
     PositionPlayhead(fillW)
     m.currentLabel.text = FormatBarTime(displayMs / 1000.0)
-    m.remainingLabel.text = FormatBarTime((durationMs - displayMs) / 1000.0)
+    m.remainingLabel.text = "-" + FormatBarTime((durationMs - displayMs) / 1000.0) + " / " + FormatBarTime(durationMs / 1000.0)
 
     ' Raise the handle while scrubbing so the scanGlyph sits at screen-center over the center tile; rest it
     ' low otherwise (the idle InstantReplay icon rides the resting handle).

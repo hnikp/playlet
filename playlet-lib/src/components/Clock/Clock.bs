@@ -1,3 +1,4 @@
+import "pkg:/source/utils/ClockUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -33,21 +34,7 @@ end function
 function Update()
     m.dateTime.Mark()
     m.dateTime.ToLocalTime()
-
-    hours = m.dateTime.GetHours()
-    minutes = m.dateTime.GetMinutes()
-
-    if hours >= 12
-        ampm = "p.m."
-    else
-        ampm = "a.m."
-    end if
-    hours12 = hours mod 12
-    if hours12 = 0
-        hours12 = 12
-    end if
-
-    m.top.text = hours12.ToStr() + ":" + minutes.ToStr("%02d") + " " + ampm
+    m.top.text = ClockUtils.FormatTime(m.dateTime)
 end function
 
 function OnDispose()

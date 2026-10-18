@@ -104,6 +104,7 @@
                 <Label id="titleLabel" />
                 <Label id="secondaryTitleLabel" />
                 <Clock id="clock" />
+                <Label id="endTimeLabel" />
             </Group>
             <TrickPlayBar id="trickPlayBar" />
             <ButtonRow id="buttonRow" />

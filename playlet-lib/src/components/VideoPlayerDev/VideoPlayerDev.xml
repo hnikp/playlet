@@ -78,9 +78,11 @@
         <!-- ===================== Chrome group (the HUD, faded as one opacity unit) ===================== -->
         <Group id="Chrome" opacity="0" visible="false">
             <!-- Full-screen darkening scrim, chrome-gated (rides the fade), not pause-gated. -->
+            <!-- bundled scrim (dark behind the title and the bar/buttons): the OS PauseGradient.9.png is
+                 missing on some firmware (Roku OS 15.3), which left the HUD unreadable over bright video. -->
             <Poster id="pauseGradient"
-                uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/PauseGradient.9.png"
-                width="1280" height="720" />
+                uri="pkg:/images/player-scrim.png"
+                width="1280" height="720" loadDisplayMode="scaleToFill" />
 
             <!-- First content sibling: its full-screen black backdrop must paint UNDER the title/bar/buttons
                  (all later siblings), and the bar's scan-glyph in front of the tiles. Its `visible` is
@@ -105,6 +107,11 @@
                     </Label>
                 </LayoutGroup>
                 <Clock id="clock" />
+                <!-- when the video ends at the current speed, under the clock (hidden on live) -->
+                <Label id="endTimeLabel" translation="[934, 58]" width="300" height="22"
+                    color="0xFEFEFEFF" horizAlign="right" vertAlign="top">
+                    <Font role="font" uri="font:SystemFontFile" size="18" />
+                </Label>
             </Group>
 
             <TrickPlayBar id="trickPlayBar" translation="[68, 632]" />

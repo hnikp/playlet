@@ -12,6 +12,7 @@ import "pkg:/components/VideoPlayerDev/SponsorBlockController.bs"
 import "pkg:/components/VideoPlayerDev/TransportController.bs"
 import "pkg:/components/VideoPlayerDev/VideoNode.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
+import "pkg:/source/utils/ClockUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
@@ -92,6 +93,9 @@ function Initialize()
     m.titleFont = m.titleLabel.font
     m.secondaryTitleFont = m.secondaryTitleLabel.font
     m.clock = m.top.findNode("clock")
+    m.endTimeLabel = m.top.findNode("endTimeLabel")
+    ' translated once: code-assigned strings don't get the automatic XML lookup.
+    m.endsAtText = Tr(Locale.VideoPlayer.EndsAt)
     m.bifDisplay = m.top.findNode("bifDisplay")
     m.trickPlayBar = m.top.findNode("trickPlayBar")
     m.spinner = m.top.findNode("spinner")
@@ -298,6 +302,7 @@ function PushTransportToRenderers() as void
     m.trickPlayBar.isLive = isLive
     m.trickPlayBar.positionMs = m.transport.positionMs
     m.trickPlayBar.durationMs = m.transport.durationMs
+    UpdateEndTime()
 
     if mode <> TransportController.Mode.Idle or isLive
         m.trickPlayBar.liveFloorMs = m.transport.LiveFloorMs()
@@ -942,6 +947,24 @@ function OnDuration(event as object) as void
         PushLiveEdge()
     end if
     ApplyTransport()
+end function
+
+' "Ends at H:MM" under the clock: now + what's left at the current playback speed. Live has no end.
+function UpdateEndTime() as void
+    durationMs = m.transport.durationMs
+    if m.transport.isLive or durationMs <= 0
+        m.endTimeLabel.text = ""
+        return
+    end if
+    speed = ValidFloat(m.top.playbackSpeed)
+    if speed <= 0
+        speed = 1.0
+    end if
+    remainingSeconds = (durationMs - m.transport.positionMs) / 1000.0 / speed
+    if remainingSeconds < 0
+        remainingSeconds = 0
+    end if
+    m.endTimeLabel.text = m.endsAtText + " " + ClockUtils.FormatEpochSeconds(NowSeconds() + Int(remainingSeconds))
 end function
 
 ' Current wall-clock epoch seconds, off the cached roDateTime.

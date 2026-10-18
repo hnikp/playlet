@@ -1,0 +1,11 @@
+{
+  inputHash: '4c08616ac0e53160fd4acad0191bd7b7',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/bar.png',
+      outputHash: 'ea29b9aad8009f65a6160f8ad60e7a1e',
+      width: 1144,
+      height: 12,
+    },
+  ],
+}

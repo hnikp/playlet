@@ -1,0 +1,11 @@
+{
+  inputHash: 'b82c45aacf13f3e73fed5dfce6edfc02',
+  outputs: [
+    {
+      outputFilePath: 'images/player-scrim.png',
+      outputHash: 'd1d6e867a54b5afeb45ff0f320ca3c20',
+      width: 1,
+      height: 256,
+    },
+  ],
+}
