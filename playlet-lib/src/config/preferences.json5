@@ -312,10 +312,40 @@
       },
       {
         displayText: "Thumbnail preview",
-        key: "misc.thumbnail_preview",
-        description: "Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds",
+        key: "misc.thumbnail_preview_mode",
+        description: "When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing",
+        type: "radio",
+        defaultValue: "video",
+        options: [
+          {
+            displayText: "Off",
+            value: "off",
+          },
+          {
+            displayText: "Frames",
+            value: "frames",
+          },
+          {
+            displayText: "Video",
+            value: "video",
+          },
+        ],
+      },
+      {
+        displayText: "Preview sound",
+        key: "misc.thumbnail_preview_sound",
+        description: "Play video previews with sound",
         type: "boolean",
         defaultValue: true,
+      },
+      {
+        displayText: "Preview time limit",
+        key: "misc.thumbnail_preview_limit",
+        description: "Stop a video preview after this many minutes (0 = no limit)",
+        type: "number",
+        min: 0,
+        max: 30,
+        defaultValue: 5,
       },
     ],
   },

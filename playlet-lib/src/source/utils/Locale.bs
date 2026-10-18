@@ -313,7 +313,12 @@ namespace Locale
         OpenVideoDetails = "Open video page on select"
         OpenVideoDetailsDescription = "Selecting a video opens its page (description, comments, subscribe) instead of playing it right away"
         ThumbnailPreview = "Thumbnail preview"
-        ThumbnailPreviewDescription = "Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds"
+        ThumbnailPreviewDescription = "When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing"
+        ThumbnailPreviewFrames = "Frames"
+        PreviewSound = "Preview sound"
+        PreviewSoundDescription = "Play video previews with sound"
+        PreviewTimeLimit = "Preview time limit"
+        PreviewTimeLimitDescription = "Stop a video preview after this many minutes (0 = no limit)"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"

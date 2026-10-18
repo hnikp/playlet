@@ -1,0 +1,48 @@
+namespace Tests
+
+    @SGNode("Preferences")
+    @suite
+    class PreferencesTests extends Rooibos.BaseTestSuite
+
+        @describe("MigrateExistingPreferences v9 -> v10")
+
+        @it("Turns a disabled thumbnail preview into mode off and drops the old key")
+        function _()
+            userPrefs = {
+                __version: 9
+                "misc.thumbnail_preview": false
+            }
+            isDirty = MigrateExistingPreferences(userPrefs)
+
+            m.assertTrue(isDirty)
+            m.assertEqual(userPrefs.__version, 10)
+            m.assertEqual(userPrefs["misc.thumbnail_preview_mode"], "off")
+            m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview"))
+        end function
+
+        @it("Drops an enabled thumbnail preview without setting the mode, so the default applies")
+        function _()
+            userPrefs = {
+                __version: 9
+                "misc.thumbnail_preview": true
+            }
+            isDirty = MigrateExistingPreferences(userPrefs)
+
+            m.assertTrue(isDirty)
+            m.assertEqual(userPrefs.__version, 10)
+            m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview"))
+            m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview_mode"))
+        end function
+
+        @it("Leaves the mode unset when the old key was never saved")
+        function _()
+            userPrefs = { __version: 9 }
+            MigrateExistingPreferences(userPrefs)
+
+            m.assertEqual(userPrefs.__version, 10)
+            m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview_mode"))
+        end function
+
+    end class
+
+end namespace

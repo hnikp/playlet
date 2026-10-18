@@ -1537,8 +1537,28 @@
         <translation>Thumbnail preview</translation>
     </message>
     <message>
-        <source>Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds</source>
-        <translation>Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds</translation>
+        <source>When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing</source>
+        <translation>When a video stays focused for 2 seconds: play the video in its thumbnail, animate frames from the video, or do nothing</translation>
+    </message>
+    <message>
+        <source>Frames</source>
+        <translation>Frames</translation>
+    </message>
+    <message>
+        <source>Preview sound</source>
+        <translation>Preview sound</translation>
+    </message>
+    <message>
+        <source>Play video previews with sound</source>
+        <translation>Play video previews with sound</translation>
+    </message>
+    <message>
+        <source>Preview time limit</source>
+        <translation>Preview time limit</translation>
+    </message>
+    <message>
+        <source>Stop a video preview after this many minutes (0 = no limit)</source>
+        <translation>Stop a video preview after this many minutes (0 = no limit)</translation>
     </message>
     <message>
         <source>Audio track</source>
