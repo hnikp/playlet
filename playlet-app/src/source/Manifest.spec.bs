@@ -6,7 +6,7 @@ namespace Tests
         @describe("Manifest")
 
         @it("Reads values from manifest")
-        @params("title", "Playlet")
+        @params("title", "Playlet Fork")
         @params("supports_input_launch", "1")
         @params("playlet_lib_zip_embedded_url", "pkg:/lib/playlet-lib.zip")
         function _(key as string, expectedValue as string)
