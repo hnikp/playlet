@@ -7,6 +7,8 @@
         <field id="preferences" type="node" bind="/Preferences" />
         <field id="initialFocus" type="int" value="-1" />
         <field id="screenOffset" type="float" value="170" />
+        <!-- Brings the nav page of a screen to the front (closing pushed views), focuses it, and returns the screen node (invalid if hidden) -->
+        <function name="FocusScreen" />
     </interface>
 
     <children>
@@ -54,7 +56,7 @@
                 focusBitmapUri="pkg:/images/white.$$RES$$.9.png"
                 focusBitmapBlendColor="0xFF1C30FF"
                 vertFocusAnimationStyle="floatingFocus"
-                numRows="10"
+                numRows="11"
                 scrollSpeed="99999"
                 itemSpacing="[0, 5]"
                 translation="[13, 145]">

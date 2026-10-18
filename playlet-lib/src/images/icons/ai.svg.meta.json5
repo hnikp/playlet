@@ -1,0 +1,11 @@
+{
+  inputHash: 'a31bba3e367e6688a2e7f74172a2306f',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/ai.png',
+      outputHash: '914c66c97ecc5ec9d9db1b67ccd36a60',
+      width: 48,
+      height: 48,
+    },
+  ],
+}

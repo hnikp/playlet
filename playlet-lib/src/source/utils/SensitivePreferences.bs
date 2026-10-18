@@ -1,0 +1,76 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Preferences marked `sensitive: true` in config/preferences.json5 (like API keys)
+' are never sent back to the web app in clear text: they are replaced by a mask.
+namespace SensitivePreferences
+
+    ' Returns a dictionary of the keys of sensitive preferences, from the preferences model.
+    function GetKeys(prefsModel as object) as object
+        keysDict = {}
+        for each item in ValidArray(prefsModel)
+            CollectKeys(item, keysDict)
+        end for
+        return keysDict
+    end function
+
+    function CollectKeys(item as object, keysDict as object) as void
+        if not IsAssociativeArray(item)
+            return
+        end if
+        if item.sensitive = true and IsString(item.key)
+            keysDict[item.key] = true
+        end if
+        if IsArray(item.children)
+            for each child in item.children
+                CollectKeys(child, keysDict)
+            end for
+        end if
+    end function
+
+    ' "" if empty, else "••••" followed by the last 4 characters.
+    ' Short values only show the dots, so that most of the value stays hidden.
+    function Mask(value as dynamic) as string
+        if StringUtils.IsNullOrEmpty(value)
+            return ""
+        end if
+        dots = "••••"
+        if Len(value) <= 8
+            return dots
+        end if
+        return dots + Right(value, 4)
+    end function
+
+    ' Replaces the values of sensitive keys with their mask (in place). Returns the same object.
+    function MaskValues(values as object, keysDict as object) as object
+        if not IsAssociativeArray(values)
+            return values
+        end if
+        for each prefKey in keysDict
+            if values.DoesExist(prefKey)
+                values[prefKey] = Mask(values[prefKey])
+            end if
+        end for
+        return values
+    end function
+
+    ' True if the value is a mask (a real key never starts with the dots)
+    function IsMasked(value as dynamic) as boolean
+        return IsString(value) and Left(value, 4) = "••••"
+    end function
+
+    ' Removes from the payload the sensitive values that are a mask (like the one GET returned),
+    ' so that sending back what the web app received does not overwrite the real value.
+    function DropMaskedValues(payload as object, keysDict as object) as object
+        if not IsAssociativeArray(payload)
+            return payload
+        end if
+        for each prefKey in keysDict
+            if payload.DoesExist(prefKey) and IsMasked(payload[prefKey])
+                payload.Delete(prefKey)
+            end if
+        end for
+        return payload
+    end function
+
+end namespace

@@ -1,4 +1,5 @@
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
+import "pkg:/source/utils/SensitivePreferences.bs"
 
 namespace Http
 
@@ -8,6 +9,11 @@ namespace Http
             super()
 
             m.preferencesNode = server.sceneNodes.preferences
+            ' The model doesn't change at runtime: read it once
+            m.sensitiveKeys = {}
+            if m.preferencesNode <> invalid
+                m.sensitiveKeys = SensitivePreferences.GetKeys(m.preferencesNode.prefsModel)
+            end if
         end function
 
         @get("/api/preferences")
@@ -15,6 +21,7 @@ namespace Http
             response = context.response
 
             userPrefs = m.preferencesNode@.GetUserPreferences()
+            SensitivePreferences.MaskValues(userPrefs, m.sensitiveKeys)
             response.Json(userPrefs)
             return true
         end function
@@ -30,6 +37,8 @@ namespace Http
                 return true
             end if
 
+            ' The web app only knows the masked values: never save a mask over the real value
+            SensitivePreferences.DropMaskedValues(payload, m.sensitiveKeys)
             m.preferencesNode@.ApplyUserPreferences(payload)
             response.Default(204, "OK")
             return true

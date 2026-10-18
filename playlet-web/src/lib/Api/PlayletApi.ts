@@ -148,6 +148,22 @@ export class PlayletApi {
         await PlayletApi.send("POST", `${PlayletApi.host()}/api/view/open?authorId=${encodeURIComponent(authorId)}`);
     }
 
+    // Runs an AI search on the TV: the TV switches to the AI Search page and asks the AI.
+    static async aiSearch(q: string) {
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/ai-search`, { q });
+        if (!response.ok) {
+            const body = await response.text().catch(() => "");
+            // Error pages are HTML: keep the reason line only
+            const reason = body.match(/<\/h1>([\s\S]*?)<hr>/)?.[1]?.trim() || response.statusText;
+            throw new Error(`HTTP ${response.status}: ${reason}`);
+        }
+    }
+
+    static async getAiSearchState() {
+        const response = await fetch(`${PlayletApi.host()}/api/ai-search`);
+        return await response.json();
+    }
+
     static async getSearchHistory() {
         const response = await fetch(`${PlayletApi.host()}/api/search-history`);
         return await response.json();

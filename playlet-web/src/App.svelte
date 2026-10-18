@@ -18,6 +18,7 @@
   import HomeScreen from "lib/Screens/HomeScreen.svelte";
   import type { AppState } from "lib/Types";
   import SearchScreen from "lib/Screens/SearchScreen.svelte";
+  import AiSearchScreen from "lib/Screens/AiSearchScreen.svelte";
   import SettingsScreen from "lib/Screens/SettingsScreen.svelte";
   import InfoScreen from "lib/Screens/InfoScreen.svelte";
   import LinkDragDrop from "lib/LinkDragDrop.svelte";
@@ -81,6 +82,8 @@
   -->
   <div style="margin-bottom: calc(4rem + env(safe-area-inset-bottom))">
     <SearchScreen visibility={currentScreen == "search"} />
+
+    <AiSearchScreen visibility={currentScreen == "ai-search"} />
 
     <HomeScreen visibility={currentScreen == "home"} />
 

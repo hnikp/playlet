@@ -1,0 +1,80 @@
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
+import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace Http
+
+    class AiSearchRouter extends HttpRouter
+
+        function new(server as object)
+            super()
+
+            m.appController = server.sceneNodes.appController
+            m.videoQueue = server.sceneNodes.videoQueue
+        end function
+
+        ' The last AI search on the TV, so the phone can follow it: {query, status, text, picks, queries}
+        @get("/api/ai-search")
+        function GetAiSearchState(context as object) as boolean
+            response = context.response
+
+            state = invalid
+            screen = m.appController@.GetRootScreen("AiSearchScreen")
+            if screen <> invalid and screen.hasField("aiState")
+                state = screen.aiState
+            end if
+            if not IsAssociativeArray(state)
+                state = {}
+            end if
+
+            response.Json(state)
+            return true
+        end function
+
+        ' Runs an AI search on the TV, with a query typed on the phone.
+        @post("/api/ai-search")
+        function AiSearch(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            payload = request.BodyJson()
+            if not IsAssociativeArray(payload)
+                response.Default(400, `Invalid JSON payload`)
+                return true
+            end if
+
+            query = ValidString(payload.q).Trim()
+            if query = ""
+                response.Default(400, `missing "q" property in JSON payload`)
+                return true
+            end if
+
+            navBar = m.appController.findNode("NavBar")
+            if navBar = invalid
+                response.Default(500, "NavBar not found")
+                return true
+            end if
+
+            if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue) and VideoQueueUtils.IsVideoPlayerFullScreen(m.videoQueue)
+                VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+            end if
+
+            screen = navBar@.FocusScreen("AiSearchScreen")
+            if screen = invalid
+                response.Default(409, "The AI Search page is hidden. Turn on Show AI Search page in the settings")
+                return true
+            end if
+            if not screen.hasField("externalQuery")
+                response.Default(500, "AI Search screen can't take a query")
+                return true
+            end if
+
+            screen.externalQuery = query
+            response.Default(204, "OK")
+            return true
+        end function
+
+    end class
+
+end namespace

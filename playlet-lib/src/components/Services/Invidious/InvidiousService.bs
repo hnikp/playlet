@@ -737,6 +737,67 @@ namespace Invidious
             return result
         end function
 
+        ' An "AI picks" row cell (AiSearchScreen): a search for "<title> <channel>" reduced to the single
+        ' best video, the first whose channel matches feedSource.aiPick.channel (case-insensitive, either
+        ' one containing the other), else the first video. A failed search gives no item instead of an
+        ' error, so one pick doesn't mark the whole row as failed.
+        function AiPickHandler(context as object) as object
+            result = m.DefaultHandler(context)
+            if result = invalid or not IsArray(result.items)
+                LogWarnNoTelemetry("AI pick search failed:", context.response.ErrorMessage())
+                return {
+                    items: []
+                    isLastPage: true
+                }
+            end if
+
+            channel = ""
+            if IsAssociativeArray(context.feedSource.aiPick)
+                channel = LCase(ValidString(context.feedSource.aiPick.channel).Trim())
+            end if
+
+            firstVideo = invalid
+            bestVideo = invalid
+            for each item in result.items
+                if not IsAssociativeArray(item)
+                    continue for
+                end if
+                if item.type <> invalid and item.type <> "video"
+                    continue for
+                end if
+                if StringUtils.IsNullOrEmpty(item.videoId)
+                    continue for
+                end if
+                if firstVideo = invalid
+                    firstVideo = item
+                end if
+                if channel = ""
+                    exit for
+                end if
+                author = LCase(ValidString(item.author).Trim())
+                if author = "" and IsArray(item.lines) and item.lines.Count() > 1
+                    author = LCase(ValidString(item.lines[0]).Trim())
+                end if
+                if author <> "" and (author.InStr(channel) <> -1 or channel.InStr(author) <> -1)
+                    bestVideo = item
+                    exit for
+                end if
+            end for
+
+            if bestVideo = invalid
+                bestVideo = firstVideo
+            end if
+
+            items = []
+            if bestVideo <> invalid
+                items.Push(bestVideo)
+            end if
+            return {
+                items: items
+                isLastPage: true
+            }
+        end function
+
         ' "Top recent": the latest videos of several channels (feedSource.channels, an array
         ' of ucids), ranked by FeedRanking (views relative to each channel's median, decayed
         ' by age). Used by a handlerOnly endpoint: it fetches the channels itself.

@@ -1,0 +1,266 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Builds the LLM request for an AI search and parses its answer. Pure functions: no node access.
+' The answer is { summary, picks: [{ title, channel, reason }], queries: [string] }, or { error }.
+namespace AiSearchUtils
+    const MAX_PICKS = 8
+    const MAX_QUERIES = 4
+
+    const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+    const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+    const ANTHROPIC_DEFAULT_MODEL = "claude-opus-5-5"
+    const GEMINI_DEFAULT_MODEL = "gemini-flash-latest"
+    const GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
+    ' A router that picks one of the free models, which come and go too often to name one
+    const OPENROUTER_DEFAULT_MODEL = "openrouter/free"
+
+    ' Returns { format: "anthropic"|"openai", url, model }, or { error }.
+    function GetProviderConfig(provider as string, model as string, baseUrl as string) as object
+        model = model.Trim()
+        if provider = "anthropic"
+            config = { format: "anthropic", url: ANTHROPIC_URL, model: ANTHROPIC_DEFAULT_MODEL }
+        else if provider = "gemini"
+            config = { format: "openai", url: GEMINI_URL, model: GEMINI_DEFAULT_MODEL }
+        else if provider = "groq"
+            config = { format: "openai", url: GROQ_URL, model: GROQ_DEFAULT_MODEL }
+        else if provider = "openrouter"
+            config = { format: "openai", url: OPENROUTER_URL, model: OPENROUTER_DEFAULT_MODEL }
+        else if provider = "custom"
+            baseUrl = baseUrl.Trim()
+            while baseUrl.EndsWith("/")
+                baseUrl = Left(baseUrl, Len(baseUrl) - 1)
+            end while
+            if baseUrl = ""
+                return { error: "Set the Server URL for the Custom AI provider in Settings" }
+            end if
+            if model = ""
+                return { error: "Set the Model for the Custom AI provider in Settings" }
+            end if
+            config = { format: "openai", url: baseUrl + "/chat/completions", model: "" }
+        else
+            return { error: `Unknown AI provider: ${provider}` }
+        end if
+        if model <> ""
+            config.model = model
+        end if
+        return config
+    end function
+
+    ' prefs: an AA with the "ai_search.provider", "ai_search.api_key", "ai_search.model" and
+    ' "ai_search.base_url" values. Returns { format, url, headers, body }, or { error }.
+    function BuildRequest(prefs as object, query as string) as object
+        provider = ValidString(prefs["ai_search.provider"])
+        if provider = ""
+            provider = "anthropic"
+        end if
+        apiKey = ValidString(prefs["ai_search.api_key"]).Trim()
+        config = GetProviderConfig(provider, ValidString(prefs["ai_search.model"]), ValidString(prefs["ai_search.base_url"]))
+        if config.error <> invalid
+            return config
+        end if
+        if apiKey = "" and provider <> "custom"
+            return { error: Tr(Locale.AiSearch.NoApiKey) }
+        end if
+        query = query.Trim()
+        if query = ""
+            return { error: "Describe the video you are looking for" }
+        end if
+
+        if config.format = "anthropic"
+            headers = {
+                "x-api-key": apiKey
+                "anthropic-version": "2023-06-01"
+                "anthropic-beta": "server-side-fallback-2026-07-01"
+                "content-type": "application/json"
+            }
+            body = {
+                "model": config.model
+                "max_tokens": 4000
+                "system": GetSystemPrompt()
+                "messages": [{ "role": "user", "content": query }]
+                "output_config": {
+                    "effort": "low"
+                    "format": { "type": "json_schema", "schema": GetOutputSchema() }
+                }
+                "fallbacks": "default"
+            }
+        else
+            headers = {}
+            if apiKey <> ""
+                headers["Authorization"] = "Bearer " + apiKey
+            end if
+            body = {
+                "model": config.model
+                "messages": [
+                    { "role": "system", "content": GetSystemPrompt() }
+                    { "role": "user", "content": query }
+                ]
+                "response_format": { "type": "json_object" }
+            }
+        end if
+        return { format: config.format, url: config.url, headers: headers, body: body }
+    end function
+
+    function GetSystemPrompt() as string
+        lines = [
+            "You are the YouTube search assistant of a TV app. The user describes a video they remember or a kind of video they want to watch."
+            "Recommend real, existing YouTube videos and channels that match. Use each video's exact title as it appears on YouTube when you know it, and its channel's name."
+            "Never invent videos, video ids or URLs. If you are unsure a specific video exists, prefer well-known channels and good search queries instead."
+            "Answer in the user's language (for example Persian/Farsi when the user writes in Persian). Titles and queries may be in the language the videos are in."
+            "Output ONLY a JSON object, with no other text, of this shape:"
+            "{""summary"": ""one short sentence about what you found"", ""picks"": [{""title"": ""video title"", ""channel"": ""channel name"", ""reason"": ""why it matches, a few words""}], ""queries"": [""YouTube search query""]}"
+            `Give at most ${MAX_PICKS} picks and at most ${MAX_QUERIES} queries. The queries find more videos like the ones described.`
+        ]
+        return lines.Join(" ")
+    end function
+
+    function GetOutputSchema() as object
+        return {
+            "type": "object"
+            "properties": {
+                "summary": { "type": "string" }
+                "picks": {
+                    "type": "array"
+                    "items": {
+                        "type": "object"
+                        "properties": {
+                            "title": { "type": "string" }
+                            "channel": { "type": "string" }
+                            "reason": { "type": "string" }
+                        }
+                        "required": ["title", "channel", "reason"]
+                        "additionalProperties": false
+                    }
+                }
+                "queries": {
+                    "type": "array"
+                    "items": { "type": "string" }
+                }
+            }
+            "required": ["summary", "picks", "queries"]
+            "additionalProperties": false
+        }
+    end function
+
+    ' format: "anthropic" or "openai". responseJson: the parsed response body, success or error.
+    ' Returns { summary, picks, queries }, or { error }.
+    function ParseResponse(format as string, responseJson as dynamic) as object
+        apiError = GetApiErrorMessage(responseJson)
+        if apiError <> ""
+            return { error: apiError }
+        end if
+        if not IsAssociativeArray(responseJson)
+            return { error: "The AI service sent an invalid response" }
+        end if
+
+        text = ""
+        if format = "anthropic"
+            if ValidString(responseJson.stop_reason) = "refusal"
+                return { error: "The AI declined to answer this request" }
+            end if
+            for each block in ValidArray(responseJson.content)
+                if IsAssociativeArray(block) and ValidString(block.type) = "text" and IsString(block.text)
+                    text = block.text
+                    exit for
+                end if
+            end for
+        else
+            choices = ValidArray(responseJson.choices)
+            if choices.Count() > 0 and IsAssociativeArray(choices[0]) and IsAssociativeArray(choices[0].message)
+                text = ValidString(choices[0].message.content)
+            end if
+        end if
+        if text.Trim() = ""
+            return { error: "The AI sent an empty answer" }
+        end if
+        return ParseRecommendations(text)
+    end function
+
+    ' The message of an API error body, such as { error: { message } } or [{ error: { message } }], or "".
+    function GetApiErrorMessage(responseJson as dynamic) as string
+        if IsArray(responseJson) and responseJson.Count() > 0
+            responseJson = responseJson[0]
+        end if
+        if not IsAssociativeArray(responseJson)
+            return ""
+        end if
+        apiError = responseJson.error
+        if IsString(apiError)
+            if apiError.Trim() = ""
+                return ""
+            end if
+            return apiError.Trim()
+        end if
+        if not IsAssociativeArray(apiError)
+            return ""
+        end if
+        message = ValidString(apiError.message).Trim()
+        if message = ""
+            message = ValidString(apiError.type).Trim()
+        end if
+        if message = ""
+            message = "The AI service returned an error"
+        end if
+        return message
+    end function
+
+    ' The model's text: the JSON object, maybe in ``` fences or with prose around it.
+    function ParseRecommendations(text as string) as object
+        ' From the first { to the last }: drops ```json fences and prose alike
+        startIndex = text.InStr("{")
+        endIndex = -1
+        index = Len(text) - 1
+        while index > startIndex
+            if Mid(text, index + 1, 1) = "}"
+                endIndex = index
+                exit while
+            end if
+            index -= 1
+        end while
+        if startIndex < 0 or endIndex < 0
+            return { error: "The AI's answer had no recommendations" }
+        end if
+
+        json = StringUtils.ParseJsonSafe(text.Mid(startIndex, endIndex - startIndex + 1))
+        if not IsAssociativeArray(json)
+            return { error: "The AI's answer could not be read" }
+        end if
+
+        picks = []
+        for each pick in ValidArray(json.picks)
+            if picks.Count() >= MAX_PICKS
+                exit for
+            end if
+            if IsAssociativeArray(pick)
+                title = ValidString(pick.title).Trim()
+                if title <> ""
+                    picks.Push({
+                        title: title
+                        channel: ValidString(pick.channel).Trim()
+                        reason: ValidString(pick.reason).Trim()
+                    })
+                end if
+            end if
+        end for
+
+        queries = []
+        for each item in ValidArray(json.queries)
+            if queries.Count() >= MAX_QUERIES
+                exit for
+            end if
+            if IsString(item) and item.Trim() <> ""
+                queries.Push(item.Trim())
+            end if
+        end for
+
+        if picks.Count() = 0 and queries.Count() = 0
+            return { error: Tr(Locale.AiSearch.NoRecommendations) }
+        end if
+        return { summary: ValidString(json.summary).Trim(), picks: picks, queries: queries }
+    end function
+end namespace

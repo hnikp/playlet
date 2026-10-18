@@ -2,7 +2,9 @@
     <interface>
         <field id="displayText" type="string" alias="DisplayTextLabel.text" />
         <field id="description" type="string" alias="DescriptionLabel.text" />
-        <field id="value" type="string" alias="Button.text" onChange="OnValueChange" />
+        <field id="value" type="string" onChange="OnValueChange" />
+        <!-- Sensitive values (like API keys) are shown masked, and the keyboard opens empty -->
+        <field id="sensitive" type="boolean" value="false" onChange="UpdateButtonText" />
         <function name="BindPreference" />
     </interface>
     <children>

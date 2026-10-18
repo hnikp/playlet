@@ -1,4 +1,4 @@
-export const ScreenNames = ["search", "home", "bookmarks", "settings", "info", "remote"] as const;
+export const ScreenNames = ["search", "ai-search", "home", "bookmarks", "settings", "info", "remote"] as const;
 
 export enum ProfileAuthState {
     Authenticated = "Authenticated",
@@ -6,7 +6,7 @@ export enum ProfileAuthState {
 }
 
 export type AppState = {
-    screen: "search" | "home" | "bookmarks" | "settings" | "info" | "remote"
+    screen: "search" | "ai-search" | "home" | "bookmarks" | "settings" | "info" | "remote"
 }
 
 export type PlayletState = {

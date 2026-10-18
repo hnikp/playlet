@@ -2,6 +2,7 @@
   import HomeIcon from "../assets/home-icon.svg.svelte";
   import InfoIcon from "../assets/info-icon.svg.svelte";
   import SearchIcon from "../assets/search-icon.svg.svelte";
+  import AiIcon from "../assets/ai-icon.svg.svelte";
   import SettingsIcon from "../assets/settings-icon.svg.svelte";
   import BookmarksIcon from "../assets/star-icon.svg.svelte";
   import RemoteIcon from "../assets/remote-control.svg.svelte";
@@ -75,6 +76,15 @@
       <SearchIcon />
     </div>
     <span class="text-xs">{$translate("Search")}</span>
+  </button>
+  <button
+    on:click={() => setScreen("ai-search")}
+    class={$appStateStore.screen === "ai-search" ? "active" : ""}
+  >
+    <div class="h-6">
+      <AiIcon />
+    </div>
+    <span class="text-xs">{$translate("AI Search")}</span>
   </button>
   <button
     on:click={() => setScreen("home")}

@@ -1,0 +1,66 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/AiSearchUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Asks the configured LLM for videos matching input.query. Outputs { summary, picks, queries }.
+' The request carries the API key: it is sent without telemetry or curl logging, and errors never include it.
+@job("AiSearchJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+    preferencesNode = input.preferences
+
+    prefs = {
+        "ai_search.provider": ValidString(preferencesNode["ai_search.provider"])
+        "ai_search.api_key": ValidString(preferencesNode["ai_search.api_key"])
+        "ai_search.model": ValidString(preferencesNode["ai_search.model"])
+        "ai_search.base_url": ValidString(preferencesNode["ai_search.base_url"])
+    }
+    llmRequest = AiSearchUtils.BuildRequest(prefs, ValidString(input.query))
+    if llmRequest.error <> invalid
+        JobError(llmRequest.error)
+        return
+    end if
+
+    request = HttpClient.Post(llmRequest.url)
+    request.Headers(llmRequest.headers)
+    request.JsonBody(llmRequest.body)
+    request.NoTelemetry()
+    request.AttemptTimeoutMs(60000)
+    request.Cancellation(JobGetCancellation())
+    response = request.Await()
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    if not response.IsSuccess()
+        message = AiSearchUtils.GetApiErrorMessage(response.Json())
+        if message = ""
+            if response.IsTimedOut()
+                message = "The AI service took too long to answer"
+            else
+                message = `The AI service failed (status ${response.StatusCode()})`
+            end if
+        else
+            message = `${message} (status ${response.StatusCode()})`
+        end if
+        JobError(RedactKey(message, prefs["ai_search.api_key"]))
+        return
+    end if
+
+    result = AiSearchUtils.ParseResponse(llmRequest.format, response.Json())
+    if result.error <> invalid
+        JobError(RedactKey(result.error, prefs["ai_search.api_key"]))
+        return
+    end if
+    JobSuccessData({ summary: result.summary, picks: result.picks, queries: result.queries })
+end function
+
+' Some APIs echo the key they rejected
+function RedactKey(message as string, apiKey as string) as string
+    apiKey = apiKey.Trim()
+    if Len(apiKey) < 4
+        return message
+    end if
+    return message.Replace(apiKey, "***")
+end function

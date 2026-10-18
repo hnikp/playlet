@@ -147,6 +147,13 @@
         defaultValue: true,
       },
       {
+        displayText: "Show AI Search page",
+        key: "browsing.show_ai_search",
+        description: "Show the AI Search page in the menu",
+        type: "boolean",
+        defaultValue: true,
+      },
+      {
         displayText: "Show Bookmarks page",
         key: "browsing.show_bookmarks",
         description: "Show the Bookmarks page in the menu",
@@ -248,6 +255,64 @@
             value: "fahrenheit",
           },
         ],
+      },
+    ],
+  },
+  {
+    displayText: "AI search",
+    key: "ai_search",
+    description: "The AI service that turns a description into video recommendations",
+    children: [
+      {
+        displayText: "AI provider",
+        key: "ai_search.provider",
+        description: "Service that answers AI searches. Anthropic needs a paid API key from console.anthropic.com; Gemini, Groq and OpenRouter offer free keys",
+        type: "radio",
+        defaultValue: "anthropic",
+        options: [
+          {
+            displayText: "Anthropic (Claude)",
+            value: "anthropic",
+          },
+          {
+            displayText: "Google Gemini",
+            value: "gemini",
+          },
+          {
+            displayText: "Groq",
+            value: "groq",
+          },
+          {
+            displayText: "OpenRouter",
+            value: "openrouter",
+          },
+          {
+            displayText: "Custom (OpenAI-compatible)",
+            value: "custom",
+          },
+        ],
+      },
+      {
+        displayText: "API key",
+        key: "ai_search.api_key",
+        description: "API key for the AI provider. Easiest to paste from the Playlet web app on your phone",
+        type: "string",
+        sensitive: true,
+        defaultValue: "",
+      },
+      {
+        displayText: "Model",
+        key: "ai_search.model",
+        description: "Model name. Leave empty to use the provider's default",
+        type: "string",
+        defaultValue: "",
+      },
+      {
+        displayText: "Server URL",
+        key: "ai_search.base_url",
+        description: "Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama",
+        type: "string",
+        defaultValue: "",
       },
     ],
   },

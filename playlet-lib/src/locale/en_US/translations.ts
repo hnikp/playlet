@@ -1760,5 +1760,117 @@
         <source>Show the Info page (app version and details) in the menu</source>
         <translation>Show the Info page (app version and details) in the menu</translation>
     </message>
+    <message>
+        <source>AI search</source>
+        <translation>AI search</translation>
+    </message>
+    <message>
+        <source>The AI service that turns a description into video recommendations</source>
+        <translation>The AI service that turns a description into video recommendations</translation>
+    </message>
+    <message>
+        <source>AI provider</source>
+        <translation>AI provider</translation>
+    </message>
+    <message>
+        <source>Service that answers AI searches. Anthropic needs a paid API key from console.anthropic.com; Gemini, Groq and OpenRouter offer free keys</source>
+        <translation>Service that answers AI searches. Anthropic needs a paid API key from console.anthropic.com; Gemini, Groq and OpenRouter offer free keys</translation>
+    </message>
+    <message>
+        <source>Anthropic (Claude)</source>
+        <translation>Anthropic (Claude)</translation>
+    </message>
+    <message>
+        <source>Google Gemini</source>
+        <translation>Google Gemini</translation>
+    </message>
+    <message>
+        <source>Groq</source>
+        <translation>Groq</translation>
+    </message>
+    <message>
+        <source>OpenRouter</source>
+        <translation>OpenRouter</translation>
+    </message>
+    <message>
+        <source>Custom (OpenAI-compatible)</source>
+        <translation>Custom (OpenAI-compatible)</translation>
+    </message>
+    <message>
+        <source>API key</source>
+        <translation>API key</translation>
+    </message>
+    <message>
+        <source>API key for the AI provider. Easiest to paste from the Playlet web app on your phone</source>
+        <translation>API key for the AI provider. Easiest to paste from the Playlet web app on your phone</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>Model name. Leave empty to use the provider's default</source>
+        <translation>Model name. Leave empty to use the provider's default</translation>
+    </message>
+    <message>
+        <source>Server URL</source>
+        <translation>Server URL</translation>
+    </message>
+    <message>
+        <source>Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama</source>
+        <translation>Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama</translation>
+    </message>
+    <message>
+        <source>Show AI Search page</source>
+        <translation>Show AI Search page</translation>
+    </message>
+    <message>
+        <source>Show the AI Search page in the menu</source>
+        <translation>Show the AI Search page in the menu</translation>
+    </message>
+    <message>
+        <source>AI Search</source>
+        <translation>AI Search</translation>
+    </message>
+    <message>
+        <source>Describe a video, for example: a calm piano video for studying</source>
+        <translation>Describe a video, for example: a calm piano video for studying</translation>
+    </message>
+    <message>
+        <source>Ask AI</source>
+        <translation>Ask AI</translation>
+    </message>
+    <message>
+        <source>Thinking…</source>
+        <translation>Thinking…</translation>
+    </message>
+    <message>
+        <source>Set an API key in the AI search settings, or from the Playlet web app on your phone</source>
+        <translation>Set an API key in the AI search settings, or from the Playlet web app on your phone</translation>
+    </message>
+    <message>
+        <source>AI picks</source>
+        <translation>AI picks</translation>
+    </message>
+    <message>
+        <source>AI search failed</source>
+        <translation>AI search failed</translation>
+    </message>
+    <message>
+        <source>The AI found no recommendations</source>
+        <translation>The AI found no recommendations</translation>
+    </message>
+    <message>
+        <source>Sent to the TV</source>
+        <translation>Sent to the TV</translation>
+    </message>
+    <message>
+        <source>Describe a video</source>
+        <translation>Describe a video</translation>
+    </message>
+    <message>
+        <source>Suggested searches</source>
+        <translation>Suggested searches</translation>
+    </message>
 </context>
 </TS>

@@ -171,6 +171,7 @@ function CreateStringControl(item as object, container as object) as object
     node = container.createChild("StringControl")
     node.displayText = Tr(item.displayText)
     node.description = Tr(item.description)
+    node.sensitive = item.sensitive = true
     return node
 end function
 

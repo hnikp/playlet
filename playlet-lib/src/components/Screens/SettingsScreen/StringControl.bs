@@ -1,5 +1,6 @@
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/SensitivePreferences.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -49,11 +50,21 @@ function OnPreferenceChange()
 end function
 
 function OnValueChange() as void
+    UpdateButtonText()
+
     if m.preferences = invalid or m.key = invalid
         return
     end if
 
     m.preferences[m.key] = m.top.value
+end function
+
+function UpdateButtonText()
+    if m.top.sensitive
+        m.button.text = SensitivePreferences.Mask(m.top.value)
+    else
+        m.button.text = m.top.value
+    end if
 end function
 
 function OnFocusChange() as void
@@ -68,8 +79,14 @@ function ShowEditKeyboard()
     keyboardDialog = createObject("roSGNode", "StandardKeyboardDialog")
     keyboardDialog.title = m.top.displayText
     keyboardDialog.message = [m.top.description]
-    keyboardDialog.text = m.top.value
-    keyboardDialog.buttons = [Tr(Locale.Buttons.OK), Tr(Locale.Buttons.Cancel)]
+    if m.top.sensitive
+        ' Never show the saved value on the TV: OK with an empty text keeps it, Clear removes it
+        keyboardDialog.text = ""
+        keyboardDialog.buttons = [Tr(Locale.Buttons.OK), Tr(Locale.Buttons.Cancel), Tr(Locale.Buttons.Clear)]
+    else
+        keyboardDialog.text = m.top.value
+        keyboardDialog.buttons = [Tr(Locale.Buttons.OK), Tr(Locale.Buttons.Cancel)]
+    end if
     keyboardDialog.observeField("buttonSelected", FuncName(OnKeyboardButton))
 
     m.top.getScene().dialog = keyboardDialog
@@ -79,7 +96,11 @@ function OnKeyboardButton(event as object)
     keyboard = event.getRoSGNode()
     buttonSelected = keyboard.buttonSelected
     if buttonSelected = 0
-        m.top.value = keyboard.text
+        if not m.top.sensitive or keyboard.text <> ""
+            m.top.value = keyboard.text
+        end if
+    else if buttonSelected = 2 and m.top.sensitive
+        m.top.value = ""
     end if
     keyboard.close = true
 end function

@@ -1,0 +1,481 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Recent AI queries shown under the Ask AI button
+const AI_HISTORY_MAX_SHOWN = 5
+const AI_HISTORY_FONT_SIZE = 22
+const AI_HISTORY_TEXT_WIDTH = 420
+
+function Init()
+    m.top.focusable = true
+    m.container = m.top.FindNode("container")
+    m.header = m.top.FindNode("header")
+    m.askButton = m.top.FindNode("askButton")
+    m.keyboard = m.top.FindNode("keyboard")
+    m.history = m.top.FindNode("history")
+    m.statusLabel = m.top.FindNode("statusLabel")
+    m.statusFont = m.statusLabel.font
+    m.rowList = m.top.FindNode("rowList")
+    m.scrollAnimation = m.top.FindNode("scrollAnimation")
+    m.scrollAnimationInterpolator = m.top.FindNode("scrollAnimationInterpolator")
+
+    m.rowList.screen = m.top
+
+    m.header.title = Locale.NavBar.AiSearch
+    m.askButton.text = Tr(Locale.AiSearch.AskAi)
+
+    textEditBox = m.keyboard.textEditBox
+    textEditBox.voiceEntryType = "generic"
+    textEditBox.voiceEnabled = true
+    textEditBox.hintText = Tr(Locale.AiSearch.Hint)
+
+    m.historyDefaultFont = m.history.textFont
+    m.historyDefaultFocusedFont = m.history.focusedTextFont
+    ' The raw queries behind the history buttons (the buttons show them shaped for Persian)
+    m.historyQueries = []
+
+    m.aiSearchJob = invalid
+    m.isNodeReady = false
+    m.pendingExternalQuery = invalid
+end function
+
+function OnNodeReady()
+    m.rowList@.BindNode()
+    m.keyboard@.BindNode()
+    m.askButton.ObserveField("buttonSelected", FuncName(OnAskButtonSelected))
+    m.history.ObserveField("buttonSelected", FuncName(OnHistoryButtonSelected))
+
+    ' No navigation callbacks: they run with m set to the navigation entry. Scrolling is done in OnKeyEvent.
+    SetNavigation(invalid, RemoteKeys.Back, m.navBar)
+    SetNavigation(m.askButton, RemoteKeys.Right, m.keyboard)
+    SetNavigation(m.history, RemoteKeys.Right, m.keyboard)
+    SetNavigation(m.keyboard, RemoteKeys.Left, m.askButton)
+    SetNavigation(m.askButton, RemoteKeys.Left, m.navBar)
+    SetNavigation(m.history, RemoteKeys.Left, m.navBar)
+    SetNavigation(m.keyboard, RemoteKeys.Left, m.navBar)
+    SetNavigation(m.rowList, RemoteKeys.Left, m.navBar)
+
+    SetNavigation(m.askButton, RemoteKeys.Down, m.history)
+    SetNavigation(invalid, RemoteKeys.Down, m.rowList)
+
+    SetNavigation(m.history, RemoteKeys.Up, m.askButton)
+    SetNavigation(m.rowList, RemoteKeys.Up, m.keyboard)
+
+    m.currentNavigtionNode = m.keyboard
+    LoadAiHistory()
+
+    m.isNodeReady = true
+    if m.pendingExternalQuery <> invalid
+        q = m.pendingExternalQuery
+        m.pendingExternalQuery = invalid
+        StartFromExternalQuery(q)
+    end if
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    if m.currentNavigtionNode = invalid or not m.currentNavigtionNode.focusable
+        m.currentNavigtionNode = m.keyboard
+    end if
+    NodeSetFocus(m.currentNavigtionNode, true)
+    if m.currentNavigtionNode.isSameNode(m.rowList)
+        ScrollDownAiResults()
+    else
+        ScrollUpAiResults()
+    end if
+end function
+
+function OnExternalQuery() as void
+    q = m.top.externalQuery
+    if not m.isNodeReady
+        m.pendingExternalQuery = q
+        return
+    end if
+    StartFromExternalQuery(q)
+end function
+
+function StartFromExternalQuery(q as dynamic) as void
+    q = ValidString(q).Trim()
+    if q = ""
+        return
+    end if
+    m.keyboard.text = q
+    RunAiSearch(q)
+end function
+
+function OnAskButtonSelected()
+    RunAiSearch(m.keyboard.text)
+end function
+
+function OnHistoryButtonSelected() as void
+    index = m.history.buttonSelected
+    if index < 0 or index >= m.historyQueries.Count()
+        return
+    end if
+    q = m.historyQueries[index]
+    m.keyboard.text = q
+    RunAiSearch(q)
+end function
+
+function RunAiSearch(text as dynamic) as void
+    text = ValidString(text).Trim()
+    if text = ""
+        SetAiStatus(Tr(Locale.AiSearch.Describe))
+        return
+    end if
+
+    m.aiQuery = text
+    CancelAiSearchJob()
+    ClearAiResults()
+
+    provider = ValidString(m.preferences["ai_search.provider"])
+    apiKey = ValidString(m.preferences["ai_search.api_key"]).Trim()
+    if apiKey = "" and provider <> "custom"
+        SetAiStatus(Tr(Locale.AiSearch.NoApiKey))
+        PublishAiState("error", Tr(Locale.AiSearch.NoApiKey))
+        return
+    end if
+
+    SearchHistoryUtils.Save(m.preferences, text, 10, SearchHistoryUtils.AI_SEARCH_HISTORY_KEY)
+    LoadAiHistory()
+
+    SetAiStatus(Tr(Locale.AiSearch.Thinking))
+    PublishAiState("thinking", Tr(Locale.AiSearch.Thinking))
+
+    m.aiSearchJob = JobSystem.CreateCallback(OnAiSearchJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.AiSearchJob, {
+        query: text
+        preferences: m.preferences
+    }, m.aiSearchJob)
+end function
+
+function CancelAiSearchJob()
+    if m.aiSearchJob <> invalid
+        JobSystem.UnobserveCallback(m.aiSearchJob)
+        m.aiSearchJob.cancel = true
+        m.aiSearchJob = invalid
+    end if
+end function
+
+function OnAiSearchJobDone(event as object) as void
+    callbackNode = event.getRoSGNode()
+    JobSystem.UnobserveCallback(callbackNode)
+    if m.aiSearchJob = invalid or not m.aiSearchJob.isSameNode(callbackNode)
+        return
+    end if
+    m.aiSearchJob = invalid
+
+    info = event.getInfo()
+    if not info.success
+        if info.cancel = true
+            return
+        end if
+        errorText = ValidString(info.error)
+        LogWarnNoTelemetry("AI search failed:", errorText)
+        if errorText = ""
+            errorText = Tr(Locale.AiSearch.Failed)
+        else
+            errorText = `${Tr(Locale.AiSearch.Failed)}: ${errorText}`
+        end if
+        SetAiStatus(errorText)
+        PublishAiState("error", errorText)
+        return
+    end if
+
+    data = info.data
+    if not IsAssociativeArray(data)
+        SetAiStatus(Tr(Locale.AiSearch.Failed))
+        PublishAiState("error", Tr(Locale.AiSearch.Failed))
+        return
+    end if
+
+    aiFeeds = BuildAiFeeds(data)
+    if aiFeeds.Count() = 0
+        SetAiStatus(Tr(Locale.AiSearch.NoRecommendations))
+        PublishAiState("done", Tr(Locale.AiSearch.NoRecommendations))
+        return
+    end if
+
+    summary = ValidString(data.summary).Trim()
+    SetAiStatus(summary)
+    PublishAiState("done", summary, data)
+
+    m.rowList.UnobserveFieldScoped("someContentReady")
+    m.rowList.ObserveFieldScoped("someContentReady", FuncName(OnAiContentReady))
+    m.rowList.feeds = aiFeeds
+end function
+
+' Rows like SearchScreen's search feed: "AI picks" (one search per pick, reduced to one video by
+' InvidiousService.AiPickHandler; the feed sources of a row are loaded one after the other into the
+' same row), then a plain search row per suggested query.
+function BuildAiFeeds(data as object) as object
+    aiFeeds = []
+
+    pickSources = []
+    for each pick in ValidArray(data.picks)
+        if not IsAssociativeArray(pick)
+            continue for
+        end if
+        pickTitle = ValidString(pick.title).Trim()
+        pickChannel = ValidString(pick.channel).Trim()
+        if pickTitle = ""
+            continue for
+        end if
+        pickSources.Push({
+            "id": `ai_pick_${CryptoUtils.GetMd5(pickTitle + pickChannel)}`
+            "title": pickTitle
+            "apiType": "Invidious"
+            "endpoint": "search"
+            "queryParams": {
+                "q": (pickTitle + " " + pickChannel).Trim()
+                "type": "video"
+            }
+            "responseHandler": "AiPickHandler"
+            "aiPick": {
+                "title": pickTitle
+                "channel": pickChannel
+            }
+        })
+    end for
+
+    if pickSources.Count() > 0
+        aiFeeds.Push({
+            "title": Tr(Locale.AiSearch.AiPicks)
+            "feedSources": pickSources
+        })
+    end if
+
+    ' The row label font has no Persian glyphs: when a title needs them, all rows use the bundled font
+    hasArabicScript = false
+    for each suggestedQuery in ValidArray(data.queries)
+        suggestedQuery = ValidString(suggestedQuery).Trim()
+        if suggestedQuery = ""
+            continue for
+        end if
+        if RtlText.ContainsArabicScript(suggestedQuery)
+            hasArabicScript = true
+        end if
+        aiFeeds.Push({
+            "title": RtlText.Prepare(suggestedQuery).text
+            "feedSources": [{
+                "id": `inv_search_${CryptoUtils.GetMd5(suggestedQuery)}`
+                "title": suggestedQuery
+                "apiType": "Invidious"
+                "endpoint": "search"
+                "queryParams": {
+                    "q": suggestedQuery
+                }
+            }]
+        })
+    end for
+
+    if m.defaultRowLabelFont = invalid
+        m.defaultRowLabelFont = m.rowList.rowLabelFont
+    end if
+    if hasArabicScript
+        m.rowList.rowLabelFont = RtlText.GetLabelFont(26, false)
+    else
+        m.rowList.rowLabelFont = m.defaultRowLabelFont
+    end if
+
+    return aiFeeds
+end function
+
+' someContentReady is set by each row's job: true on the first items, false when a row ended up empty.
+' Waits for content, or for every row that started loading to end up empty.
+function OnAiContentReady() as void
+    if not m.rowList.someContentReady
+        if not AreLoadedAiRowsEmpty()
+            return
+        end if
+        m.rowList.UnobserveFieldScoped("someContentReady")
+        m.rowList.feeds = invalid
+        m.rowList.focusable = false
+        SetAiStatus(Tr(Locale.AiSearch.NoRecommendations))
+        return
+    end if
+
+    m.rowList.UnobserveFieldScoped("someContentReady")
+    m.rowList.focusable = true
+    m.currentNavigtionNode = m.rowList
+    ' Results can arrive while the user is elsewhere (another page, the nav bar, a video): only take the
+    ' focus when it is on this screen
+    if m.top.isInFocusChain()
+        NodeSetFocus(m.rowList, true)
+        ' There's a bug with the floating focus indicator. If the rowList receives focus after the
+        ' content is set, the focus indicator will be "off". This is why we set the content again.
+        m.rowList.content = m.rowList.content
+        ScrollDownAiResults()
+    end if
+end function
+
+' True when no row is still loading and none has items (rows not started yet are ignored: the
+' row list only loads the rows around the focused one). A row's job keeps it "LoadedPage" between
+' its feed sources, and only stops early once it has items, so an empty LoadedPage row is still loading.
+function AreLoadedAiRowsEmpty() as boolean
+    content = m.rowList.content
+    if content = invalid
+        return true
+    end if
+    for each row in content.getChildren(-1, 0)
+        for each child in row.getChildren(-1, 0)
+            if ValidString(child.type) <> "loading"
+                return false
+            end if
+        end for
+        loadState = row.loadState
+        if loadState = FeedLoadState.Loading or loadState = FeedLoadState.LoadedPage
+            return false
+        end if
+    end for
+    return true
+end function
+
+function ClearAiResults()
+    m.rowList.UnobserveFieldScoped("someContentReady")
+    if m.rowList.isInFocusChain()
+        NodeSetFocus(m.keyboard, true)
+    end if
+    if m.currentNavigtionNode <> invalid and m.currentNavigtionNode.isSameNode(m.rowList)
+        m.currentNavigtionNode = m.keyboard
+    end if
+    m.rowList.feeds = invalid
+    m.rowList.focusable = false
+    ScrollUpAiResults()
+end function
+
+' The status line: Thinking…, an error, or the LLM's summary (which can be Persian)
+function SetAiStatus(text as string)
+    RtlText.ApplyToLabel(m.statusLabel, text, m.statusFont, false, 22)
+end function
+
+'' For the web app (GET /api/ai-search): the last search's query, status and the LLM's answer
+function PublishAiState(status as string, text as string, data = invalid as object)
+    state = {
+        "query": ValidString(m.aiQuery)
+        "status": status
+        "text": text
+        "picks": []
+        "queries": []
+    }
+    if data <> invalid
+        state.picks = ValidArray(data.picks)
+        state.queries = ValidArray(data.queries)
+    end if
+    m.top.aiState = state
+end function
+
+function LoadAiHistory()
+    queries = SearchHistoryUtils.GetAllSaved(m.preferences, SearchHistoryUtils.AI_SEARCH_HISTORY_KEY)
+    shownQueries = []
+    buttonTexts = []
+    hasArabicScript = false
+    for each savedQuery in queries
+        if not IsString(savedQuery) or savedQuery = ""
+            continue for
+        end if
+        shownQueries.Push(savedQuery)
+        if RtlText.ContainsArabicScript(savedQuery)
+            hasArabicScript = true
+            prepared = RtlText.Prepare(savedQuery, RtlText.GetMeasureFont(AI_HISTORY_FONT_SIZE, false), AI_HISTORY_TEXT_WIDTH, 1)
+            buttonTexts.Push(prepared.text)
+        else
+            buttonTexts.Push(savedQuery)
+        end if
+        if shownQueries.Count() >= AI_HISTORY_MAX_SHOWN
+            exit for
+        end if
+    end for
+
+    ' The system font has no Persian presentation forms: switch the whole group to the bundled font
+    if hasArabicScript
+        m.history.textFont = RtlText.GetLabelFont(AI_HISTORY_FONT_SIZE, false)
+        m.history.focusedTextFont = RtlText.GetLabelFont(AI_HISTORY_FONT_SIZE, true)
+    else
+        if m.historyDefaultFont <> invalid
+            m.history.textFont = m.historyDefaultFont
+        end if
+        if m.historyDefaultFocusedFont <> invalid
+            m.history.focusedTextFont = m.historyDefaultFocusedFont
+        end if
+    end if
+
+    hadFocus = m.history.isInFocusChain()
+    m.historyQueries = shownQueries
+    m.history.buttons = buttonTexts
+    m.history.focusable = buttonTexts.Count() > 0
+    if hadFocus
+        if buttonTexts.Count() > 0
+            m.history.focusButton = 0
+        else
+            NodeSetFocus(m.askButton, true)
+            m.currentNavigtionNode = m.askButton
+        end if
+    end if
+end function
+
+function ScrollUpAiResults() as void
+    destination = m.scrollAnimationInterpolator.keyValue[0][1]
+    current = m.container.translation[1]
+    if current = destination
+        return
+    end if
+
+    if m.scrollAnimation.state = "running" and m.scrollAnimationInterpolator.reverse = true
+        return
+    end if
+
+    m.scrollAnimationInterpolator.reverse = true
+    m.scrollAnimation.control = "start"
+end function
+
+function ScrollDownAiResults() as void
+    destination = m.scrollAnimationInterpolator.keyValue[2][1]
+    current = m.container.translation[1]
+    if current = destination
+        return
+    end if
+
+    if m.scrollAnimation.state = "running" and m.scrollAnimationInterpolator.reverse = false
+        return
+    end if
+
+    m.scrollAnimationInterpolator.reverse = false
+    m.scrollAnimation.control = "start"
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    navigation = NavigationKeyHandler(key, press)
+    if navigation.handled
+        node = navigation.node
+        if node.isSameNode(m.rowList)
+            ScrollDownAiResults()
+        else
+            ScrollUpAiResults()
+        end if
+        ' Coming back from the nav bar returns to the last control used on this screen
+        if not node.isSameNode(m.navBar)
+            m.currentNavigtionNode = node
+        end if
+        if node.isSameNode(m.keyboard)
+            ' First section, grid, row and key
+            m.keyboard.keyGrid.jumpToKey = [0, 0, 0, 0]
+        end if
+        return true
+    end if
+    return false
+end function

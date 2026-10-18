@@ -1,4 +1,5 @@
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
+import "pkg:/source/utils/SensitivePreferences.bs"
 import "pkg:/source/utils/Types.bs"
 
 namespace Http
@@ -53,7 +54,7 @@ namespace Http
             end if
 
             if keysDict["preferences"] = true
-                state["preferences"] = m.preferencesNode@.GetUserPreferences()
+                state["preferences"] = SensitivePreferences.MaskValues(m.preferencesNode@.GetUserPreferences(), SensitivePreferences.GetKeys(m.preferencesNode.prefsModel))
             end if
 
             if keysDict["profiles"] = true

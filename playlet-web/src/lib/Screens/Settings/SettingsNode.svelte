@@ -25,6 +25,7 @@
   export let min: number = -999999;
   export let max: number = 999999;
   export let visibility: string | undefined = undefined;
+  export let sensitive: boolean = false;
   export let children: any[] | undefined = [];
   export let level: number = 0;
 
@@ -51,7 +52,7 @@
   {:else if type === "radio"}
     <RadioControl {displayText} {key} {description} {level} {options} />
   {:else if type === "string"}
-    <StringControl {displayText} {key} {description} {level} />
+    <StringControl {displayText} {key} {description} {level} {sensitive} />
   {:else if type === "number"}
     <NumberControl {displayText} {key} {description} {level} {min} {max} />
   {:else if svelteComponent}

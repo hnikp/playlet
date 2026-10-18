@@ -42,6 +42,11 @@
                                 text="Sport"
                                 icon="pkg:/images/icons/sport.png" />
                             <NavBarItemContent
+                                screen="AiSearchScreen"
+                                preference="browsing.show_ai_search"
+                                text="AI Search"
+                                icon="pkg:/images/icons/ai.png" />
+                            <NavBarItemContent
                                 screen="BookmarksScreen"
                                 preference="browsing.show_bookmarks"
                                 text="Bookmarks"

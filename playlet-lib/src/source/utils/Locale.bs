@@ -11,6 +11,7 @@ namespace Locale
         Info = "Info"
         Chess = "Chess"
         Sport = "Sport"
+        AiSearch = "AI Search"
     end enum
 
     @locale
@@ -348,6 +349,23 @@ namespace Locale
         TemperatureUnitDescription = "Show temperatures in Celsius or Fahrenheit"
         Celsius = "Celsius"
         Fahrenheit = "Fahrenheit"
+        AiSearchSettings = "AI search"
+        AiSearchSettingsDescription = "The AI service that turns a description into video recommendations"
+        AiProvider = "AI provider"
+        AiProviderDescription = "Service that answers AI searches. Anthropic needs a paid API key from console.anthropic.com; Gemini, Groq and OpenRouter offer free keys"
+        AnthropicClaude = "Anthropic (Claude)"
+        GoogleGemini = "Google Gemini"
+        Groq = "Groq"
+        OpenRouter = "OpenRouter"
+        CustomOpenAiCompatible = "Custom (OpenAI-compatible)"
+        AiApiKey = "API key"
+        AiApiKeyDescription = "API key for the AI provider. Easiest to paste from the Playlet web app on your phone"
+        AiModel = "Model"
+        AiModelDescription = "Model name. Leave empty to use the provider's default"
+        AiServerUrl = "Server URL"
+        AiServerUrlDescription = "Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama"
+        ShowAiSearchPage = "Show AI Search page"
+        ShowAiSearchPageDescription = "Show the AI Search page in the menu"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"
@@ -565,5 +583,19 @@ namespace Locale
         Thunderstorm = "Thunderstorm"
         RainChance = "Rain %1%"
         CityNotFound = "City not found: %1"
+    end enum
+
+    @locale
+    enum AiSearch
+        Hint = "Describe a video, for example: a calm piano video for studying"
+        AskAi = "Ask AI"
+        Thinking = "Thinking…"
+        NoApiKey = "Set an API key in the AI search settings, or from the Playlet web app on your phone"
+        AiPicks = "AI picks"
+        Failed = "AI search failed"
+        NoRecommendations = "The AI found no recommendations"
+        SentToTv = "Sent to the TV"
+        Describe = "Describe a video"
+        SuggestedSearches = "Suggested searches"
     end enum
 end namespace

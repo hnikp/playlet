@@ -1,0 +1,261 @@
+import "pkg:/source/utils/AiSearchUtils.bs"
+
+namespace Tests
+
+    @SGNode("Group")
+    @suite
+    class AiSearchUtilsTests extends Rooibos.BaseTestSuite
+
+        function Prefs(provider as string, apiKey as string, model as string, baseUrl as string) as object
+            return {
+                "ai_search.provider": provider
+                "ai_search.api_key": apiKey
+                "ai_search.model": model
+                "ai_search.base_url": baseUrl
+            }
+        end function
+
+        function AnswerJson() as string
+            return FormatJson({
+                summary: "Two videos"
+                picks: [
+                    { title: "Foldables compared", channel: "MKBHD", reason: "Spring 2025" }
+                    { title: " Piano for studying ", channel: " Calm ", reason: "" }
+                ]
+                queries: ["foldable phone review"]
+            })
+        end function
+
+        @describe("AiSearchUtils.ParseRecommendations")
+
+        @it("Parses a bare JSON answer")
+        function _()
+            result = AiSearchUtils.ParseRecommendations(m.AnswerJson())
+            m.assertInvalid(result.error)
+            m.assertEqual(result.summary, "Two videos")
+            m.assertEqual(result.picks.Count(), 2)
+            m.assertEqual(result.picks[0].title, "Foldables compared")
+            m.assertEqual(result.picks[0].channel, "MKBHD")
+            m.assertEqual(result.picks[1].title, "Piano for studying")
+            m.assertEqual(result.picks[1].channel, "Calm")
+            m.assertEqual(result.queries, ["foldable phone review"])
+        end function
+
+        @it("Parses JSON in ```json fences")
+        function _()
+            result = AiSearchUtils.ParseRecommendations("```json" + Chr(10) + m.AnswerJson() + Chr(10) + "```")
+            m.assertInvalid(result.error)
+            m.assertEqual(result.picks.Count(), 2)
+        end function
+
+        @it("Parses JSON in plain ``` fences")
+        function _()
+            result = AiSearchUtils.ParseRecommendations("```" + Chr(10) + m.AnswerJson() + Chr(10) + "```")
+            m.assertInvalid(result.error)
+            m.assertEqual(result.queries.Count(), 1)
+        end function
+
+        @it("Parses JSON with prose around it")
+        function _()
+            result = AiSearchUtils.ParseRecommendations("Here you go:" + Chr(10) + m.AnswerJson() + Chr(10) + "Enjoy!")
+            m.assertInvalid(result.error)
+            m.assertEqual(result.picks.Count(), 2)
+        end function
+
+        @it("Parses a Persian answer")
+        function _()
+            text = FormatJson({ summary: "ویدیوهای پیانو", picks: [{ title: "موسیقی آرام", channel: "کانال", reason: "آرام" }], queries: ["پیانو آرام"] })
+            result = AiSearchUtils.ParseRecommendations(text)
+            m.assertInvalid(result.error)
+            m.assertEqual(result.summary, "ویدیوهای پیانو")
+            m.assertEqual(result.picks[0].title, "موسیقی آرام")
+            m.assertEqual(result.queries[0], "پیانو آرام")
+        end function
+
+        @it("Returns an error for invalid JSON or no JSON")
+        function _()
+            m.assertNotInvalid(AiSearchUtils.ParseRecommendations("{ picks: [ oops").error)
+            m.assertNotInvalid(AiSearchUtils.ParseRecommendations("{not json}").error)
+            m.assertNotInvalid(AiSearchUtils.ParseRecommendations("Sorry, I can't help with that.").error)
+            m.assertNotInvalid(AiSearchUtils.ParseRecommendations("").error)
+        end function
+
+        @it("Clamps to 8 picks and 4 queries")
+        function _()
+            picks = []
+            queries = []
+            for i = 1 to 12
+                picks.Push({ title: `Video ${i}`, channel: "C", reason: "R" })
+                queries.Push(`query ${i}`)
+            end for
+            result = AiSearchUtils.ParseRecommendations(FormatJson({ summary: "", picks: picks, queries: queries }))
+            m.assertEqual(result.picks.Count(), 8)
+            m.assertEqual(result.picks[7].title, "Video 8")
+            m.assertEqual(result.queries.Count(), 4)
+            m.assertEqual(result.queries[3], "query 4")
+        end function
+
+        @it("Drops picks without a title and blank queries")
+        function _()
+            text = FormatJson({
+                summary: 5
+                picks: [{ channel: "No title" }, { title: "  ", channel: "Blank" }, "a string", { title: "Kept", channel: invalid }]
+                queries: ["", 3, "kept query"]
+            })
+            result = AiSearchUtils.ParseRecommendations(text)
+            m.assertInvalid(result.error)
+            m.assertEqual(result.summary, "")
+            m.assertEqual(result.picks.Count(), 1)
+            m.assertEqual(result.picks[0].title, "Kept")
+            m.assertEqual(result.picks[0].channel, "")
+            m.assertEqual(result.queries, ["kept query"])
+        end function
+
+        @it("Returns an error when nothing is left")
+        function _()
+            result = AiSearchUtils.ParseRecommendations(FormatJson({ summary: "Nothing", picks: [{ channel: "x" }], queries: [] }))
+            m.assertNotInvalid(result.error)
+        end function
+
+        @describe("AiSearchUtils.ParseResponse")
+
+        @it("Reads the first text block of an Anthropic response")
+        function _()
+            response = {
+                stop_reason: "end_turn"
+                content: [
+                    { type: "thinking", thinking: "..." }
+                    { type: "text", text: m.AnswerJson() }
+                    { type: "text", text: "ignored" }
+                ]
+            }
+            result = AiSearchUtils.ParseResponse("anthropic", response)
+            m.assertInvalid(result.error)
+            m.assertEqual(result.picks.Count(), 2)
+        end function
+
+        @it("Treats an Anthropic refusal as an error")
+        function _()
+            response = { stop_reason: "refusal", content: [{ type: "text", text: m.AnswerJson() }] }
+            m.assertNotInvalid(AiSearchUtils.ParseResponse("anthropic", response).error)
+        end function
+
+        @it("Reads choices[0].message.content of an OpenAI-compatible response")
+        function _()
+            response = { choices: [{ index: 0, message: { role: "assistant", content: m.AnswerJson() } }] }
+            result = AiSearchUtils.ParseResponse("openai", response)
+            m.assertInvalid(result.error)
+            m.assertEqual(result.picks[0].channel, "MKBHD")
+        end function
+
+        @it("Returns an error for an empty or invalid response")
+        function _()
+            m.assertNotInvalid(AiSearchUtils.ParseResponse("openai", { choices: [] }).error)
+            m.assertNotInvalid(AiSearchUtils.ParseResponse("anthropic", { content: [] }).error)
+            m.assertNotInvalid(AiSearchUtils.ParseResponse("openai", invalid).error)
+        end function
+
+        @it("Returns the message of an API error body")
+        function _()
+            anthropicError = { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } }
+            m.assertEqual(AiSearchUtils.ParseResponse("anthropic", anthropicError).error, "invalid x-api-key")
+
+            geminiError = [{ error: { code: 400, message: "API key not valid", status: "INVALID_ARGUMENT" } }]
+            m.assertEqual(AiSearchUtils.ParseResponse("openai", geminiError).error, "API key not valid")
+
+            m.assertEqual(AiSearchUtils.GetApiErrorMessage({ error: { type: "overloaded_error" } }), "overloaded_error")
+            m.assertEqual(AiSearchUtils.GetApiErrorMessage({ choices: [] }), "")
+            m.assertEqual(AiSearchUtils.GetApiErrorMessage(invalid), "")
+        end function
+
+        @describe("AiSearchUtils.BuildRequest")
+
+        @it("Builds an Anthropic request")
+        function _()
+            request = AiSearchUtils.BuildRequest(m.Prefs("anthropic", "sk-ant-test", "", ""), " calm piano ")
+            m.assertInvalid(request.error)
+            m.assertEqual(request.format, "anthropic")
+            m.assertEqual(request.url, "https://api.anthropic.com/v1/messages")
+            m.assertEqual(request.headers["x-api-key"], "sk-ant-test")
+            m.assertEqual(request.headers["anthropic-version"], "2023-06-01")
+            m.assertEqual(request.headers["anthropic-beta"], "server-side-fallback-2026-07-01")
+            m.assertInvalid(request.headers["Authorization"])
+            body = request.body
+            m.assertEqual(body.model, "claude-opus-5-5")
+            m.assertEqual(body.max_tokens, 4000)
+            m.assertEqual(body.fallbacks, "default")
+            m.assertInvalid(body.thinking)
+            m.assertNotEmpty(body.system)
+            m.assertEqual(body.messages.Count(), 1)
+            m.assertEqual(body.messages[0].role, "user")
+            m.assertEqual(body.messages[0].content, "calm piano")
+            m.assertEqual(body.output_config.effort, "low")
+            m.assertEqual(body.output_config.format.type, "json_schema")
+            m.assertEqual(body.output_config.format.schema.required, ["summary", "picks", "queries"])
+            m.assertFalse(body.output_config.format.schema.additionalProperties)
+            m.assertFalse(body.output_config.format.schema.properties.picks.items.additionalProperties)
+        end function
+
+        @it("Uses the model preference over the preset default")
+        function _()
+            request = AiSearchUtils.BuildRequest(m.Prefs("anthropic", "key", " claude-haiku-5-5 ", ""), "q")
+            m.assertEqual(request.body.model, "claude-haiku-5-5")
+        end function
+
+        @it("Builds a Gemini request")
+        function _()
+            request = AiSearchUtils.BuildRequest(m.Prefs("gemini", "AIza-test", "", ""), "q")
+            m.assertInvalid(request.error)
+            m.assertEqual(request.format, "openai")
+            m.assertEqual(request.url, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
+            m.assertEqual(request.headers["Authorization"], "Bearer AIza-test")
+            m.assertInvalid(request.headers["x-api-key"])
+            body = request.body
+            m.assertEqual(body.model, "gemini-flash-latest")
+            m.assertEqual(body.messages.Count(), 2)
+            m.assertEqual(body.messages[0].role, "system")
+            m.assertEqual(body.messages[1].role, "user")
+            m.assertEqual(body.messages[1].content, "q")
+            m.assertEqual(body.response_format.type, "json_object")
+            m.assertInvalid(body.output_config)
+        end function
+
+        @it("Returns an error without an API key")
+        function _()
+            request = AiSearchUtils.BuildRequest(m.Prefs("groq", "  ", "", ""), "q")
+            m.assertEqual(request.error, Tr(Locale.AiSearch.NoApiKey))
+            m.assertInvalid(request.url)
+        end function
+
+        @it("Returns an error for an empty query")
+        function _()
+            m.assertNotInvalid(AiSearchUtils.BuildRequest(m.Prefs("gemini", "key", "", ""), "   ").error)
+        end function
+
+        @it("Builds a custom request without a key, trimming the URL's trailing slash")
+        function _()
+            request = AiSearchUtils.BuildRequest(m.Prefs("custom", "", "llama3.2", "http://192.168.0.10:11434/v1/"), "q")
+            m.assertInvalid(request.error)
+            m.assertEqual(request.url, "http://192.168.0.10:11434/v1/chat/completions")
+            m.assertEqual(request.body.model, "llama3.2")
+            m.assertInvalid(request.headers["Authorization"])
+        end function
+
+        @it("Returns an error for a custom provider without a URL or model")
+        function _()
+            m.assertNotInvalid(AiSearchUtils.GetProviderConfig("custom", "llama3.2", "").error)
+            m.assertNotInvalid(AiSearchUtils.GetProviderConfig("custom", "", "http://host/v1").error)
+            m.assertNotInvalid(AiSearchUtils.GetProviderConfig("unknown", "", "").error)
+        end function
+
+        @it("Has a preset for every provider")
+        function _()
+            m.assertEqual(AiSearchUtils.GetProviderConfig("groq", "", "").url, "https://api.groq.com/openai/v1/chat/completions")
+            m.assertEqual(AiSearchUtils.GetProviderConfig("groq", "", "").model, "openai/gpt-oss-120b")
+            m.assertEqual(AiSearchUtils.GetProviderConfig("openrouter", "", "").url, "https://openrouter.ai/api/v1/chat/completions")
+            m.assertEqual(AiSearchUtils.GetProviderConfig("openrouter", "", "").model, "openrouter/free")
+        end function
+
+    end class
+
+end namespace

@@ -273,6 +273,44 @@ function OnItemFocused() as void
     m.appController@.ShowRootScreen(item.screen)
 end function
 
+' Brings the nav page of screenName to the front, as if the user selected it in the menu
+' (used by the web app, e.g. /api/ai-search). Views pushed on top (video page, channel...)
+' are closed. Returns the screen node, or invalid if the page is hidden or unknown.
+function FocusScreen(screenName as string) as object
+    index = FindNavItemIndex(screenName)
+    if index = -1
+        return invalid
+    end if
+
+    ' Close the views pushed on top of the root (the root is the first child of the stack)
+    stack = m.appController.stack
+    while stack <> invalid and stack.getChildCount() > 1
+        topScreen = stack.getChild(stack.getChildCount() - 1)
+        m.appController@.PopScreen()
+        if topScreen.hasField("dispose")
+            topScreen.dispose = true
+        end if
+    end while
+
+    if not m.itemFocusedObserved
+        ' The list never had focus: OnListFirstFocus will jump to this item
+        m.initialScreen = screenName
+    else if index <> m.lastItemFocused
+        UnfocusItem(m.lastItemFocused)
+        m.lastItemFocused = index
+        m.itemsList.jumpToItem = index
+        ' The list moves its focus while the screen has the focus: OnItemFocused must not undo it
+        m.ignoreUnfocusedItemFocus = true
+    end if
+
+    m.appController@.ShowRootScreen(screenName)
+    screen = m.appController@.GetRootScreen(screenName)
+    if screen <> invalid and screen.focusable
+        NodeSetFocus(screen, true)
+    end if
+    return screen
+end function
+
 function UnfocusItem(index as integer) as void
     item = GetItem(index)
     if item = invalid

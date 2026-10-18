@@ -1,0 +1,81 @@
+<!-- The AI Search page: describe a video (typed, dictated, or sent from the phone web app), an LLM
+     (AiSearchJob) suggests videos and search queries, and they are resolved with the regular search:
+     an "AI picks" row (one search per pick, reduced to one video by InvidiousService.AiPickHandler),
+     then one row per suggested query. Layout modeled on SearchScreen. -->
+<component name="AiSearchScreen" extends="Group" includes="AutoBind,Focus">
+    <interface>
+        <field id="navBar" type="node" bind="/NavBar" />
+        <field id="appController" type="node" bind="/AppController" />
+        <field id="preferences" type="node" bind="/Preferences" />
+        <field id="jobQueue" type="node" bind="/JobQueue" />
+        <!-- Set by the web app (AiSearchRouter): fills the keyboard text and runs the search -->
+        <field id="externalQuery" type="string" alwaysNotify="true" onChange="OnExternalQuery" />
+        <!-- The last search for the web app: {query, status: thinking|done|error, text, picks, queries} -->
+        <field id="aiState" type="assocarray" />
+    </interface>
+    <children>
+        <Group id="container">
+            <ScreenHeader
+                id="header"
+                translation="[90,18]"
+                iconUri="pkg:/images/icons/ai.png"
+                accentColor="#8E5CF0FF" />
+
+            <ButtonEx
+                id="askButton"
+                translation="[125,110]"
+                iconUri="pkg:/images/icons/ai.png"
+                anchor="[0,0.5]"
+                padding="[30,30]"
+                text="Ask AI" />
+
+            <SearchKeyboard
+                id="keyboard"
+                translation="[630,102]" />
+
+            <ButtonGroup
+                id="history"
+                focusable="false"
+                minWidth="400"
+                maxWidth="460"
+                buttonHeight="50"
+                translation="[125,160]" />
+
+            <Label
+                id="statusLabel"
+                translation="[130,450]"
+                width="460"
+                wrap="true"
+                maxLines="4"
+                color="#DDDDDD">
+                <Font role="font" uri="font:SystemFontFile" size="22" />
+            </Label>
+
+            <VideoRowList
+                itemComponentName="RowCell"
+                id="rowList"
+                focusable="false"
+                translation="[0,620]"
+                numRows="1"
+                rowitemSize="[[350,196]]"
+                rowItemSpacing="[[25,0]]"
+                itemSize="[1280,326]"
+                itemSpacing="[0,65]"
+                rowLabelOffset="[[90,20]]"
+                focusXOffset="[90]"
+                showRowLabel="[true]"
+                rowFocusAnimationStyle="floatingfocus"
+                variableWidthItems="true"
+                focusBitmapUri="pkg:/images/focus-glow-padding-30.$$RES$$.9.png" />
+            <Animation
+                id="scrollAnimation"
+                duration="0.3">
+                <Vector2DFieldInterpolator
+                    id="scrollAnimationInterpolator"
+                    key="[ 0.0, 0.5, 1.0 ]"
+                    keyValue="[ [0.0,0.0], [0.0,-160.0], [0.0,-320.0]]"
+                    fieldToInterp="container.translation" />
+            </Animation>
+        </Group>
+    </children>
+</component>
