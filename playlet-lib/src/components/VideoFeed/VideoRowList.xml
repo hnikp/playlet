@@ -12,8 +12,6 @@
         <field id="jobQueue" type="node" bind="/JobQueue" />
         <field id="preferences" type="node" bind="/Preferences" />
         <field id="screen" type="node" />
-        <!-- the thumbnail preview's Video node, picked up by VideoRowCell (see VideoContentNode.previewVideoActive) -->
-        <field id="previewPlayer" type="node" />
         <field id="feeds" type="array" onChange="OnFeedsChange" />
         <!-- 
             someContentReady is a field specifically for the search screen.

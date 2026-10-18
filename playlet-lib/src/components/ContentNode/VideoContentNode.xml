@@ -31,7 +31,7 @@
         <field id="previewStoryboard" type="assocarray" />
         <!-- true while this item's video plays inside its thumbnail. A flag, not the Video node: a node field
              would make every change of the playing Video a change of this item for its observers
-             (VideoView reloaded its details in a loop). The node is VideoRowList.previewPlayer. -->
+             (VideoView reloaded its details in a loop). The node is m.global.thumbnailPreviewPlayer. -->
         <field id="previewVideoActive" type="boolean" />
         <!-- Persian/Arabic title and author prepared for VideoRowCell's labels (see RtlText.PrepareForLabel) -->
         <field id="titlePrepared" type="assocarray" />

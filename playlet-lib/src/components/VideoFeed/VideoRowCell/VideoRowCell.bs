@@ -187,16 +187,12 @@ function OnPreviewLoadStatus() as void
     end if
 end function
 
-' The cell is a descendant of its VideoRowList, which owns the preview's Video node
+' The preview's Video node, owned by the VideoRowList that set previewVideoActive
 function FindPreviewPlayer() as dynamic
-    node = m.top.getParent()
-    while node <> invalid
-        if node.hasField("previewPlayer")
-            return node.previewPlayer
-        end if
-        node = node.getParent()
-    end while
-    return invalid
+    if not m.global.hasField("thumbnailPreviewPlayer")
+        return invalid
+    end if
+    return m.global.thumbnailPreviewPlayer
 end function
 
 ' The Video node (owned by VideoRowList) is placed over the frames, covering the thumbnail

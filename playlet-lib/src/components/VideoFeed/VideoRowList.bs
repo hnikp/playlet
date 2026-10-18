@@ -568,7 +568,6 @@ function GetPreviewVideo() as object
         player.loop = false
         player.ObserveFieldScoped("state", FuncName(OnPreviewVideoState))
         m.previewVideo = player
-        m.top.previewPlayer = player
     end if
     return m.previewVideo
 end function
@@ -591,6 +590,12 @@ function PlayPreviewVideo(item as object, data as object) as void
 
     player.content = streamContent
     ' VideoRowCell picks the node up and places it over the thumbnail
+    ' VideoRowCell finds the node here: RowList item components are not descendants of the RowList.
+    ' Only one preview plays at a time, so one global slot is enough.
+    if not m.global.hasField("thumbnailPreviewPlayer")
+        m.global.addField("thumbnailPreviewPlayer", "node", false)
+    end if
+    m.global.thumbnailPreviewPlayer = player
     item.previewVideoActive = true
     player.control = "play"
 
