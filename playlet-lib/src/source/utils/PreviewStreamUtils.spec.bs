@@ -59,15 +59,39 @@ namespace Tests
             m.assertInvalid(PreviewStreamUtils.PickPreviewStream(invalid, "", 8888, "load1"))
         end function
 
-        @it("Returns invalid for live and DRM videos")
+        @it("Returns invalid for DRM videos")
         function _()
-            live = m.Metadata([{ itag: "18", url: "https://v.example/18" }], [{ itag: "134", url: "https://v.example/134" }])
-            live.liveNow = true
-            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(live, "", 8888, "load1"))
-
             drm = m.Metadata([], [{ itag: "134", url: "https://v.example/134" }])
             drm.drmParams = "params"
             m.assertInvalid(PreviewStreamUtils.PickPreviewStream(drm, "", 8888, "load1"))
+        end function
+
+        @it("Returns the low quality local HLS manifest for live videos")
+        function _()
+            live = m.Metadata([{ itag: "18", url: "https://v.example/18" }], [{ itag: "134", url: "https://v.example/134" }])
+            live.liveNow = true
+            live.hlsUrl = "/api/manifest/hls_variant/abc"
+            result = PreviewStreamUtils.PickPreviewStream(live, "https://inv.example", 8888, "load1")
+            m.assertEqual(result.streamFormat, "hls")
+            m.assertTrue(result.live)
+            m.assertTrue(result.url.StartsWith("http://127.0.0.1:8888/api/hls?"))
+            m.assertTrue(result.url.InStr(UrlUtils.GetEncodedQueryParam("url", "https://inv.example/api/manifest/hls_variant/abc")) > 0)
+            m.assertTrue(result.url.InStr("v=abc") > 0)
+            m.assertTrue(result.url.InStr("quality=144p%2C240p%2C360p") > 0)
+
+        end function
+
+        @it("Returns the live DASH manifest for live videos without an HLS url")
+        function _()
+            live = m.Metadata([{ itag: "18", url: "https://v.example/18" }], [{ itag: "134", url: "https://v.example/134" }])
+            live.liveNow = true
+            result = PreviewStreamUtils.PickPreviewStream(live, "", 8888, "load1")
+            m.assertEqual(result.streamFormat, "dash")
+            m.assertTrue(result.live)
+
+            noStreams = m.Metadata([], [])
+            noStreams.liveNow = true
+            m.assertInvalid(PreviewStreamUtils.PickPreviewStream(noStreams, "", 8888, "load1"))
         end function
 
         function Metadata(formatStreams as dynamic, adaptiveFormats as dynamic) as object

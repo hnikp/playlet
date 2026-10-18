@@ -17,20 +17,31 @@ namespace PreviewStreamUtils
     ' Muxed 360p mp4 (itag 18), the smallest stream that has audio and video in one file.
     const PREFERRED_ITAG = "18"
     const PREVIEW_DASH_QUALITY = "360p"
+    ' Live previews: the lowest of these the HLS manifest has (HlsRouter falls back to all variants)
+    const PREVIEW_HLS_QUALITY = "144p,240p,360p"
 
     ' Returns { url, streamFormat: "mp4" } for the lowest resolution muxed stream (preferring itag 18),
     ' else { url, streamFormat: "dash", needsMetadata: true } for a DASH manifest from Playlet's local
-    ' web server (which reads the metadata back by videoLoadId), else invalid (no stream, live, DRM).
+    ' web server (which reads the metadata back by videoLoadId), else invalid (no stream, DRM).
+    ' Live streams (live: true): the HLS manifest when the backend has one (LivePreviewStream), else the
+    ' live DASH manifest the local web server generates from adaptiveFormats, as for the main player.
     function PickPreviewStream(metadata as dynamic, instance as string, playletServerPort as integer, videoLoadId as string) as object
         if not IsAssociativeArray(metadata)
             return invalid
         end if
-        if ValidBool(metadata.liveNow) or not StringUtils.IsNullOrEmpty(metadata.drmParams)
+        if not StringUtils.IsNullOrEmpty(metadata.drmParams)
             return invalid
+        end if
+        isLive = ValidBool(metadata.liveNow)
+        if isLive
+            hls = PreviewStreamUtils.LivePreviewStream(metadata, instance, playletServerPort)
+            if hls <> invalid
+                return hls
+            end if
         end if
 
         best = invalid
-        if IsArray(metadata.formatStreams)
+        if not isLive and IsArray(metadata.formatStreams)
             for each stream in metadata.formatStreams
                 if not IsAssociativeArray(stream) or StringUtils.IsNullOrEmpty(stream.url)
                     continue for
@@ -66,6 +77,25 @@ namespace PreviewStreamUtils
             url: dashUrl
             streamFormat: "dash"
             needsMetadata: true
+            live: isLive
+        }
+    end function
+
+    ' The live HLS manifest through Playlet's local web server, like VideoContentJob's AddHlsUrls, filtered
+    ' to a low quality. Invalid without an hlsUrl (the built-in backend's live streams have none).
+    function LivePreviewStream(metadata as object, instance as string, playletServerPort as integer) as object
+        hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
+        if StringUtils.IsNullOrEmpty(hlsUrl)
+            return invalid
+        end if
+        return {
+            url: UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, {
+                url: hlsUrl
+                v: metadata.videoId
+                quality: PREVIEW_HLS_QUALITY
+            })
+            streamFormat: "hls"
+            live: true
         }
     end function
 

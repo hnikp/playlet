@@ -7,8 +7,8 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' Resolves what a focused feed thumbnail plays in its video preview (VideoRowList): a muxed mp4
-' stream, else a DASH manifest from Playlet's local web server, plus storyboard frames to fall
-' back on. Returns { url, streamFormat, frames } (url/streamFormat invalid when only frames are
+' stream, else a DASH manifest from Playlet's local web server (live: HLS, else live DASH), plus
+' storyboard frames to fall back on. Returns { url, streamFormat, live, frames } (url/streamFormat invalid when only frames are
 ' usable, frames invalid without a usable storyboard); for "dash", also { videoLoadId, metadata },
 ' which VideoRowList hands to the DASH router via VideoQueue.previewContent.
 ' Previews are frequent and best effort: no telemetry, no dialogs, no player cache files.
@@ -74,6 +74,7 @@ function ExecuteJob() as void
     if stream <> invalid
         result.url = stream.url
         result.streamFormat = stream.streamFormat
+        result.live = stream.live = true
         if stream.streamFormat = "dash"
             result.videoLoadId = videoLoadId
             result.metadata = metadata
@@ -83,7 +84,7 @@ function ExecuteJob() as void
 end function
 
 ' JobError, minus its LogError (which reports to telemetry): a failed preview is expected
-' (live, DRM, rate limits) and only logged.
+' (DRM, rate limits, a live stream without an HLS url) and only logged.
 function PreviewJobError(error as dynamic) as void
     error = ErrorUtils.Format(error)
     LogInfo(`[VideoPreviewJob]${error}`)

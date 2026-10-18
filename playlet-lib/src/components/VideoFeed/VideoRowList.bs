@@ -444,15 +444,19 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
-' Restarts the preview delay for the newly focused item (only videos with a known duration: not live/upcoming)
+' Restarts the preview delay for the newly focused item (not upcoming videos; live ones only as video,
+' they have no storyboard frames)
 function SchedulePreview(item as object) as void
     StopPreview()
-    if item = invalid or item.type <> "video" or item.liveNow or item.isUpcoming
+    if item = invalid or item.type <> "video" or item.isUpcoming
         return
     end if
     mode = m.preferences["misc.thumbnail_preview_mode"]
     if mode <> "frames" and mode <> "video"
         LogDebug("Thumbnail preview off:", mode)
+        return
+    end if
+    if item.liveNow and mode <> "video"
         return
     end if
 
@@ -481,7 +485,7 @@ function OnPreviewTimerFire() as void
     ' Roku can't decode two videos: with a player open (e.g. picture-in-picture) only frames are shown
     if m.preferences["misc.thumbnail_preview_mode"] = "video" and not VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue)
         QueueVideoPreviewJob(item)
-    else
+    else if not item.liveNow
         QueueStoryboardPreviewJob(item)
     end if
 end function
@@ -538,6 +542,10 @@ function OnVideoPreviewJobDone(event as object) as void
     end if
 
     if not info.success
+        if item.liveNow
+            LogDebug("No live thumbnail preview:", info.error)
+            return
+        end if
         LogDebug("No video thumbnail preview, falling back to frames:", info.error)
         QueueStoryboardPreviewJob(item)
         return
@@ -579,6 +587,8 @@ function PlayPreviewVideo(item as object, data as object) as void
     streamContent = CreateObject("roSGNode", "ContentNode")
     streamContent.url = data.url
     streamContent.streamFormat = data.streamFormat
+    ' a live stream starts at its live edge
+    streamContent.live = data.live = true
 
     m.previewVideoItem = item
     if data.streamFormat = "dash"
@@ -597,6 +607,11 @@ function PlayPreviewVideo(item as object, data as object) as void
     end if
     m.global.thumbnailPreviewPlayer = player
     item.previewVideoActive = true
+    if streamContent.live
+        ' like the main player (VideoPlayerDev.SeekToInitialPosition): a live DASH manifest lists the whole DVR
+        ' window and would otherwise start hours behind; seeking past the end lands on the live edge
+        player.seek = 999999
+    end if
     player.control = "play"
 
     limitMinutes = m.preferences["misc.thumbnail_preview_limit"]
