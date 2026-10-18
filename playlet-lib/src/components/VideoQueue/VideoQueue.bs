@@ -266,8 +266,22 @@ function FindPlaylistVideosInQueue(videoNodes as object) as integer
     return -1
 end function
 
-function OnClearQueue()
+function OnClearQueue() as void
     queueCount = m.content.getChildCount()
+
+    ' Keep the video that is playing (only the rest of the queue is cleared)
+    index = m.top.index
+    if m.top.player <> invalid and index >= 0 and index < queueCount
+        if index + 1 < queueCount
+            m.content.removeChildrenIndex(queueCount - index - 1, index + 1)
+        end if
+        if index > 0
+            m.content.removeChildrenIndex(index, 0)
+        end if
+        m.top.index = 0
+        return
+    end if
+
     if queueCount > 0
         m.content.removeChildrenIndex(queueCount, 0)
     end if

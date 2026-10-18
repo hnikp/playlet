@@ -1,7 +1,6 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
-import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
@@ -62,7 +61,6 @@ function OnNodeReady()
     DisposableObserveFieldScoped(m.subscribeButton, "enabled", FuncName(OnSubscribeButtonEnabledChange))
     DisposableObserveField(m.rowList, "focusedChild", FuncName(OnRowListFocusChange))
 
-    SetNavigation(m.rowList, RemoteKeys.Up, m.playButton, OnRowListUp)
 end function
 
 function OnFocusChange() as void
@@ -162,7 +160,6 @@ function OnRelatedSet() as void
     end if
     m.rowList.content = related
     m.rowList.focusable = true
-    SetNavigation(invalid, RemoteKeys.Down, m.rowList, OnRowListDown)
 end function
 
 function OnPlayButtonSelected()
@@ -225,18 +222,12 @@ function OnSubscribeButtonEnabledChange()
     end if
 end function
 
-function OnRowListDown()
-    ScrollTo(-RELATED_SCROLL_OFFSET)
-end function
-
-function OnRowListUp()
-    FocusButton(m.focusedButton)
-    ScrollTo(0)
-end function
-
+' The page scrolls up to show the related videos while they have focus
 function OnRowListFocusChange()
     if m.rowList.isInFocusChain()
         ScrollTo(-RELATED_SCROLL_OFFSET)
+    else
+        ScrollTo(0)
     end if
 end function
 
@@ -291,15 +282,22 @@ function JoinNonEmpty(values as object) as string
 end function
 
 function OnKeyEvent(key as string, press as boolean) as boolean
-    if NavigationKeyHandler(key, press).handled
-        return true
-    end if
-
     if not press
         return false
     end if
 
     buttonsFocused = not m.rowList.isInFocusChain()
+
+    ' Up/Down between the buttons and the related videos (handled here rather than with SetNavigation callbacks:
+    ' NavigationKeyHandler calls them as item.callback(), so their m would be the navigation entry)
+    if key = RemoteKeys.Down and buttonsFocused and m.rowList.focusable
+        NodeSetFocus(m.rowList, true)
+        return true
+    end if
+    if key = RemoteKeys.Up and not buttonsFocused
+        FocusButton(m.focusedButton)
+        return true
+    end if
 
     if buttonsFocused and (key = RemoteKeys.Left or key = RemoteKeys.Right)
         if key = RemoteKeys.Left
