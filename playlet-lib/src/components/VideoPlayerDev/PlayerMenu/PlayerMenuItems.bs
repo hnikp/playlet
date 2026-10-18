@@ -6,6 +6,7 @@ import "pkg:/source/utils/Types.bs"
 '   author, authorId, isLive, loggedIn, isSubscribed (true/false, or invalid while unknown),
 '   qualities (["1080p", "720p", ...]), quality ("auto" or "720p"),
 '   supportsSpeed, speed (float), captions ([{ description, trackName }]), captionTrack ("" when off),
+'   audioTracks ([{ id, name }], from the Video node's availableAudioTracks), audioTrack (current id),
 '   autoplay, sponsorblock, liveChat
 namespace PlayerMenuItems
     const SELECTED_MARK = "• "
@@ -38,6 +39,12 @@ namespace PlayerMenuItems
 
         if state.supportsSpeed = true and state.isLive <> true
             items.Push({ id: "speed", title: Tr(Locale.PlayerMenu.PlaybackSpeed) + ": " + SpeedTitle(state.speed) })
+        end if
+
+        ' only worth a page when there is a choice (e.g. original vs auto-dubbed audio)
+        audioTracks = ValidArray(state.audioTracks)
+        if audioTracks.Count() > 1
+            items.Push({ id: "audio", title: Tr(Locale.PlayerMenu.AudioTrack) + ": " + AudioTrackTitle(audioTracks, ValidString(state.audioTrack)) })
         end if
 
         captions = ValidArray(state.captions)
@@ -92,6 +99,15 @@ namespace PlayerMenuItems
         return items
     end function
 
+    function AudioItems(state as object) as object
+        current = ValidString(state.audioTrack)
+        items = []
+        for each track in ValidArray(state.audioTracks)
+            items.Push(SelectableItem("audio", track.id, ValidString(track.name), current = track.id))
+        end for
+        return items
+    end function
+
     ' The sub-page items for a root item id, or invalid if the item is an action
     function SubItems(id as string, state as object) as dynamic
         if id = "quality"
@@ -100,6 +116,8 @@ namespace PlayerMenuItems
             return SpeedItems(state)
         else if id = "captions"
             return CaptionItems(state)
+        else if id = "audio"
+            return AudioItems(state)
         end if
         return invalid
     end function
@@ -168,6 +186,15 @@ namespace PlayerMenuItems
             end for
         end if
         return Tr(Locale.PlayerMenu.CaptionsOff)
+    end function
+
+    function AudioTrackTitle(tracks as object, trackId as string) as string
+        for each track in tracks
+            if track.id = trackId
+                return ValidString(track.name)
+            end if
+        end for
+        return ""
     end function
 
     function OnOffTitle(isOn as boolean) as string

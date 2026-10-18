@@ -1532,5 +1532,13 @@
         <source>Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds</source>
         <translation>Animate a video's thumbnail with frames from the video when it stays focused for 2 seconds</translation>
     </message>
+    <message>
+        <source>Audio track</source>
+        <translation>Audio track</translation>
+    </message>
+    <message>
+        <source>%1 (dubbed)</source>
+        <translation>%1 (dubbed)</translation>
+    </message>
 </context>
 </TS>

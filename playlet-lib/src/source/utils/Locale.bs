@@ -499,6 +499,8 @@ namespace Locale
         Quality = "Quality"
         PlaybackSpeed = "Playback speed"
         Captions = "Captions"
+        AudioTrack = "Audio track"
+        Dubbed = "%1 (dubbed)"
         CaptionsOff = "Off"
         On = "On"
         VideoQueue = "Video queue"

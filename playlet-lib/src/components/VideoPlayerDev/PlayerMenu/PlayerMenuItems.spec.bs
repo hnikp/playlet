@@ -6,10 +6,28 @@ namespace Tests
 
         @describe("PlayerMenuItems.RootItems")
 
-        @it("Shows every item for a logged-in VOD with qualities, speed and captions")
+        @it("Shows every item for a logged-in VOD with qualities, speed, audio tracks and captions")
         function _()
             ids = m.Ids(PlayerMenuItems.RootItems(m.FullState()))
-            m.assertEqual(ids, ["channel", "subscribe", "quality", "speed", "captions", "comments", "queue", "autoplay", "sponsorblock", "pip"])
+            m.assertEqual(ids, ["channel", "subscribe", "quality", "speed", "audio", "captions", "comments", "queue", "autoplay", "sponsorblock", "pip"])
+        end function
+
+        @it("Hides the audio track item without a choice of tracks")
+        function _()
+            state = m.FullState()
+            state.audioTracks = [{ id: "1", name: "English (original)" }]
+            m.assertArrayNotContains(m.Ids(PlayerMenuItems.RootItems(state)), "audio")
+        end function
+
+        @it("Lists audio tracks and marks the current one")
+        function _()
+            items = PlayerMenuItems.AudioItems(m.FullState())
+            m.assertEqual(items.Count(), 2)
+            m.assertEqual(items[0].value, "1")
+            m.assertTrue(items[0].selected)
+            m.assertEqual(items[1].value, "2")
+            m.assertFalse(items[1].selected)
+            m.assertEqual(items[1].title, "Spanish (auto-dubbed)")
         end function
 
         @it("Hides subscribe when logged out, and channel items without an author id")
@@ -117,6 +135,8 @@ namespace Tests
                 speed: 1.0
                 captions: [{ description: "English", trackName: "http://captions/en" }]
                 captionTrack: ""
+                audioTracks: [{ id: "1", name: "English (original)" }, { id: "2", name: "Spanish (auto-dubbed)" }]
+                audioTrack: "1"
                 autoplay: true
                 sponsorblock: false
             }

@@ -4,6 +4,7 @@ import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerMenuItems.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/components/VideoQueue/VideoQueueViewUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -15,12 +16,21 @@ function InitializePlayerMenu() as void
     m.playerMenu = m.top.findNode("playerMenu")
     m.playerComments = invalid
     m.qualityOverride = ""
+    m.audioTrackObserved = false
+    ' the device's caption mode before the menu turned captions on, restored when they're turned off
+    m.savedCaptionMode = ""
     if m.playerMenu = invalid
         return
     end if
     m.playerMenu.ObserveField("action", FuncName(OnPlayerMenuAction))
     m.playerMenu.ObserveField("closed", FuncName(OnPlayerMenuClosed))
     m.top.ObserveField("showMenu", FuncName(OnShowMenuRequested))
+    ' the device lists the audio and caption tracks a moment after playback starts: keep an open menu up to date
+    for each field in ["availableAudioTracks", "availableSubtitleTracks"]
+        if m.top.hasField(field)
+            m.top.ObserveField(field, FuncName(RefreshPlayerMenuState))
+        end if
+    end for
 end function
 
 function BindPlayerMenu() as void
@@ -95,15 +105,24 @@ function GetPlayerMenuState() as object
         author = metadata.author
     end if
 
+    ' The device's own caption track list: its TrackName values ("<RSG_...>https://...") are what subtitleTrack
+    ' takes and currentSubtitleTrack reports, unlike the urls in content.SubtitleTracks.
     captions = []
-    captionTrack = ""
-    if content <> invalid and IsArray(content.SubtitleTracks)
-        for each track in content.SubtitleTracks
+    if m.top.hasField("availableSubtitleTracks")
+        for each track in ValidArray(m.top.availableSubtitleTracks)
             captions.Push({ description: ValidString(track.Description), trackName: ValidString(track.TrackName) })
         end for
-        if m.top.globalCaptionMode = "On"
-            captionTrack = ValidString(m.top.subtitleTrack)
-        end if
+    end if
+    ' Captions only count as on in mode "On" (the device's other modes show them only after a replay or on mute)
+    captionTrack = ""
+    if m.top.globalCaptionMode = "On" and m.top.hasField("currentSubtitleTrack")
+        captionTrack = ValidString(m.top.currentSubtitleTrack)
+    end if
+
+    audioTracks = GetAudioTracks()
+    audioTrack = ""
+    if m.top.hasField("currentAudioTrack")
+        audioTrack = ValidString(m.top.currentAudioTrack)
     end if
 
     quality = m.qualityOverride
@@ -124,6 +143,8 @@ function GetPlayerMenuState() as object
         speed: ValidFloat(m.top.playbackSpeed)
         captions: captions
         captionTrack: captionTrack
+        audioTracks: audioTracks
+        audioTrack: audioTrack
         autoplay: preferences["playback.autoplay"] = true
         sponsorblock: preferences["sponsorblock.enabled"] = true
         liveChat: false
@@ -170,6 +191,9 @@ function OnPlayerMenuAction() as void
         RefreshPlayerMenuState()
     else if id = "captions"
         SetCaptionTrack(ValidString(action.value))
+        RefreshPlayerMenuState()
+    else if id = "audio"
+        SetAudioTrack(ValidString(action.value))
         RefreshPlayerMenuState()
     end if
 end function
@@ -274,11 +298,73 @@ function SetPlaybackSpeed(speed as float) as void
     end if
 end function
 
-' trackName "" turns captions off. Note: globalCaptionMode is the device-wide captions setting.
+' The stream's audio tracks, as the device lists them (one per language/variant in the DASH manifest; the name is
+' the manifest Label, i.e. YouTube's track name, e.g. "English (original)" or "Spanish (auto-dubbed)").
+function GetAudioTracks() as object
+    tracks = []
+    if not m.top.hasField("availableAudioTracks")
+        return tracks
+    end if
+    originals = []
+    for each track in ValidArray(m.top.availableAudioTracks)
+        id = ValidString(track.Track)
+        if id = ""
+            continue for
+        end if
+        name = ValidString(track.Name)
+        if name = ""
+            name = ValidString(track.Language)
+        end if
+        if name = ""
+            name = id
+        end if
+        ' The device's track ids carry the DASH roles (DashManifest.GetTrackRoles), e.g.
+        ' "dash/a~AAC~es~alternate_dub~~0~Spanish" or "dash/a~AAC~en-US~main~~0~English (US) original"
+        if id.InStr("_dub") <> -1 and LCase(name).InStr("dub") = -1
+            name = Tr(Locale.PlayerMenu.Dubbed).Replace("%1", name)
+        end if
+        ' the original audio first, so it's easy to switch back to it from a dub
+        if id.InStr("~main~") <> -1
+            originals.Push({ id: id, name: name })
+        else
+            tracks.Push({ id: id, name: name })
+        end if
+    end for
+    originals.Append(tracks)
+    return originals
+end function
+
+function SetAudioTrack(trackId as string) as void
+    if trackId = "" or not m.top.hasField("audioTrack")
+        return
+    end if
+    LogInfo("Switching audio track to", trackId)
+    if not m.audioTrackObserved and m.top.hasField("currentAudioTrack")
+        m.audioTrackObserved = true
+        m.top.ObserveField("currentAudioTrack", FuncName(OnCurrentAudioTrackChange))
+    end if
+    m.top.audioTrack = trackId
+end function
+
+' The switch is applied asynchronously: refresh the menu when it lands
+function OnCurrentAudioTrackChange() as void
+    RefreshPlayerMenuState()
+end function
+
+' trackName "" turns captions off. globalCaptionMode is the device-wide captions setting (it may be e.g.
+' "Instant replay"): turning captions off restores the mode the device had before they were turned on here.
 function SetCaptionTrack(trackName as string) as void
     if trackName = ""
-        m.top.globalCaptionMode = "Off"
+        mode = m.savedCaptionMode
+        if mode = "" or mode = "On"
+            mode = "Off"
+        end if
+        m.top.globalCaptionMode = mode
+        m.savedCaptionMode = ""
         return
+    end if
+    if m.savedCaptionMode = "" and m.top.globalCaptionMode <> "On"
+        m.savedCaptionMode = m.top.globalCaptionMode
     end if
     m.top.subtitleTrack = trackName
     m.top.globalCaptionMode = "On"

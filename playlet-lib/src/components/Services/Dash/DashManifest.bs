@@ -494,6 +494,9 @@ class DashManifest
                         displayName = firstFormat.audioTrack.displayName
                         if firstFormat.isDrc = true
                             displayName = `${displayName} (Stable Volume)`
+                        else if firstFormat.isVoiceBoost = true
+                            ' otherwise it has the same name as the original track in the player's audio menu
+                            displayName = `${displayName} (Voice Boost)`
                         end if
                         xml.Node("Label", { "id": id })
                         xml.Text(displayName)
