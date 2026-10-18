@@ -1,9 +1,10 @@
 import "pkg:/source/services/HttpClient.bs"
 
-' Fork: diagnostics go to this fork's own Sentry project, not upstream's support server / Sentry project.
-' Until the envelope urls below are set (see Sentry.IsConfigured), nothing is sent.
-const SUPPORT_SERVER_ENVELOPE_URL = "https://SENTRY_NOT_CONFIGURED/primary/envelope"
-const SENTRY_FALLBACK_ENVELOPE_URL = "https://SENTRY_NOT_CONFIGURED/fallback/envelope/?sentry_key=none"
+' Fork: diagnostics go to this fork's own Sentry project (personal-9ds/playlet-fork), not upstream's support
+' server / Sentry project. Both are the project's envelope endpoint (DSN key in the query); the fallback is only
+' used when the first send got no answer at all. Set to SENTRY_NOT_CONFIGURED urls to stop sending (Sentry.IsConfigured).
+const SUPPORT_SERVER_ENVELOPE_URL = "https://o4512273731158016.ingest.de.sentry.io/api/4512275801768016/envelope/?sentry_key=7e91748333aab3558fcaef9abd20f9c4&sentry_version=7"
+const SENTRY_FALLBACK_ENVELOPE_URL = "https://o4512273731158016.ingest.de.sentry.io/api/4512275801768016/envelope/?sentry_key=7e91748333aab3558fcaef9abd20f9c4"
 
 namespace Sentry
 
