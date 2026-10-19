@@ -472,6 +472,7 @@
           { displayText: "Français", value: "fr_FR" },
           { displayText: "Português", value: "pt_BR" },
           { displayText: "Русский", value: "ru_RU" },
+          { displayText: "Persian (Farsi)", value: "fa_IR" },
         ],
       },
     ],

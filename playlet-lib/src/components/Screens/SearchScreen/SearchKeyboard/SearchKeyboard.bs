@@ -1,7 +1,11 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
+
+const RTL_TEXT_FONT_SIZE = 26
+const RTL_TEXT_PADDING = 16
 
 function Init()
     CopyFile("libpkg:/images/icons/globe-white.png", "tmp:/globe-white.png")
@@ -14,6 +18,8 @@ function Init()
         { code: "fr_FR", name: "Français" }
         { code: "pt_BR", name: "Português" }
         { code: "ru_RU", name: "Русский" }
+        ' The system font has no Persian glyphs: the name stays in Latin script, and the keys are images
+        { code: "fa_IR", name: "Persian (Farsi)" }
     ]
 
     languageKeys = {}
@@ -21,11 +27,46 @@ function Init()
         languageKeys[lang.code] = true
     end for
     m.languageKeys = languageKeys
+
+    ' The TextEditBox draws with the system font and no shaping: Persian text is shown in this label instead,
+    ' and the box's own text is made transparent while it does.
+    textEditBox = m.top.textEditBox
+    m.rtlTextLabel = textEditBox.CreateChild("Label")
+    m.rtlTextLabel.vertAlign = "center"
+    m.textEditBoxTextColor = textEditBox.textColor
+    m.top.ObserveField("text", FuncName(OnKeyboardTextChange))
 end function
 
 function OnNodeReady() as void
     OnLanguagePreferenceChanged()
     m.preferences.ObserveFieldScoped("search.keyboard_language", FuncName(OnLanguagePreferenceChanged))
+end function
+
+function OnKeyboardTextChange() as void
+    text = m.top.text
+    textEditBox = m.top.textEditBox
+    if not RtlText.ContainsArabicScript(text)
+        if m.rtlTextShown = true
+            m.rtlTextShown = false
+            m.rtlTextLabel.text = ""
+            textEditBox.textColor = m.textEditBoxTextColor
+            textEditBox.active = true
+        end if
+        return
+    end if
+
+    if m.rtlTextShown <> true
+        m.rtlTextShown = true
+        rect = textEditBox.boundingRect()
+        m.rtlTextLabel.translation = [RTL_TEXT_PADDING, 0]
+        m.rtlTextLabel.width = rect.width - RTL_TEXT_PADDING * 2
+        m.rtlTextLabel.height = rect.height
+        m.rtlTextLabel.color = m.textEditBoxTextColor
+        textEditBox.textColor = "#80808000"
+        ' The caret would be placed for the hidden logical text, not the shaped visual text
+        textEditBox.active = false
+    end if
+    RtlText.ApplyToLabel(m.rtlTextLabel, text, invalid, false, RTL_TEXT_FONT_SIZE)
 end function
 
 function keySelected(key as string) as boolean
@@ -88,5 +129,21 @@ function SetCurrentLanguage(code as string) as void
 
     LogDebug("Setting keyboard language to", code)
     m.currentLanguage = code
+    if code = "fa_IR"
+        CopyPersianKeyIcons()
+    end if
     m.top.keyGrid.keyDefinitionUri = "libpkg:/config/search-kb-layout/" + code + ".json5"
+end function
+
+' The layout's key icons are referenced from tmp:/, like the globe icons
+function CopyPersianKeyIcons() as void
+    if m.persianKeyIconsCopied = true
+        return
+    end if
+    m.persianKeyIconsCopied = true
+
+    CreateDirectory("tmp:/kb-fa")
+    for each file in ListDir("libpkg:/images/kb-fa")
+        CopyFile("libpkg:/images/kb-fa/" + file, "tmp:/kb-fa/" + file)
+    end for
 end function

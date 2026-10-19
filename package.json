@@ -70,6 +70,7 @@
         "manifest-git-hash": "node tools/update-manifest-git-hash.js",
         "screenshot": "node tools/screenshot.js",
         "convert-images": "node tools/convert-images.js",
+        "generate-persian-kb-icons": "node tools/generate-persian-keyboard-icons.js",
         "update-rale-component": "cd tools/RALE && rm TrackerTask.xml && curl -o TrackerTask.zip https://devtools.web.roku.com/roku-advanced-layout-editor/app/TrackerTask.zip && unzip TrackerTask.zip && rm TrackerTask.zip",
         "postinstall": "cd playlet-lib && npm install && cd ../playlet-app && npm install && cd ../playground && npm install && cd ../playlet-web && npm install",
         "update-deps": "npx npm-check-updates --deep --upgrade --install always --reject typescript",

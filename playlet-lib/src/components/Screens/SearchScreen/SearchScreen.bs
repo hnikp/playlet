@@ -10,7 +10,11 @@ import "pkg:/source/utils/LoadingScreen.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/UrlUtils.bs"
+
+const SUGGESTIONS_FONT_SIZE = 22
+const SUGGESTIONS_TEXT_WIDTH = 440
 
 function Init()
     m.top.focusable = true
@@ -21,6 +25,11 @@ function Init()
     m.scrollAnimationInterpolator = m.top.FindNode("scrollAnimationInterpolator")
     m.suggestions = m.top.FindNode("suggestions")
     m.filtersButton = m.top.FindNode("filtersButton")
+
+    m.suggestionsDefaultFont = m.suggestions.textFont
+    m.suggestionsDefaultFocusedFont = m.suggestions.focusedTextFont
+    ' The raw queries behind the suggestion buttons (the buttons show them shaped for Persian)
+    m.suggestionQueries = []
 
     m.rowList.screen = m.top
 
@@ -141,10 +150,37 @@ function OnSearchSuggestions(event as object) as void
     if m.suggestions.isInFocusChain()
         buttonFocused = m.suggestions.buttonFocused
     end if
-    if buttonFocused >= m.suggestions.buttons.Count()
-        buttonFocused = m.suggestions.buttons.Count() - 1
+    if buttonFocused >= suggestions.Count()
+        buttonFocused = suggestions.Count() - 1
     end if
-    m.suggestions.buttons = suggestions
+
+    buttonTexts = []
+    hasArabicScript = false
+    for each suggestion in suggestions
+        if RtlText.ContainsArabicScript(suggestion)
+            hasArabicScript = true
+            prepared = RtlText.Prepare(suggestion, RtlText.GetMeasureFont(SUGGESTIONS_FONT_SIZE, false), SUGGESTIONS_TEXT_WIDTH, 1)
+            buttonTexts.Push(prepared.text)
+        else
+            buttonTexts.Push(suggestion)
+        end if
+    end for
+
+    ' The system font has no Persian presentation forms: switch the whole group to the bundled font
+    if hasArabicScript
+        m.suggestions.textFont = RtlText.GetLabelFont(SUGGESTIONS_FONT_SIZE, false)
+        m.suggestions.focusedTextFont = RtlText.GetLabelFont(SUGGESTIONS_FONT_SIZE, true)
+    else
+        if m.suggestionsDefaultFont <> invalid
+            m.suggestions.textFont = m.suggestionsDefaultFont
+        end if
+        if m.suggestionsDefaultFocusedFont <> invalid
+            m.suggestions.focusedTextFont = m.suggestionsDefaultFocusedFont
+        end if
+    end if
+
+    m.suggestionQueries = suggestions
+    m.suggestions.buttons = buttonTexts
     if buttonFocused <> -1
         m.suggestions.focusButton = buttonFocused
     end if
@@ -158,9 +194,12 @@ function OnFiltersButtonSelected()
     searchFilters@.BindNode()
 end function
 
-function OnSearchButtonSelected()
+function OnSearchButtonSelected() as void
     selected = m.suggestions.buttonSelected
-    text = m.suggestions.buttons[selected]
+    text = m.suggestionQueries[selected]
+    if not IsString(text)
+        return
+    end if
     SearchHistoryUtils.Save(m.preferences, text)
     Search(text)
 end function
@@ -177,10 +216,10 @@ function OnSearchButtonFocused() as void
     end if
 
     selected = m.suggestions.buttonFocused
-    if selected >= m.suggestions.buttons.Count() or selected < 0
+    if selected >= m.suggestionQueries.Count() or selected < 0
         return
     end if
-    text = m.suggestions.buttons[selected]
+    text = m.suggestionQueries[selected]
     m.keyboard.text = text
 end function
 
@@ -230,8 +269,18 @@ function Search(text as string)
         end if
     end for
 
+    ' The row label font has no Persian glyphs: switch to the bundled font for a Persian query
+    if m.defaultRowLabelFont = invalid
+        m.defaultRowLabelFont = m.rowList.rowLabelFont
+    end if
+    if RtlText.ContainsArabicScript(text)
+        m.rowList.rowLabelFont = RtlText.GetLabelFont(26, false)
+    else
+        m.rowList.rowLabelFont = m.defaultRowLabelFont
+    end if
+
     m.rowList.feeds = [{
-        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
+        "title": RtlText.Prepare(`${Tr(Locale.NavBar.Search)} - ${text}`).text
         "feedSources": [feedSource]
     }]
 end function
