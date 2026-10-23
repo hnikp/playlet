@@ -1,0 +1,11 @@
+{
+  inputHash: '860ead65452faa95e481a8b301ae9ec9',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/ff-x3.png',
+      outputHash: '001f7b2f14f4ebd9d82b77fb2d6b12f6',
+      width: 50,
+      height: 30,
+    },
+  ],
+}

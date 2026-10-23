@@ -1,0 +1,11 @@
+{
+  inputHash: 'a76074e51fbc88ec79a792c17451fec0',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/replay.png',
+      outputHash: '2d2a8b1a34a6467f2538a4d76f898dbc',
+      width: 50,
+      height: 30,
+    },
+  ],
+}

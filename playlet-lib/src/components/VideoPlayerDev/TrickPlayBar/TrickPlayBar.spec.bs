@@ -108,9 +108,9 @@ namespace Tests
             m.top.glyph = TransportController.Glyph.SkipAhead
             sg = m.top.findNode("scanGlyph")
             m.assertTrue(sg.visible)
-            m.assertTrue(sg.uri.EndsWith("icon_skipAhead.png"))
+            m.assertTrue(sg.uri.EndsWith("skip-ahead.png"))
             m.top.glyph = TransportController.Glyph.Ffx3
-            m.assertTrue(sg.uri.EndsWith("icon_FFx3.png"))
+            m.assertTrue(sg.uri.EndsWith("ff-x3.png"))
             m.top.glyph = TransportController.Glyph.None
             m.assertFalse(sg.visible)
         end function
@@ -122,7 +122,7 @@ namespace Tests
             m.top.glyph = TransportController.Glyph.Replay
             sg = m.top.findNode("scanGlyph")
             m.assertTrue(sg.visible)
-            m.assertTrue(sg.uri.EndsWith("icon_replay.png"))
+            m.assertTrue(sg.uri.EndsWith("replay.png"))
             handle = m.top.findNode("handle")
             m.assertEqual(handle.translation[1], 22.0) ' rest, NOT raised (icon sits in the resting handle)
             ' toast expiry (glyph -> none) just hides the icon; handle stays at rest

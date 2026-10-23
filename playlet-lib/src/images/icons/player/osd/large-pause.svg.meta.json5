@@ -1,0 +1,11 @@
+{
+  inputHash: '5e94de255c90db394e5dee9e63f75eac',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/large-pause.png',
+      outputHash: 'd1b740c06ed3563519ae5fb93560d472',
+      width: 80,
+      height: 80,
+    },
+  ],
+}

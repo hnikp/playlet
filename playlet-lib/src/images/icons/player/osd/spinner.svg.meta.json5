@@ -1,0 +1,11 @@
+{
+  inputHash: 'cd24e55e8e23a6e8cfb093f4d99bc548',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/spinner.png',
+      outputHash: '00e03db457651fe59387323b60250bc0',
+      width: 80,
+      height: 80,
+    },
+  ],
+}

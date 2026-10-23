@@ -1,0 +1,11 @@
+{
+  inputHash: 'e2934260f54e4d0d7a7fde8c928dd0f9',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/bullet.png',
+      outputHash: '59791515339873808f6f305d6ac64a0e',
+      width: 14,
+      height: 14,
+    },
+  ],
+}

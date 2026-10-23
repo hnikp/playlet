@@ -1,0 +1,11 @@
+{
+  inputHash: '19edcf3f8f5450e9b820ffe2a7462564',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/tile-gradient.png',
+      outputHash: '2d6ddc9faa4856409c3769e44bb149ab',
+      width: 304,
+      height: 171,
+    },
+  ],
+}

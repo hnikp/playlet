@@ -1,0 +1,11 @@
+{
+  inputHash: '11fdd9fdc7b1d991775d3c94314693d1',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/tile-footprint.png',
+      outputHash: 'a918558ec113f22893ec75bad7f1ee0e',
+      width: 250,
+      height: 141,
+    },
+  ],
+}

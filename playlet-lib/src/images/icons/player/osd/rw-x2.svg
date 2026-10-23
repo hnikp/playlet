@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="30" viewBox="0 0 50 30">
+    <text x="5" y="21" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="13" fill="#fff">2x</text>
+    <path d="M33 7l-11 8 11 8z" fill="#fff"/>
+    <path d="M43 7l-11 8 11 8z" fill="#fff"/>
+</svg>

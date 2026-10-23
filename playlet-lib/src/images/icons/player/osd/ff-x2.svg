@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="30" viewBox="0 0 50 30">
+    <path d="M6 7l11 8-11 8z" fill="#fff"/>
+    <path d="M16 7l11 8-11 8z" fill="#fff"/>
+    <text x="30" y="21" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="13" fill="#fff">2x</text>
+</svg>

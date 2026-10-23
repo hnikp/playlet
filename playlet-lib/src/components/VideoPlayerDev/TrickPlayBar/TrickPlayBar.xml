@@ -44,9 +44,9 @@
                 keyValue="[ [ 1.0, 1.0 ], [ 1.5, 1.5 ] ]"
                 fieldToInterp="playhead.scale" />
         </Animation>
-        <!-- handle: pinned at bar-center. {547,22} rest, {547,-54} active. -->
+        <!-- handle: pinned at bar-center. {547,22} rest, {547,-54} active. No artwork of its own (the OS
+             handle image is gone on Roku OS 15.3); it only carries the scan glyph. -->
         <Poster id="handle"
-            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/videoProgressBarHandle.9.png"
             translation="[547, 22]" width="50" height="30" loadDisplayMode="noScale">
             <Poster id="scanGlyph" visible="false" width="50" height="30" loadDisplayMode="noScale" />
         </Poster>
@@ -63,8 +63,8 @@
         </Label>
         <!-- LIVE bullet: shown only at the edge. -->
         <Poster id="bullet" visible="false"
-            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/icon_inline_unselected_bullet.webp"
-            translation="[1056, 24]" blendColor="0xD53E5AFF" loadDisplayMode="noScale" />
+            uri="pkg:/images/icons/player/osd/bullet.png" width="14" height="14"
+            translation="[1056, 32]" blendColor="0xD53E5AFF" loadDisplayMode="noScale" />
         <!-- LIVE badge: shown only at the edge. -->
         <Label id="liveLabel" visible="false" translation="[1080, 24]" height="30"
             text="LIVE" color="0xFEFEFEFF" horizAlign="left" vertAlign="top">

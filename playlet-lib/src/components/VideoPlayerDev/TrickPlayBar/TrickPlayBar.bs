@@ -6,7 +6,7 @@ import "pkg:/source/utils/Types.bs"
 ' Every input field is observed in Init and repaints on change, except glyph, focused and the SponsorBlock
 ' tint, which update only their own piece.
 
-const GLYPH_ASSET_BASE = "/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/"
+const GLYPH_ASSET_BASE = "pkg:/images/icons/player/osd/"
 
 function Init()
     m.trackFill = m.top.findNode("trackFill")
@@ -119,7 +119,7 @@ function RenderLiveBar() as void
             m.liveBadgeLaidOut = true
             labelW = m.liveLabel.boundingRect().width
             m.liveLabel.translation = [1144 - labelW, 24]
-            m.bullet.translation = [1144 - labelW - 24, 24]
+            m.bullet.translation = [1144 - labelW - 24, 32]
         end if
     else
         m.remainingLabel.text = FormatBarTime(m.top.liveOffsetMs / 1000.0)
@@ -166,23 +166,23 @@ end function
 
 function GlyphAssetName(glyph as integer) as string
     if glyph = TransportController.Glyph.SkipBack
-        return "icon_skipBack"
+        return "skip-back"
     else if glyph = TransportController.Glyph.SkipAhead
-        return "icon_skipAhead"
+        return "skip-ahead"
     else if glyph = TransportController.Glyph.Ffx1
-        return "icon_FFx1"
+        return "ff-x1"
     else if glyph = TransportController.Glyph.Ffx2
-        return "icon_FFx2"
+        return "ff-x2"
     else if glyph = TransportController.Glyph.Ffx3
-        return "icon_FFx3"
+        return "ff-x3"
     else if glyph = TransportController.Glyph.Rwx1
-        return "icon_RWx1"
+        return "rw-x1"
     else if glyph = TransportController.Glyph.Rwx2
-        return "icon_RWx2"
+        return "rw-x2"
     else if glyph = TransportController.Glyph.Rwx3
-        return "icon_RWx3"
+        return "rw-x3"
     else if glyph = TransportController.Glyph.Replay
-        return "icon_replay"
+        return "replay"
     end if
     return ""
 end function

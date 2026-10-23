@@ -1,0 +1,11 @@
+{
+  inputHash: 'f1e9af9cb615a6dc46d35f9efdfd83ff',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/rw-x2.png',
+      outputHash: '0b045227e8a553832c80c7289748690c',
+      width: 50,
+      height: 30,
+    },
+  ],
+}

@@ -1,0 +1,11 @@
+{
+  inputHash: 'fdd2d54f6c083fbac09a212014c9a5e4',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/osd/tile-frame.png',
+      outputHash: 'f42df04c0c8d6f3071ab620917cbccfb',
+      width: 328,
+      height: 196,
+    },
+  ],
+}
