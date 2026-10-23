@@ -1,7 +1,7 @@
 import "pkg:/source/utils/RtlText.bs"
 
 function Init()
-    m.hasArabicScript = false
+    m.useBundledFont = false
 end function
 
 function OnContentSet() as void
@@ -12,8 +12,8 @@ function OnContentSet() as void
 
     ' options can carry names (e.g. a bookmark group named after a Persian channel): shaped like other labels.
     ' A ScrollingLabel has no wrap, so the text is prepared as one line.
-    m.hasArabicScript = RtlText.ContainsArabicScript(content.title)
     prepared = RtlText.Prepare(content.title)
+    m.useBundledFont = RtlText.NeedsBundledFont(prepared.text)
     if prepared.isRtl
         m.top.findNode("label").horizAlign = "right"
     else
@@ -43,9 +43,9 @@ function OnFocusPercent()
     end if
 end function
 
-' The system fonts lack Persian glyphs: Arabic-script options use RtlText's font at the same size.
+' The system fonts lack Persian and emoji glyphs: such options use RtlText's font at the same size.
 function SetBold(bold as boolean) as void
-    if m.hasArabicScript
+    if m.useBundledFont
         m.top.font = RtlText.GetLabelFont(18, bold)
     else if bold
         m.top.font = "font:SmallestBoldSystemFont"

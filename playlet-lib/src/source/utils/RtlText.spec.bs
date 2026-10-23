@@ -16,6 +16,32 @@ namespace Tests
             m.assertEqual(RtlText.ContainsArabicScript(text), expected)
         end function
 
+        @describe("RtlText.NeedsBundledFont")
+
+        @it("Detects Arabic-script text and emoji")
+        @params("Hello world", false)
+        @params(invalid, false)
+        @params("سلام", true)
+        @params("Goal 😀", true)
+        @params("I ❤ it", true)
+        function _(text as dynamic, expected as boolean)
+            m.assertEqual(RtlText.NeedsBundledFont(text), expected)
+        end function
+
+        @describe("RtlText.CleanEmoji")
+
+        @it("Drops the parts of emoji sequences Roku can't combine")
+        function _()
+            m.assertEqual(RtlText.CleanEmoji("Hello"), "Hello")
+            m.assertEqual(RtlText.CleanEmoji(invalid), "")
+            m.assertEqual(RtlText.CleanEmoji("I " + Chr(&h2764) + Chr(&hFE0F) + " it"), "I " + Chr(&h2764) + " it")
+            m.assertEqual(RtlText.CleanEmoji(Chr(&h1F44D) + Chr(&h1F3FD)), Chr(&h1F44D))
+            m.assertEqual(RtlText.CleanEmoji("Iran " + Chr(&h1F1EE) + Chr(&h1F1F7)), "Iran ")
+            m.assertEqual(RtlText.CleanEmoji(Chr(&h1F468) + Chr(&h200D) + Chr(&h1F469)), Chr(&h1F468) + Chr(&h1F469))
+            ' a ZWNJ/ZWJ in Persian text is kept
+            m.assertEqual(RtlText.CleanEmoji("می" + Chr(&h200C) + "روم 😀"), "می" + Chr(&h200C) + "روم 😀")
+        end function
+
         @describe("RtlText.Chars")
 
         @it("Splits a string into characters")

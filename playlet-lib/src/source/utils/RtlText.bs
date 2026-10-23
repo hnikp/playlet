@@ -5,7 +5,8 @@ import "pkg:/source/utils/Types.bs"
 '   1. Shape: replaces Arabic letters with their contextual presentation forms (U+FB50-FEFF)
 '   2. ToVisual: reorders a line into visual (left-to-right drawing) order, a simplified Unicode Bidi Algorithm
 '   3. Wrap: breaks logical text into lines before reordering, so multi-line labels keep the right line order
-' The bundled Vazirmatn font covers the presentation forms needed by Persian and Arabic.
+' The bundled Vazirmatn font covers the presentation forms needed by Persian and Arabic. It also has Noto Emoji's
+' black-and-white emoji (tools/build-emoji-fonts.py): the system font has none, so labels with emoji use it too.
 namespace RtlText
     const FONT_REGULAR_URI = "pkg:/fonts/Vazirmatn-Regular.ttf"
     const FONT_BOLD_URI = "pkg:/fonts/Vazirmatn-Bold.ttf"
@@ -35,6 +36,74 @@ namespace RtlText
 
     function IsArabicScriptCodePoint(c as integer) as boolean
         return (c >= &h0600 and c <= &h06FF) or (c >= &h0750 and c <= &h077F) or (c >= &h08A0 and c <= &h08FF) or (c >= &hFB50 and c <= &hFDFF) or (c >= &hFE70 and c <= &hFEFF)
+    end function
+
+    ' Single code point emoji, as added to the bundled font by tools/build-emoji-fonts.py
+    function IsEmojiCodePoint(c as integer) as boolean
+        return (c >= &h1F000 and c <= &h1FAFF) or (c >= &h2600 and c <= &h27BF) or (c >= &h2300 and c <= &h23FF) or (c >= &h2B00 and c <= &h2BFF)
+    end function
+
+    ' Parts of emoji sequences that Roku can't combine: variation selectors, skin tones, regional indicators (flags)
+    ' and tags. They are dropped, as are joiners between emoji: a family shows as its members.
+    function IsEmojiSequenceCodePoint(c as integer) as boolean
+        return (c >= &hFE00 and c <= &hFE0F) or (c >= &h1F3FB and c <= &h1F3FF) or (c >= &h1F1E6 and c <= &h1F1FF) or (c >= &hE0020 and c <= &hE007F)
+    end function
+
+    function ContainsEmoji(text as dynamic) as boolean
+        if not IsString(text)
+            return false
+        end if
+        for each char in Chars(text)
+            if IsEmojiCodePoint(Asc(char))
+                return true
+            end if
+        end for
+        return false
+    end function
+
+    ' True if the text needs the bundled font: Arabic-script letters or emoji. Call it on cleaned text (CleanEmoji).
+    function NeedsBundledFont(text as dynamic) as boolean
+        if not IsString(text)
+            return false
+        end if
+        for each char in Chars(text)
+            c = Asc(char)
+            if IsArabicScriptCodePoint(c) or IsEmojiCodePoint(c)
+                return true
+            end if
+        end for
+        return false
+    end function
+
+    ' Removes the parts of emoji sequences that would show as boxes (see IsEmojiSequenceCodePoint).
+    function CleanEmoji(text as dynamic) as string
+        if not IsString(text)
+            return ""
+        end if
+        characters = Chars(text)
+        found = false
+        for each char in characters
+            c = Asc(char)
+            if IsEmojiSequenceCodePoint(c) or IsEmojiCodePoint(c)
+                found = true
+                exit for
+            end if
+        end for
+        if not found
+            return text
+        end if
+
+        out = []
+        previousIsEmoji = false
+        for each char in characters
+            c = Asc(char)
+            if IsEmojiSequenceCodePoint(c) or (c = ZWJ and previousIsEmoji)
+                continue for
+            end if
+            out.Push(char)
+            previousIsEmoji = IsEmojiCodePoint(c)
+        end for
+        return out.Join("")
     end function
 
     ' True if the first strong character of the text is right-to-left.
@@ -331,7 +400,7 @@ namespace RtlText
     ' Shapes + wraps + reorders text for display. Returns { text, isRtl } ready to assign to a label.
     ' font (an roFont, see GetMeasureFont) is optional: without it the text is not wrapped.
     function Prepare(text as dynamic, font = invalid as object, maxWidth = 0 as integer, maxLines = 1 as integer) as object
-        text = ValidString(text)
+        text = CleanEmoji(text)
         if not ContainsArabicScript(text)
             return { text: text, isRtl: false }
         end if
@@ -359,29 +428,29 @@ namespace RtlText
     end function
 
     ' For text prepared in a task thread and shown later in a label: returns
-    ' { text, isRtl, hasArabicScript }. When hasArabicScript is true, the label should use
+    ' { text, isRtl, useBundledFont }. When useBundledFont is true, the label should use
     ' GetLabelFont(size, bold) and horizAlign "right" if isRtl.
     function PrepareForLabel(text as dynamic, size as integer, bold as boolean, width as integer, maxLines as integer) as object
-        text = ValidString(text)
-        if not ContainsArabicScript(text)
-            return { text: text, isRtl: false, hasArabicScript: false }
+        text = CleanEmoji(text)
+        if not NeedsBundledFont(text)
+            return { text: text, isRtl: false, useBundledFont: false }
         end if
         ' see ApplyToLabel for the slack
         prepared = Prepare(text, GetMeasureFont(size, bold), Int(width * 0.95), maxLines)
-        prepared.hasArabicScript = true
+        prepared.useBundledFont = true
         return prepared
     end function
 
-    ' Sets text on a Label, switching to the Persian-capable font for Arabic-script text and back to
+    ' Sets text on a Label, switching to the bundled font for Arabic-script text or emoji and back to
     ' defaultFont otherwise. The label's width and maxLines are honored.
     ' defaultFont is a Font node or a font name ("font:SmallestSystemFont"); size is the font size to use for the
-    ' Persian-capable font (0 = the size of the defaultFont node).
+    ' bundled font (0 = the size of the defaultFont node).
     function ApplyToLabel(label as object, text as dynamic, defaultFont as dynamic, bold = false as boolean, size = 0 as integer) as void
         if label = invalid
             return
         end if
-        text = ValidString(text)
-        if not ContainsArabicScript(text)
+        text = CleanEmoji(text)
+        if not NeedsBundledFont(text)
             SetDefaultFont(label, defaultFont)
             label.horizAlign = "left"
             label.text = text
@@ -420,11 +489,11 @@ namespace RtlText
     ' Sets a label's text, using text prepared in a task thread (PrepareForLabel) when available, so the render
     ' thread doesn't shape/wrap. Without prepared text, it is prepared here (ApplyToLabel).
     function SetLabelText(label as object, text as dynamic, prepared as dynamic, defaultFont as dynamic, size as integer, bold as boolean) as void
-        if not IsAssociativeArray(prepared) or not prepared.DoesExist("hasArabicScript")
+        if not IsAssociativeArray(prepared) or not prepared.DoesExist("useBundledFont")
             ApplyToLabel(label, text, defaultFont, bold, size)
             return
         end if
-        if prepared.hasArabicScript = true
+        if prepared.useBundledFont = true
             SetRtlFont(label, size, bold)
             if prepared.isRtl = true
                 label.horizAlign = "right"
@@ -436,7 +505,7 @@ namespace RtlText
         end if
         SetDefaultFont(label, defaultFont)
         label.horizAlign = "left"
-        label.text = ValidString(text)
+        label.text = CleanEmoji(text)
     end function
 
     ' Vazirmatn's lines are much taller than the system font's (~38px vs ~28px at size 18), which pushes the

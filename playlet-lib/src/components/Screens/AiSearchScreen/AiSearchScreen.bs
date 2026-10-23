@@ -259,15 +259,15 @@ function BuildAiFeeds(data as object) as object
         })
     end if
 
-    ' The row label font has no Persian glyphs: when a title needs them, all rows use the bundled font
-    hasArabicScript = false
+    ' The row label font has no Persian or emoji glyphs: when a title needs them, all rows use the bundled font
+    useBundledFont = false
     for each suggestedQuery in ValidArray(data.queries)
         suggestedQuery = ValidString(suggestedQuery).Trim()
         if suggestedQuery = ""
             continue for
         end if
-        if RtlText.ContainsArabicScript(suggestedQuery)
-            hasArabicScript = true
+        if RtlText.NeedsBundledFont(RtlText.CleanEmoji(suggestedQuery))
+            useBundledFont = true
         end if
         aiFeeds.Push({
             "title": RtlText.Prepare(suggestedQuery).text
@@ -286,7 +286,7 @@ function BuildAiFeeds(data as object) as object
     if m.defaultRowLabelFont = invalid
         m.defaultRowLabelFont = m.rowList.rowLabelFont
     end if
-    if hasArabicScript
+    if useBundledFont
         m.rowList.rowLabelFont = RtlText.GetLabelFont(26, false)
     else
         m.rowList.rowLabelFont = m.defaultRowLabelFont
@@ -383,14 +383,14 @@ function LoadAiHistory()
     queries = SearchHistoryUtils.GetAllSaved(m.preferences, SearchHistoryUtils.AI_SEARCH_HISTORY_KEY)
     shownQueries = []
     buttonTexts = []
-    hasArabicScript = false
+    useBundledFont = false
     for each savedQuery in queries
         if not IsString(savedQuery) or savedQuery = ""
             continue for
         end if
         shownQueries.Push(savedQuery)
-        if RtlText.ContainsArabicScript(savedQuery)
-            hasArabicScript = true
+        if RtlText.NeedsBundledFont(RtlText.CleanEmoji(savedQuery))
+            useBundledFont = true
             prepared = RtlText.Prepare(savedQuery, RtlText.GetMeasureFont(AI_HISTORY_FONT_SIZE, false), AI_HISTORY_TEXT_WIDTH, 1)
             buttonTexts.Push(prepared.text)
         else
@@ -401,8 +401,8 @@ function LoadAiHistory()
         end if
     end for
 
-    ' The system font has no Persian presentation forms: switch the whole group to the bundled font
-    if hasArabicScript
+    ' The system font has no Persian presentation forms or emoji: switch the whole group to the bundled font
+    if useBundledFont
         m.history.textFont = RtlText.GetLabelFont(AI_HISTORY_FONT_SIZE, false)
         m.history.focusedTextFont = RtlText.GetLabelFont(AI_HISTORY_FONT_SIZE, true)
     else
