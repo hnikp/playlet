@@ -20,7 +20,7 @@ function OnNodeReady()
     m.ignoreUnfocusedItemFocus = false
     m.itemsList.observeField("focusedChild", FuncName(OnListFirstFocus))
 
-    ' Keep every item: the ones with a preference (Bookmarks, Remote, Info) are only shown when switched on
+    ' Keep every item: the ones with a preference (AI Search, History, Bookmarks, Remote, Info) are only shown when switched on
     m.allItems = []
     content = m.top.content
     if content <> invalid

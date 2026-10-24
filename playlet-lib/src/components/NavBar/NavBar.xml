@@ -48,17 +48,17 @@
                     translation="[16, 65]" />
             </Poster>
 
-            <!-- 11 rows (every optional page on) must end inside the screen: 125 + 11*48 + 10*4 = 693.
-                 Rows are 48 high so the 32px icons (y 8) and the 40px profile icon (y 4) stay centred. -->
+            <!-- 12 rows (every optional page on) must end inside the screen: 125 + 12*44 + 11*4 = 697.
+                 Rows are 44 high so the 32px icons (y 6) and the 40px profile icon (y 2) stay centred. -->
             <MarkupList
                 id="ItemsList"
-                itemSize="[190,48]"
+                itemSize="[190,44]"
                 itemComponentName="NavBarComponent"
                 focusFootprintBitmapUri=""
                 focusBitmapUri="pkg:/images/white.$$RES$$.9.png"
                 focusBitmapBlendColor="0xFF1C30FF"
                 vertFocusAnimationStyle="floatingFocus"
-                numRows="11"
+                numRows="12"
                 scrollSpeed="99999"
                 itemSpacing="[0, 4]"
                 translation="[13, 125]">

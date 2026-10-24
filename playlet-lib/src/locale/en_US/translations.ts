@@ -1605,6 +1605,10 @@
         <translation>Original</translation>
     </message>
     <message>
+        <source>History</source>
+        <translation>History</translation>
+    </message>
+    <message>
         <source>Chess</source>
         <translation>Chess</translation>
     </message>
@@ -1831,6 +1835,14 @@
     <message>
         <source>Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama</source>
         <translation>Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama</translation>
+    </message>
+    <message>
+        <source>Show History page</source>
+        <translation>Show History page</translation>
+    </message>
+    <message>
+        <source>Show the History page (your watch history) in the menu</source>
+        <translation>Show the History page (your watch history) in the menu</translation>
     </message>
     <message>
         <source>Show AI Search page</source>

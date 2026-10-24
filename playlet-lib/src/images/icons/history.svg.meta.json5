@@ -1,0 +1,11 @@
+{
+  inputHash: 'de19b53bb76aec2c730a2ec8ef5ddb6a',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/history.png',
+      width: 48,
+      height: 48,
+      outputHash: '31f3f2249f2be310321e18c17362e3ee',
+    },
+  ],
+}

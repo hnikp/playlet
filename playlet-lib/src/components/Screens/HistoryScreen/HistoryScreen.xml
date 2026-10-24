@@ -1,0 +1,4 @@
+<!-- The History page: the account's watch history (history_layout.yaml).
+     A separate component because the nav bar creates one screen per component name. -->
+<component name="HistoryScreen" extends="FeedScreen">
+</component>

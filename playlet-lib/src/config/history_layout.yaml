@@ -1,0 +1,9 @@
+# Rows of the History page (FeedScreen): the profile's watch history (needs a login, like the
+# Home screen's "Watch history" row).
+- title: Watch history
+  id: watch_history
+  feedSources:
+    - id: inv_auth_history
+      title: Watch history
+      apiType: Invidious
+      endpoint: watch_history

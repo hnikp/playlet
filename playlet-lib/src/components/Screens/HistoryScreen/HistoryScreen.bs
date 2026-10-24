@@ -1,0 +1,9 @@
+import "pkg:/source/utils/Locale.bs"
+
+' Runs after FeedScreen's Init
+function Init()
+    m.top.feedFile = "libpkg:/config/history_layout.yaml"
+    m.top.headerTitle = Tr(Locale.NavBar.History)
+    m.top.headerIcon = "pkg:/images/icons/history.png"
+    m.top.accentColor = "#4A90D9FF"
+end function

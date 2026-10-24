@@ -168,6 +168,13 @@
         defaultValue: true,
       },
       {
+        displayText: "Show History page",
+        key: "browsing.show_history",
+        description: "Show the History page (your watch history) in the menu",
+        type: "boolean",
+        defaultValue: true,
+      },
+      {
         displayText: "Show Bookmarks page",
         key: "browsing.show_bookmarks",
         description: "Show the Bookmarks page in the menu",

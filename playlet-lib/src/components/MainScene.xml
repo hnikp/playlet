@@ -14,7 +14,7 @@
                 <AppRoot id="AppRoot">
                     <AppScreens id="AppScreens" />
                     <NavBar id="NavBar"
-                        initialFocus="2"
+                        initialFocus="3"
                         appController="bind:/AppController"
                         screensContainer="bind:../AppScreens">
                         <ContentNode role="content">
@@ -26,6 +26,11 @@
                                 screen="SearchScreen"
                                 text="Search"
                                 icon="pkg:/images/icons/search.png" />
+                            <NavBarItemContent
+                                screen="AiSearchScreen"
+                                preference="browsing.show_ai_search"
+                                text="AI Search"
+                                icon="pkg:/images/icons/ai.png" />
                             <NavBarItemContent
                                 screen="HomeScreen"
                                 text="Home"
@@ -43,10 +48,10 @@
                                 text="Sport"
                                 icon="pkg:/images/icons/sport.png" />
                             <NavBarItemContent
-                                screen="AiSearchScreen"
-                                preference="browsing.show_ai_search"
-                                text="AI Search"
-                                icon="pkg:/images/icons/ai.png" />
+                                screen="HistoryScreen"
+                                preference="browsing.show_history"
+                                text="History"
+                                icon="pkg:/images/icons/history.png" />
                             <NavBarItemContent
                                 screen="BookmarksScreen"
                                 preference="browsing.show_bookmarks"
