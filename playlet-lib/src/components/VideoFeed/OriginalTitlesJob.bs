@@ -1,0 +1,12 @@
+import "pkg:/source/utils/OriginalTitles.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Looks up the original titles of videos already shown (input.videoIds, see
+' InvidiousService.ApplyStoredOriginalTitles) and puts them in their content nodes (input.nodes).
+' input.cancellation: optional, e.g. the row list's dispose (the job has no callback to cancel).
+@job("OriginalTitlesJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+    titles = OriginalTitles.Lookup(ValidArray(input.videoIds), input.invidious, input.cancellation)
+    OriginalTitles.SetNodeTitles(input.nodes, titles)
+end function

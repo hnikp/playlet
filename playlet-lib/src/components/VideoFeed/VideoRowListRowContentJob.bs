@@ -1,4 +1,6 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
@@ -144,6 +146,8 @@ function ExecuteJob() as void
                 rowList.someContentReady = true
             end if
 
+            QueueOriginalTitlesJob(response.missingOriginalTitles, itemNodes, rowList, invidiousNode)
+
             totalfetchedItems += addedItemCount
             if totalfetchedItems > 3
                 exit while
@@ -155,6 +159,38 @@ function ExecuteJob() as void
         JobError(error)
         return
     end try
+end function
+
+' The row is shown with the stored original titles: the others are looked up meanwhile, in their own job so the
+' row can load its next page (see InvidiousService.ToRequestResult)
+function QueueOriginalTitlesJob(videoIds as dynamic, itemNodes as object, rowList as object, invidiousNode as object) as void
+    if not IsArray(videoIds) or videoIds.Count() = 0
+        return
+    end if
+    missing = {}
+    for each videoId in videoIds
+        missing[videoId] = true
+    end for
+    nodes = []
+    for each itemNode in itemNodes
+        if itemNode.type = "video" and missing.DoesExist(itemNode.videoId)
+            nodes.Push(itemNode)
+        end if
+    end for
+    if nodes.Count() = 0
+        return
+    end if
+
+    cancellation = invalid
+    if rowList.hasField("dispose")
+        cancellation = CancellationUtils.CreateCancellation(rowList, "dispose", true)
+    end if
+    JobSystem.QueueJob(rowList.jobQueue, Jobs.OriginalTitlesJob, {
+        invidious: invidiousNode
+        nodes: nodes
+        videoIds: videoIds
+        cancellation: cancellation
+    })
 end function
 
 function RemovePlaceHolderItems(contentNode as object)

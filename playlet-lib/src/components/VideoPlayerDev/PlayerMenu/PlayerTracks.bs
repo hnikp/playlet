@@ -6,8 +6,9 @@ import "pkg:/source/utils/Types.bs"
 ' Audio and caption tracks of the player menu (PlayerMenuController), in the VideoPlayerDev scope.
 
 ' The device starts on the track in its own language, so a Spanish video with an English auto-dub plays the dub.
-' Unless playback.audio_track is "device", switch to the original audio (the "main" track, see GetAudioTracks) once per stream;
-' a track picked later in the menu is left alone.
+' Unless playback.audio_track is "device", switch to the original audio (the "main" track, see GetAudioTracks) once per stream.
+' A track picked in the menu wins instead: it is re-applied when the stream restarts for a quality change (SwitchQuality).
+' The decision waits until the device names its current track; once made (or a track is picked), nothing switches on its own.
 function PreferOriginalAudio() as void
     if not m.originalAudioPending
         return
@@ -16,24 +17,62 @@ function PreferOriginalAudio() as void
     if tracks.Count() = 0
         return
     end if
-    m.originalAudioPending = false
-    if m.top.preferences["playback.audio_track"] = "device"
-        return
-    end if
-    original = tracks[0]
-    if not DashTrackRoles.IsOriginalAudioTrackId(original.id)
-        ' no track is marked original (e.g. a single-language video)
+    target = GetPreferredAudioTrackId(tracks)
+    if target = ""
+        m.originalAudioPending = false
         return
     end if
     current = ""
     if m.top.hasField("currentAudioTrack")
         current = ValidString(m.top.currentAudioTrack)
     end if
-    if current = "" or current = original.id
+    if current = ""
+        ' not known yet: retried on the next currentAudioTrack change (OnCurrentAudioTrackChange)
         return
     end if
-    LogInfo("Switching to the original audio from", current)
-    SetAudioTrack(original.id)
+    m.originalAudioPending = false
+    if current = target
+        return
+    end if
+    LogInfo("Switching audio track from", current)
+    SetAudioTrack(target)
+end function
+
+' The track PreferOriginalAudio should play: the one picked in the menu for this video if the stream has it,
+' else the original audio. "" leaves the device's track alone.
+function GetPreferredAudioTrackId(tracks as object) as string
+    if m.userAudioTrack <> ""
+        for each track in tracks
+            if track.id = m.userAudioTrack
+                return track.id
+            end if
+        end for
+        return ""
+    end if
+    if m.top.preferences["playback.audio_track"] = "device"
+        return ""
+    end if
+    original = tracks[0]
+    if not DashTrackRoles.IsOriginalAudioTrackId(original.id)
+        ' no track is marked original (e.g. a single-language video)
+        return ""
+    end if
+    return original.id
+end function
+
+' A track picked in the menu: remembered for this video, and never overridden by PreferOriginalAudio
+function PickAudioTrack(trackId as string) as void
+    if trackId = ""
+        return
+    end if
+    m.originalAudioPending = false
+    m.userAudioTrack = trackId
+    m.userAudioVideoId = ""
+    content = m.top.content
+    if content <> invalid
+        m.userAudioVideoId = ValidString(content.videoId)
+    end if
+    SetAudioTrack(trackId)
 end function
 
 ' The stream's audio tracks, as the device lists them (one per language/variant in the DASH manifest; the name is
@@ -77,15 +116,13 @@ function SetAudioTrack(trackId as string) as void
         return
     end if
     LogInfo("Switching audio track to", trackId)
-    if not m.audioTrackObserved and m.top.hasField("currentAudioTrack")
-        m.audioTrackObserved = true
-        m.top.ObserveField("currentAudioTrack", FuncName(OnCurrentAudioTrackChange))
-    end if
     m.top.audioTrack = trackId
 end function
 
-' The switch is applied asynchronously: refresh the menu when it lands
+' A switch is applied asynchronously: refresh the menu when it lands. A stream's starting track may also be named
+' only after its tracks are listed: PreferOriginalAudio waits for it.
 function OnCurrentAudioTrackChange() as void
+    PreferOriginalAudio()
     RefreshPlayerMenuState()
 end function
 

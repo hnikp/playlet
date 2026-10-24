@@ -3,6 +3,7 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/OriginalTitles.bs"
 import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -50,12 +51,8 @@ function ExecuteJob() as void
         liveNow: metadata.liveNow = true
     }
 
-    ' the details are up: the related row's titles can take the extra requests
-    service.ApplyOriginalTitles(metadata.recommendedVideos, JobGetCancellation())
-    if JobIsCancelled()
-        JobCancel()
-        return
-    end if
+    ' the related row is shown with the stored original titles, the others are looked up after
+    missingIds = service.ApplyStoredOriginalTitles(metadata.recommendedVideos)
 
     instance = service.GetInstance()
     related = CreateObject("roSGNode", "ContentNode")
@@ -68,10 +65,21 @@ function ExecuteJob() as void
             row.appendChild(node)
         end if
     end for
-    if row.getChildCount() > 0
-        related.appendChild(row)
-        videoView.related = related
+    if row.getChildCount() = 0
+        return
     end if
+    related.appendChild(row)
+    videoView.related = related
+
+    if missingIds.Count() = 0
+        return
+    end if
+    titles = OriginalTitles.Lookup(missingIds, invidiousNode, JobGetCancellation())
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+    OriginalTitles.SetNodeTitles(row.getChildren(-1, 0), titles)
 end function
 
 function GetPublishedText(metadata as object) as string

@@ -1,6 +1,7 @@
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ContentFilters.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -10,66 +11,146 @@ import "pkg:/source/utils/Types.bs"
 ' answers with the original one, a small request per video.
 ' Titles are kept in one store shared by the jobs (the Invidious node's originalTitles field, saved to a single
 ' cachefs file), so a video is looked up once a week, and a video without an answer (private, embedding disabled)
-' once a day.
+' once a day. When lookups time out or fail (offline, rate limited), all of them pause for a while (the Invidious
+' node's originalTitlesPausedUntil field).
+' Feeds only take the stored titles (ApplyStored) and look the others up after they are shown (OriginalTitlesJob).
 namespace OriginalTitles
     const OEMBED_URL = "https://www.youtube.com/oembed"
     const PARALLEL_REQUESTS = 10
     const ATTEMPT_TIMEOUT_MS = 4000
     const TITLE_MAX_AGE_SECONDS = 604800
     const MISS_MAX_AGE_SECONDS = 86400
+    const PAUSE_SECONDS = 600
     const MAX_ENTRIES = 2000
-    ' the file is rewritten once this many new titles came in (and when the store is loaded/pruned)
+    ' the file is rewritten once this many new titles came in (and when the store is pruned)
     const SAVE_EVERY = 25
     const STORE_FILE = "cachefs:/original_titles_v1.json"
 
+    ' Only with the built-in backend: whoever picked an Invidious instance doesn't want requests to YouTube.
+    function IsEnabled(preferences as object) as boolean
+        if preferences = invalid or preferences["browsing.original_titles"] = false
+            return false
+        end if
+        backend = preferences["backend.selected"]
+        return backend = invalid or backend = "playlet"
+    end function
+
     ' Replaces the title of each video in items (Invidious API items, or a video's metadata) with its original
-    ' title. Videos without one keep theirs. storeNode: the node with the originalTitles field (Invidious).
-    ' Blocks: task threads only.
+    ' title, looking up the ones not stored. Videos without one keep theirs. storeNode: the node with the
+    ' originalTitles field (Invidious). Blocks: task threads only.
     function Apply(items as object, storeNode as object, cancellation = invalid as dynamic) as void
+        missingIds = ApplyStored(items, storeNode)
+        titles = Lookup(missingIds, storeNode, cancellation)
+        if titles.Count() = 0
+            return
+        end if
+        for each video in GetVideos(items)
+            title = titles[video.videoId]
+            if IsString(title) and title <> ""
+                video.title = title
+            end if
+        end for
+    end function
+
+    ' Apply without requests: only the stored titles. Returns the ids of the videos to look up (none while
+    ' lookups are paused).
+    function ApplyStored(items as object, storeNode as object) as object
+        missingIds = []
+        videos = GetVideos(items)
+        if videos.Count() = 0
+            return missingIds
+        end if
+
+        store = LoadStore(storeNode)
+        nowSeconds = TimeUtils.NowSeconds()
+        paused = IsPaused(GetPausedUntil(storeNode), nowSeconds)
+        missingDict = {}
+        for each video in videos
+            entry = store.entries[video.videoId]
+            if IsFresh(entry, nowSeconds)
+                if entry[0] <> ""
+                    video.title = entry[0]
+                end if
+            else if not paused and not missingDict.DoesExist(video.videoId)
+                missingDict[video.videoId] = true
+                missingIds.Push(video.videoId)
+            end if
+        end for
+        return missingIds
+    end function
+
+    ' Looks the titles up and stores them. Returns { videoId: title }, "" for the videos without an answer.
+    ' Blocks: task threads only.
+    function Lookup(videoIds as object, storeNode as object, cancellation = invalid as dynamic) as object
+        if videoIds.Count() = 0 or IsPaused(GetPausedUntil(storeNode), TimeUtils.NowSeconds())
+            return {}
+        end if
+
+        fetched = Fetch(videoIds, cancellation)
+        nowSeconds = TimeUtils.NowSeconds()
+        if ShouldPause(fetched.failures, fetched.answers) and storeNode <> invalid
+            storeNode.originalTitlesPausedUntil = nowSeconds + PAUSE_SECONDS
+        end if
+
+        titles = fetched.titles
+        if titles.Count() > 0
+            ' read again: another job may have added titles meanwhile
+            store = LoadStore(storeNode)
+            for each videoId in titles
+                store.entries[videoId] = [titles[videoId], nowSeconds]
+            end for
+            store.unsaved += titles.Count()
+            SaveStore(storeNode, store, nowSeconds)
+        end if
+        return titles
+    end function
+
+    ' Puts titles ({ videoId: title }, from Lookup) in the video content nodes shown with the translated ones,
+    ' with their label text prepared like InvidiousContent.ToVideoContentNode's.
+    function SetNodeTitles(nodes as dynamic, titles as object) as void
+        if titles.Count() = 0
+            return
+        end if
+        for each node in ValidArray(nodes)
+            if node.type <> "video"
+                continue for
+            end if
+            title = titles[node.videoId]
+            if IsString(title) and title <> "" and title <> node.title
+                ' both at once: a row cell drawn in between would get a title and a prepared text that don't match
+                node.setFields({
+                    title: title
+                    titlePrepared: RtlText.PrepareForLabel(title, 18, true, 350, 2)
+                })
+            end if
+        end for
+    end function
+
+    function GetVideos(items as dynamic) as object
         videos = []
         for each item in ValidArray(items)
             if IsAssociativeArray(item) and ContentFilters.IsVideoItem(item) and IsString(item.videoId) and item.videoId <> ""
                 videos.Push(item)
             end if
         end for
-        if videos.Count() = 0
-            return
+        return videos
+    end function
+
+    function GetPausedUntil(storeNode as object) as integer
+        if storeNode = invalid
+            return 0
         end if
+        return ValidInt(storeNode.originalTitlesPausedUntil)
+    end function
 
-        store = LoadStore(storeNode)
-        nowSeconds = TimeUtils.NowSeconds()
-        missingIds = []
-        missingDict = {}
-        for each video in videos
-            entry = store.entries[video.videoId]
-            if IsFresh(entry, nowSeconds)
-                continue for
-            end if
-            if not missingDict.DoesExist(video.videoId)
-                missingDict[video.videoId] = true
-                missingIds.Push(video.videoId)
-            end if
-        end for
+    function IsPaused(pausedUntilSeconds as integer, nowSeconds as integer) as boolean
+        return nowSeconds < pausedUntilSeconds
+    end function
 
-        if missingIds.Count() > 0
-            fetched = Fetch(missingIds, cancellation)
-            if fetched.Count() > 0
-                ' read again: another job may have added titles meanwhile
-                store = LoadStore(storeNode)
-                for each videoId in fetched
-                    store.entries[videoId] = [fetched[videoId], nowSeconds]
-                end for
-                store.unsaved += fetched.Count()
-                SaveStore(storeNode, store, nowSeconds)
-            end if
-        end if
-
-        for each video in videos
-            entry = store.entries[video.videoId]
-            if IsArray(entry) and IsString(entry[0]) and entry[0] <> ""
-                video.title = entry[0]
-            end if
-        end for
+    ' Lookups pause when at least as many requests failed (timeout, network, server error, rate limit) as were
+    ' answered: one slow request among answered ones is only retried at the next load.
+    function ShouldPause(failures as integer, answers as integer) as boolean
+        return failures > 0 and failures >= answers
     end function
 
     ' entry: [title, savedAtSeconds]; title "" for a video without an answer
@@ -85,10 +166,12 @@ namespace OriginalTitles
     end function
 
     ' Looks the titles up, PARALLEL_REQUESTS at a time (a new request starts as soon as one ends).
-    ' Returns { videoId: title }, "" for the videos without an answer; a timeout or a cancelled request isn't
-    ' remembered.
+    ' Returns { titles: { videoId: title }, answers, failures }: "" for the videos without an answer; a failed or
+    ' cancelled request isn't in titles, and a cancelled one isn't counted.
     function Fetch(videoIds as object, cancellation as dynamic) as object
         titles = {}
+        answers = 0
+        failures = 0
         port = CreateObject("roMessagePort")
         active = []
         nextIndex = 0
@@ -121,12 +204,15 @@ namespace OriginalTitles
                     title = ParseTitle(response)
                     if title <> "" or IsMissingVideo(response)
                         titles[active[i].videoId] = title
+                        answers += 1
+                    else if not response.IsSuccess() and not response.IsCancelled()
+                        failures += 1
                     end if
                     active.Delete(i)
                 end if
             end for
         end while
-        return titles
+        return { titles: titles, answers: answers, failures: failures }
     end function
 
     function CreateRequest(videoId as string) as object
@@ -184,8 +270,7 @@ namespace OriginalTitles
     end function
 
     function SaveStore(storeNode as object, store as object, nowSeconds as integer) as void
-        if store.entries.Count() > MAX_ENTRIES
-            Prune(store.entries, nowSeconds)
+        if store.entries.Count() > MAX_ENTRIES and Prune(store.entries, nowSeconds) > 0
             store.unsaved = SAVE_EVERY
         end if
         if store.unsaved >= SAVE_EVERY
@@ -198,21 +283,29 @@ namespace OriginalTitles
         end if
     end function
 
-    ' Drops the expired entries, then, if still too many, the older half
-    function Prune(entries as object, nowSeconds as integer) as void
+    ' Drops the expired entries, then, if still more than maxEntries, keeps the newest three quarters of
+    ' maxEntries. Returns how many were dropped.
+    function Prune(entries as object, nowSeconds as integer, maxEntries = MAX_ENTRIES as integer) as integer
+        removed = 0
         for each videoId in entries.Keys()
             if not IsFresh(entries[videoId], nowSeconds)
                 entries.Delete(videoId)
+                removed += 1
             end if
         end for
-        if entries.Count() <= MAX_ENTRIES
-            return
+        if entries.Count() <= maxEntries
+            return removed
         end if
-        cutoff = nowSeconds - TITLE_MAX_AGE_SECONDS / 2
-        for each videoId in entries.Keys()
-            if ValidInt(entries[videoId][1]) < cutoff
-                entries.Delete(videoId)
-            end if
+
+        bySavedAt = []
+        for each videoId in entries
+            bySavedAt.Push({ videoId: videoId, savedAt: ValidInt(entries[videoId][1]) })
         end for
+        bySavedAt.SortBy("savedAt", "r")
+        for i = maxEntries * 3 \ 4 to bySavedAt.Count() - 1
+            entries.Delete(bySavedAt[i].videoId)
+            removed += 1
+        end for
+        return removed
     end function
 end namespace

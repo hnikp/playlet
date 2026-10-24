@@ -67,24 +67,29 @@ namespace SensitivePreferences
     end function
 
     ' Adds an empty value for each sensitive key (BOUND_TO) whose endpoint the payload changes, unless the payload
-    ' also brings a new value for it. currentValues: the preferences as they are now. Returns the same payload.
+    ' also brings a new value for it (a non-empty string that is not a mask: any other value is overwritten, since
+    ' the preferences node would reject it and keep the old key). currentValues: the preferences as they are now.
+    ' Returns the keys that were cleared, so the web app knows to reload them.
     function ClearValuesBoundToChanges(payload as object, currentValues as object) as object
+        cleared = []
         if not IsAssociativeArray(payload) or not IsAssociativeArray(currentValues)
-            return payload
+            return cleared
         end if
         bindings = BOUND_TO
         for each sensitiveKey in bindings
-            if payload.DoesExist(sensitiveKey) and not IsMasked(payload[sensitiveKey])
+            newValue = payload[sensitiveKey]
+            if IsString(newValue) and newValue <> "" and not IsMasked(newValue)
                 continue for
             end if
             for each boundKey in bindings[sensitiveKey]
                 if payload.DoesExist(boundKey) and ValidString(payload[boundKey]) <> ValidString(currentValues[boundKey])
                     payload[sensitiveKey] = ""
+                    cleared.Push(sensitiveKey)
                     exit for
                 end if
             end for
         end for
-        return payload
+        return cleared
     end function
 
     ' Removes from the payload the sensitive values that are a mask (like the one GET returned),

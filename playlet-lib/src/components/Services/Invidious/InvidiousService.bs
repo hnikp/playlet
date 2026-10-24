@@ -180,8 +180,8 @@ namespace Invidious
             if Invidious.NeedsLiveStreamInfo(metadata)
                 Innertube.GetLiveStreamInfo(metadata, metadata.adaptiveFormats, 0, invalid, cancellation)
             end if
-            ' only where the title is shown from the metadata (the video page): playback and previews keep the feed's
-            ' title, and an extra request there would delay the start
+            ' only the video page asks (it shows the title from the metadata): an extra request would delay
+            ' playback's start, so VideoContentJob keeps the feed's title and takes the stored ones only
             if OptionUtils.Get(options, "originalTitles") = true
                 m.ApplyOriginalTitles([metadata], cancellation)
             end if
@@ -190,12 +190,21 @@ namespace Invidious
         end function
 
         ' Video titles in their original language instead of YouTube's translation (pref browsing.original_titles,
-        ' see OriginalTitles.Apply). Blocks: task threads only.
+        ' built-in backend only, see OriginalTitles.Apply). Looks up the titles not stored. Blocks: task threads only.
         function ApplyOriginalTitles(items as object, cancellation = invalid as dynamic) as void
-            if m.GetPreferences()["browsing.original_titles"] = false
+            if not OriginalTitles.IsEnabled(m.GetPreferences())
                 return
             end if
             OriginalTitles.Apply(items, m.invidiousNode, cancellation)
+        end function
+
+        ' ApplyOriginalTitles without requests: the stored titles only. Returns the ids of the videos to look up
+        ' later (see OriginalTitlesJob).
+        function ApplyStoredOriginalTitles(items as object) as object
+            if not OriginalTitles.IsEnabled(m.GetPreferences())
+                return []
+            end if
+            return OriginalTitles.ApplyStored(items, m.invidiousNode)
         end function
 
         ' Comments (or replies, with a replies continuation) of a video. sortBy is "top" or "new".
@@ -446,12 +455,16 @@ namespace Invidious
                 }
             end if
 
+            ' stored titles only: the feed doesn't wait for lookups (the caller can start them, OriginalTitlesJob)
+            missingOriginalTitles = []
             if IsArray(result.items)
-                m.ApplyOriginalTitles(result.items, cancellation)
+                missingOriginalTitles = m.ApplyStoredOriginalTitles(result.items)
             end if
             return {
                 success: true
                 result: result
+                ' ids of the videos whose original title isn't known yet
+                missingOriginalTitles: missingOriginalTitles
             }
         end function
 

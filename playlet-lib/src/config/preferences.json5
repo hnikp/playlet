@@ -198,7 +198,7 @@
       {
         displayText: "Original video titles",
         key: "browsing.original_titles",
-        description: "Show video titles in their original language instead of YouTube's automatic translation",
+        description: "Show video titles in their original language instead of YouTube's automatic translation (Playlet backend only)",
         type: "boolean",
         defaultValue: true,
       },

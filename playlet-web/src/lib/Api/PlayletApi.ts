@@ -1,4 +1,5 @@
 import { getHost } from "lib/Api/Host";
+import { userPreferencesStore } from "lib/Stores";
 
 const CsrfHeader = "X-Playlet";
 
@@ -59,7 +60,14 @@ export class PlayletApi {
 
     static async saveUserPreference(key, value) {
         const response = await PlayletApi.send("PUT", `${PlayletApi.host()}/api/preferences`, { [key]: value });
-        return await response;
+        // Saving some preferences (like the AI provider) clears others on the TV (like the API key): reload them
+        if (response.status === 200) {
+            const body = await response.json().catch(() => ({}));
+            if (Array.isArray(body.cleared) && body.cleared.length > 0) {
+                userPreferencesStore.set(await PlayletApi.getUserPreferences());
+            }
+        }
+        return response;
     }
 
     static async getProfiles() {

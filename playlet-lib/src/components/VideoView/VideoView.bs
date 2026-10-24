@@ -126,7 +126,8 @@ function OnDetailsJobDone(event as object) as void
     if not info.success and not info.cancel
         LogWarnNoTelemetry("Video details:", info.error)
         ' nothing arrived (offline, unavailable video...): say so instead of leaving the page blank under the title
-        if m.top.details = invalid
+        details = m.top.details
+        if not IsAssociativeArray(details) or details.Count() = 0
             RtlText.ApplyToLabel(m.descriptionLabel, Tr(Locale.Dialogs.FailedToLoadVideoDetails), "font:SmallestSystemFont")
         end if
     end if
@@ -134,7 +135,7 @@ end function
 
 function OnDetailsSet() as void
     details = m.top.details
-    if details = invalid
+    if not IsAssociativeArray(details) or details.Count() = 0
         return
     end if
 

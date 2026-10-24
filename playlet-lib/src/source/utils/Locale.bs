@@ -373,7 +373,7 @@ namespace Locale
         ShowHistoryPage = "Show History page"
         ShowHistoryPageDescription = "Show the History page (your watch history) in the menu"
         OriginalVideoTitles = "Original video titles"
-        OriginalVideoTitlesDescription = "Show video titles in their original language instead of YouTube's automatic translation"
+        OriginalVideoTitlesDescription = "Show video titles in their original language instead of YouTube's automatic translation (Playlet backend only)"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"

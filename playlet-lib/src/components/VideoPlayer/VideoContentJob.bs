@@ -75,8 +75,12 @@ function ExecuteJob() as void
         return
     end if
 
+    ' The metadata comes with YouTube's translated title: a stored original title replaces it (no request, it
+    ' would delay the start), else the content's title stays (from a feed: already the original, see OriginalTitles)
+    translatedTitle = metadata.title
+    service.ApplyStoredOriginalTitles([metadata])
     title = metadata.title
-    if not StringUtils.IsNullOrEmpty(title)
+    if not StringUtils.IsNullOrEmpty(title) and (title <> translatedTitle or StringUtils.IsNullOrEmpty(contentNode.title))
         contentNode.title = title
     end if
 

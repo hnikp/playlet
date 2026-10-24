@@ -50,24 +50,67 @@ namespace Tests
                 old: ["Old", now - 86400 * 8]
                 missOld: ["", now - 86400 * 2]
             }
-            OriginalTitles.Prune(entries, now)
+            m.assertEqual(OriginalTitles.Prune(entries, now), 2)
             m.assertEqual(entries.Keys(), ["fresh"])
+        end function
+
+        @it("keeps the newest three quarters of the cap when still over it")
+        function _()
+            now = 1000000
+            entries = {}
+            for i = 1 to 10
+                entries["v" + i.ToStr()] = ["Title", now - i * 60]
+            end for
+            m.assertEqual(OriginalTitles.Prune(entries, now, 8), 4)
+            m.assertEqual(entries.Count(), 6)
+            m.assertTrue(entries.DoesExist("v1"))
+            m.assertTrue(entries.DoesExist("v6"))
+            m.assertFalse(entries.DoesExist("v7"))
+            m.assertFalse(entries.DoesExist("v10"))
+        end function
+
+        @it("drops nothing under the cap")
+        function _()
+            now = 1000000
+            entries = { a: ["A", now], b: ["", now] }
+            m.assertEqual(OriginalTitles.Prune(entries, now, 8), 0)
+            m.assertEqual(entries.Count(), 2)
+        end function
+
+        @describe("OriginalTitles.IsEnabled")
+
+        @it("is on with the built-in backend only")
+        function _()
+            m.assertTrue(OriginalTitles.IsEnabled({ "browsing.original_titles": true, "backend.selected": "playlet" }))
+            m.assertTrue(OriginalTitles.IsEnabled({}))
+            m.assertFalse(OriginalTitles.IsEnabled({ "browsing.original_titles": false, "backend.selected": "playlet" }))
+            m.assertFalse(OriginalTitles.IsEnabled({ "browsing.original_titles": true, "backend.selected": "invidious" }))
+            m.assertFalse(OriginalTitles.IsEnabled(invalid))
+        end function
+
+        @describe("OriginalTitles.ShouldPause")
+
+        @it("pauses when as many lookups failed as were answered")
+        function _()
+            m.assertFalse(OriginalTitles.ShouldPause(0, 0))
+            m.assertFalse(OriginalTitles.ShouldPause(0, 10))
+            m.assertFalse(OriginalTitles.ShouldPause(1, 9))
+            m.assertTrue(OriginalTitles.ShouldPause(5, 5))
+            m.assertTrue(OriginalTitles.ShouldPause(10, 0))
+        end function
+
+        @it("is paused until the given time")
+        function _()
+            m.assertTrue(OriginalTitles.IsPaused(1000, 999))
+            m.assertFalse(OriginalTitles.IsPaused(1000, 1000))
+            m.assertFalse(OriginalTitles.IsPaused(0, 1000))
         end function
 
         @describe("OriginalTitles.Apply")
 
         @it("uses stored titles without a request, and leaves other items alone")
         function _()
-            now = CreateObject("roDateTime").AsSeconds()
-            storeNode = CreateObject("roSGNode", "Node")
-            storeNode.addField("originalTitles", "assocarray", false)
-            storeNode.originalTitles = {
-                entries: {
-                    abc: ["Título original", now]
-                    priv: ["", now]
-                }
-                unsaved: 0
-            }
+            storeNode = m.StoreNode()
             items = [
                 { type: "video", videoId: "abc", title: "Translated title" }
                 { type: "video", videoId: "priv", title: "Private video" }
@@ -77,6 +120,58 @@ namespace Tests
             m.assertEqual(items[0].title, "Título original")
             m.assertEqual(items[1].title, "Private video")
             m.assertEqual(items[2].title, "A playlist")
+        end function
+
+        @describe("OriginalTitles.ApplyStored")
+
+        @it("returns the videos to look up, none while paused")
+        function _()
+            storeNode = m.StoreNode()
+            items = [
+                { type: "video", videoId: "abc", title: "Translated title" }
+                { type: "video", videoId: "new1", title: "New" }
+                { type: "video", videoId: "new1", title: "New again" }
+                { type: "video", videoId: "priv", title: "Private video" }
+            ]
+            m.assertEqual(OriginalTitles.ApplyStored(items, storeNode), ["new1"])
+            m.assertEqual(items[0].title, "Título original")
+            m.assertEqual(items[1].title, "New")
+
+            storeNode.originalTitlesPausedUntil = CreateObject("roDateTime").AsSeconds() + 60
+            m.assertEqual(OriginalTitles.ApplyStored(items, storeNode), [])
+        end function
+
+        @describe("OriginalTitles.SetNodeTitles")
+
+        @it("sets the title and its prepared text of video nodes only")
+        function _()
+            video = CreateObject("roSGNode", "VideoContentNode")
+            video.type = "video"
+            video.videoId = "abc"
+            video.title = "Translated title"
+            playlist = CreateObject("roSGNode", "PlaylistContentNode")
+            playlist.type = "playlist"
+            playlist.videoId = "abc"
+            playlist.title = "A playlist"
+            OriginalTitles.SetNodeTitles([video, playlist], { abc: "Título original" })
+            m.assertEqual(video.title, "Título original")
+            m.assertEqual(video.titlePrepared.text, "Título original")
+            m.assertEqual(playlist.title, "A playlist")
+        end function
+
+        function StoreNode() as object
+            now = CreateObject("roDateTime").AsSeconds()
+            storeNode = CreateObject("roSGNode", "Node")
+            storeNode.addField("originalTitles", "assocarray", false)
+            storeNode.addField("originalTitlesPausedUntil", "integer", false)
+            storeNode.originalTitles = {
+                entries: {
+                    abc: ["Título original", now]
+                    priv: ["", now]
+                }
+                unsaved: 0
+            }
+            return storeNode
         end function
 
     end class

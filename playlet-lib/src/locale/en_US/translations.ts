@@ -1857,8 +1857,8 @@
         <translation>Original video titles</translation>
     </message>
     <message>
-        <source>Show video titles in their original language instead of YouTube&apos;s automatic translation</source>
-        <translation>Show video titles in their original language instead of YouTube&apos;s automatic translation</translation>
+        <source>Show video titles in their original language instead of YouTube&apos;s automatic translation (Playlet backend only)</source>
+        <translation>Show video titles in their original language instead of YouTube&apos;s automatic translation (Playlet backend only)</translation>
     </message>
     <message>
         <source>AI Search</source>

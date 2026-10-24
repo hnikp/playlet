@@ -40,12 +40,24 @@ namespace Tests
             m.assertEqual(payload["ai_search.api_key"], "", "a mask is not a new key")
         end function
 
+        @it("clears the key when the value that comes along is not a new key")
+        function _()
+            current = { "ai_search.provider": "gemini", "ai_search.base_url": "" }
+            for each badValue in [0, true, invalid, {}, [], ""]
+                payload = { "ai_search.provider": "custom", "ai_search.api_key": badValue }
+                cleared = SensitivePreferences.ClearValuesBoundToChanges(payload, current)
+                m.assertEqual(payload["ai_search.api_key"], "")
+                m.assertEqual(cleared, ["ai_search.api_key"])
+            end for
+        end function
+
         @it("keeps the key when nothing it is bound to changes, or a new key comes along")
         function _()
             current = { "ai_search.provider": "gemini", "ai_search.base_url": "" }
             payload = { "ai_search.provider": "gemini", "ai_search.model": "flash" }
-            SensitivePreferences.ClearValuesBoundToChanges(payload, current)
+            cleared = SensitivePreferences.ClearValuesBoundToChanges(payload, current)
             m.assertFalse(payload.DoesExist("ai_search.api_key"))
+            m.assertEqual(cleared, [])
 
             payload = { "ai_search.provider": "groq", "ai_search.api_key": "gsk-new" }
             SensitivePreferences.ClearValuesBoundToChanges(payload, current)

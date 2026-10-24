@@ -17,9 +17,12 @@ function InitializePlayerMenu() as void
     m.playerMenu = m.top.findNode("playerMenu")
     m.playerComments = invalid
     m.qualityOverride = ""
-    m.audioTrackObserved = false
-    ' set for each stream (StartVideoContentJob): PreferOriginalAudio runs once its audio tracks are listed
+    ' set for each stream (StartVideoContentJob): PreferOriginalAudio runs once its audio tracks and the
+    ' device's current track are known
     m.originalAudioPending = false
+    ' the audio track picked in the menu, and the video it was picked for: kept across quality restarts
+    m.userAudioTrack = ""
+    m.userAudioVideoId = ""
     ' the device's caption mode before the menu turned captions on, restored when they're turned off
     m.savedCaptionMode = ""
     if m.playerMenu = invalid
@@ -31,6 +34,10 @@ function InitializePlayerMenu() as void
     ' the device lists the audio and caption tracks a moment after playback starts: keep an open menu up to date
     if m.top.hasField("availableAudioTracks")
         m.top.ObserveField("availableAudioTracks", FuncName(OnAvailableAudioTracks))
+    end if
+    ' the device applies a track switch asynchronously, and may name its starting track after listing the tracks
+    if m.top.hasField("currentAudioTrack")
+        m.top.ObserveField("currentAudioTrack", FuncName(OnCurrentAudioTrackChange))
     end if
     if m.top.hasField("availableSubtitleTracks")
         m.top.ObserveField("availableSubtitleTracks", FuncName(RefreshPlayerMenuState))
@@ -232,7 +239,7 @@ function OnPlayerMenuAction() as void
         SetCaptionTrack(ValidString(action.value))
         RefreshPlayerMenuState()
     else if id = "audio"
-        SetAudioTrack(ValidString(action.value))
+        PickAudioTrack(ValidString(action.value))
         RefreshPlayerMenuState()
     end if
 end function
