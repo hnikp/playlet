@@ -1,12 +1,28 @@
-# Rows of the Chess page (FeedScreen): live chess streams, the top recent videos
+# Rows of the Chess page (FeedScreen): this week's most viewed chess videos from
+# any channel, live chess streams, the top recent videos
 # of all the channels below, then the latest uploads of each well-known chess
 # channel. Channel names are not translated.
-# "Live now" uses ChessLiveHandler (instead of the search endpoint's handler) to
-# drop non-chess games (Auto Chess, Magic Chess...).
+# "Hot this week" (ChessHotHandler) and "Live now" (ChessLiveHandler) use (instead of the search endpoint's handler) to
+# drop non-chess games and shows (Auto Chess, Magic Chess, magnetic chess...), shorts and
+# repeated titles.
 # "Top recent" (ranked_channel_videos, RankedChannelVideosHandler) fetches the
 # latest videos of each channel in "channels" and ranks them with FeedRanking:
 # views relative to the channel's usual reach, decayed by age. Keep its channel
 # list in sync with the channel rows.
+- title: Hot this week
+  id: chess_hot
+  feedSources:
+    - id: inv_search_chess_hot
+      title: Hot this week
+      apiType: Invidious
+      endpoint: search
+      responseHandler: ChessHotHandler
+      queryParams:
+        q: chess
+        date: week
+        sort: views
+        type: video
+
 - title: Live now
   id: chess_live
   feedSources:
@@ -47,8 +63,14 @@
           name: "agadmator"
         - ucid: UCHP9CdeguNUI-_nBv_UXBhw
           name: "Daniel Naroditsky"
-        - ucid: UCAM1MwY63aDinDWKVSfTs0g
+        - ucid: UCXy10-NEFGxQ3b4NVrzHw1Q
           name: "Eric Rosen"
+        - ucid: UCvXxdkt1d8Uu08NAQP2IUTw
+          name: "chessbrah"
+        - ucid: UCIsEhwBMPkRHsEgqYAPQHsA
+          name: "ChessBase India"
+        - ucid: UC4liTXRJ-XknH6OtKz-tOuw
+          name: "ChessDojo"
 
 - title: FIDE
   id: chess_channel_UC9B47GnzCRFHTT1BIBWvStQ
@@ -159,13 +181,49 @@
         sort_by: newest
 
 - title: Eric Rosen
-  id: chess_channel_UCAM1MwY63aDinDWKVSfTs0g
+  id: chess_channel_UCXy10-NEFGxQ3b4NVrzHw1Q
   feedSources:
-    - id: inv_channel_videos_UCAM1MwY63aDinDWKVSfTs0g
+    - id: inv_channel_videos_UCXy10-NEFGxQ3b4NVrzHw1Q
       title: Eric Rosen
       apiType: Invidious
       endpoint: channel_videos
       pathParams:
-        ucid: UCAM1MwY63aDinDWKVSfTs0g
+        ucid: UCXy10-NEFGxQ3b4NVrzHw1Q
+      queryParams:
+        sort_by: newest
+
+- title: chessbrah
+  id: chess_channel_UCvXxdkt1d8Uu08NAQP2IUTw
+  feedSources:
+    - id: inv_channel_videos_UCvXxdkt1d8Uu08NAQP2IUTw
+      title: chessbrah
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCvXxdkt1d8Uu08NAQP2IUTw
+      queryParams:
+        sort_by: newest
+
+- title: ChessBase India
+  id: chess_channel_UCIsEhwBMPkRHsEgqYAPQHsA
+  feedSources:
+    - id: inv_channel_videos_UCIsEhwBMPkRHsEgqYAPQHsA
+      title: ChessBase India
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UCIsEhwBMPkRHsEgqYAPQHsA
+      queryParams:
+        sort_by: newest
+
+- title: ChessDojo
+  id: chess_channel_UC4liTXRJ-XknH6OtKz-tOuw
+  feedSources:
+    - id: inv_channel_videos_UC4liTXRJ-XknH6OtKz-tOuw
+      title: ChessDojo
+      apiType: Invidious
+      endpoint: channel_videos
+      pathParams:
+        ucid: UC4liTXRJ-XknH6OtKz-tOuw
       queryParams:
         sort_by: newest

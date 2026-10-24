@@ -737,6 +737,18 @@ namespace Invidious
             return result
         end function
 
+        ' The Chess page's "Hot this week" row: a search for this week's most viewed chess videos, with the
+        ' same filter as ChessLiveHandler but keeping videos that aren't live.
+        function ChessHotHandler(context as object) as object
+            result = m.DefaultHandler(context)
+            if result = invalid or not IsArray(result.items)
+                return result
+            end if
+
+            result.items = Invidious.FilterChessItems(result.items, false)
+            return result
+        end function
+
         ' An "AI picks" row cell (AiSearchScreen): a search for "<title> <channel>" reduced to the single
         ' best video, the first whose channel matches feedSource.aiPick.channel (case-insensitive, either
         ' one containing the other), else the first video. A failed search gives no item instead of an
@@ -1120,15 +1132,22 @@ namespace Invidious
 
     ' Whether a /videos response is a live video still missing the live timeline the
     ' innertube path gets: the built-in instance's responses carry it already.
-    ' Keeps the live videos of a chess search, dropping shorts and games that aren't chess but have
-    ' it in their name (matched in the title or the author, case-insensitive).
+    ' Keeps the live videos of a chess search (see FilterChessItems).
     function FilterChessLiveItems(items as object) as object
-        notChessRegex = CreateObject("roRegex", "auto ?chess|magic ?chess|chess ?rush|dota underlords|teamfight|\btft\b", "i")
+        return FilterChessItems(items, true)
+    end function
+
+    ' Keeps the videos of a chess search (only live ones if liveOnly), dropping shorts, repeated titles,
+    ' and games or shows that aren't chess but have it in their name (matched in the title or the author,
+    ' case-insensitive).
+    function FilterChessItems(items as object, liveOnly as boolean) as object
+        notChessRegex = CreateObject("roRegex", "auto ?chess|magic ?chess|chess ?rush|dota underlords|teamfight|\btft\b|bouncing chess|magnetic chess|analy[sz]ed like chess", "i")
         shortsRegex = CreateObject("roRegex", "#shorts?\b", "i")
 
         filtered = []
+        seenTitles = {}
         for each item in ValidArray(items)
-            if not IsAssociativeArray(item) or not ValidBool(item.liveNow)
+            if not IsAssociativeArray(item) or (liveOnly and not ValidBool(item.liveNow))
                 continue for
             end if
             if item.type <> invalid and item.type <> "video"
@@ -1143,6 +1162,11 @@ namespace Invidious
             if ValidBool(item.isShort) or shortsRegex.IsMatch(title)
                 continue for
             end if
+            titleKey = LCase(title.Trim())
+            if titleKey <> "" and seenTitles.DoesExist(titleKey)
+                continue for
+            end if
+            seenTitles[titleKey] = true
 
             filtered.Push(item)
         end for

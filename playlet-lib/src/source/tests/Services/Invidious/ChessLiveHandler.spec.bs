@@ -86,6 +86,30 @@ namespace Tests
             m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
         end function
 
+        @it("drops shows that only have chess in their name and repeated titles")
+        function _()
+            items = [
+                m.LiveVideo("show", "Hank Interrogates Mike Analysed like Chess | Breaking Bad", "Analysed Like Chess")
+                m.LiveVideo("game", "One flick and you're hooked! This bouncing chess game is so much fun!#")
+                m.LiveVideo("ok", "Candidates 2026 Round 5")
+                m.LiveVideo("again", "Candidates 2026 round 5 ")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
+        end function
+
+        @describe("Invidious.FilterChessItems")
+
+        @it("keeps videos that aren't live unless liveOnly")
+        function _()
+            items = [
+                { type: "video", videoId: "past", title: "To my friend, Daniel Naroditsky", author: "GothamChess" }
+                { type: "video", videoId: "magic", title: "Magic Chess tier list" }
+                m.LiveVideo("live", "Chess live")
+            ]
+            m.assertEqual(m.VideoIds(Invidious.FilterChessItems(items, false)), ["past", "live"])
+            m.assertEqual(m.VideoIds(Invidious.FilterChessItems(items, true)), ["live"])
+        end function
+
         @describe("Invidious.InvidiousService.ChessLiveHandler")
 
         @it("filters an Invidious search response (an array)")
