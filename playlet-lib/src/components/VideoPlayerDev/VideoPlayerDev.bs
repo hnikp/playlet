@@ -569,6 +569,15 @@ end function
 function ActivateButton(index as integer) as void
     if index = PlayerCoordinatorLogic.PlayerButton.PlayPause
         TogglePlayPause()
+    else if index = PlayerCoordinatorLogic.PlayerButton.Audio
+        OpenPlayerMenuShortcut("audio")
+        return
+    else if index = PlayerCoordinatorLogic.PlayerButton.Captions
+        OpenPlayerMenuShortcut("captions")
+        return
+    else if index = PlayerCoordinatorLogic.PlayerButton.Comments
+        OpenPlayerMenuShortcut("comments")
+        return
     else if index = PlayerCoordinatorLogic.PlayerButton.Menu
         OpenPlayerMenu()
         return

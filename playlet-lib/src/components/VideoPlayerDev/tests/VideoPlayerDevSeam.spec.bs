@@ -25,6 +25,13 @@ namespace Tests
             return m.top.callFunc("TestSnapshot")
         end function
 
+        ' From play/pause (the leftmost button), Right until the button at index is highlighted
+        function PressRightTo(index as integer) as void
+            for i = 1 to index
+                m.top.callFunc("TestKey", RemoteKeys.Right, true)
+            end for
+        end function
+
         @describe("device seam")
 
         @it("mock stands up the real coordinator (Init + OnNodeReady ran against the faked device)")
@@ -607,9 +614,8 @@ namespace Tests
 
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight the menu button
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
-            m.assertEqual(m.Snap().focusedButton, 2)
+            m.PressRightTo(PlayerCoordinatorLogic.PlayerButton.Minimize) ' highlight minimize
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize)
 
             m.top.callFunc("TestKey", RemoteKeys.Ok, true)
             after = m.Snap()
@@ -896,12 +902,11 @@ namespace Tests
             m.assertTrue(snap.chromeShown)
             m.assertEqual(snap.focusedButton, 0)
             ' highlight minimize, drop to the bar, come back up: still minimize.
-            m.top.callFunc("TestKey", RemoteKeys.Right, true)
-            m.top.callFunc("TestKey", RemoteKeys.Right, true)
-            m.assertEqual(m.Snap().focusedButton, 2)
+            m.PressRightTo(PlayerCoordinatorLogic.PlayerButton.Minimize)
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize)
             m.top.callFunc("TestKey", RemoteKeys.Down, true)
             m.top.callFunc("TestKey", RemoteKeys.Up, true)
-            m.assertEqual(m.Snap().focusedButton, 2, "the highlight survives the round-trip")
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize, "the highlight survives the round-trip")
             ' hide the chrome (scrub from the bar tier, then commit) -> the NEXT reveal starts at play/pause.
             m.top.callFunc("TestKey", RemoteKeys.Down, true)
             m.top.callFunc("TestKey", RemoteKeys.Left, true)
@@ -934,10 +939,10 @@ namespace Tests
         function _()
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> menu
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> audio
             m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons
-            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' menu -> play/pause
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' audio -> play/pause
             m.assertEqual(m.Snap().nudgeCount, 0, "every press moved focus; none may pulse")
         end function
 
@@ -948,12 +953,11 @@ namespace Tests
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause (leftmost)
             m.top.callFunc("TestKey", RemoteKeys.Left, true) ' clamped at the left end
             m.assertEqual(m.Snap().nudgeCount, 1)
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> menu
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> minimize (rightmost)
+            m.PressRightTo(PlayerCoordinatorLogic.PlayerButton.Minimize) ' -> minimize (rightmost)
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' clamped at the right end
             snap = m.Snap()
             m.assertEqual(snap.nudgeCount, 2)
-            m.assertEqual(snap.focusedButton, 2, "the clamp held the highlight at the end")
+            m.assertEqual(snap.focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize, "the clamp held the highlight at the end")
         end function
 
         ' Down at the bar tier (the bottom, and the default on reveal) is a no-op: consumed, no nudge.
@@ -1008,13 +1012,12 @@ namespace Tests
         function _()
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight the menu button
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
-            m.assertEqual(m.Snap().focusedButton, 2)
+            m.PressRightTo(PlayerCoordinatorLogic.PlayerButton.Minimize) ' highlight minimize
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize)
             m.top.callFunc("TestKey", RemoteKeys.Play, true) ' must pause, not minimize
             snap = m.Snap()
             m.assertEqual(snap.control, VideoControl.Pause, "Play paused the (playing) video")
-            m.assertEqual(snap.focusedButton, 2, "the highlight is untouched")
+            m.assertEqual(snap.focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize, "the highlight is untouched")
         end function
 
         ' Each arm is asserted: a state that silently failed to arm makes every row that follows vacuous.

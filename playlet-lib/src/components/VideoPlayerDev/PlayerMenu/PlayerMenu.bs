@@ -11,6 +11,7 @@ function Init()
     m.list = m.top.findNode("list")
     m.list.ObserveField("itemSelected", FuncName(OnItemSelected))
     m.page = "" ' "" = root, else the id of the sub page (quality, speed, captions)
+    m.directPage = false ' the sub page was opened directly (an overlay button), without the root page
     m.rootFocus = 0
     m.items = []
     m.subscriptionKnown = false
@@ -25,13 +26,17 @@ function OnFocusChange() as void
     end if
 end function
 
-' The player opened the menu: show the root page, and fetch the subscription state
+' The player opened the menu: show the root page (or the requested sub page), and fetch the subscription state
 function OnOpen() as void
-    m.page = ""
+    m.page = ValidString(m.top.page)
+    m.directPage = m.page <> ""
     m.rootFocus = 0
     m.subscriptionKnown = false
     Render()
     m.list.jumpToItem = 0
+    if m.directPage
+        JumpToSelected()
+    end if
 
     CancelSubscriptionJobs()
     state = ValidAssociativeArray(m.top.state)
@@ -53,8 +58,8 @@ function Render() as void
         state.isSubscribed = invalid
     end if
 
+    RtlText.ApplyToLabel(m.titleLabel, ValidString(state.title), "font:MediumBoldSystemFont", true, 24)
     if m.page = ""
-        RtlText.ApplyToLabel(m.titleLabel, ValidString(state.title), "font:MediumBoldSystemFont", true, 24)
         items = PlayerMenuItems.RootItems(state)
     else
         items = PlayerMenuItems.SubItems(m.page, state)
@@ -84,9 +89,13 @@ function OnItemSelected() as void
     end if
 
     if m.page <> ""
-        ' a value in a sub page: apply it and go back to the root page
+        ' a value in a sub page: apply it and go back to the root page (or close, if the page was opened directly)
         m.top.action = { id: item.id, value: item.value }
-        ShowRoot()
+        if m.directPage
+            m.top.closed = true
+        else
+            ShowRoot()
+        end if
         return
     end if
 
@@ -100,17 +109,21 @@ function OnItemSelected() as void
         m.rootFocus = m.list.itemFocused
         m.page = item.id
         Render()
-        ' focus the current value
-        for i = 0 to m.items.Count() - 1
-            if m.items[i].selected = true
-                m.list.jumpToItem = i
-                exit for
-            end if
-        end for
+        JumpToSelected()
         return
     end if
 
     m.top.action = { id: item.id }
+end function
+
+' Focuses the current value of a sub page
+function JumpToSelected()
+    for i = 0 to m.items.Count() - 1
+        if m.items[i].selected = true
+            m.list.jumpToItem = i
+            exit for
+        end if
+    end for
 end function
 
 function ShowRoot()
@@ -151,7 +164,9 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     if press
         if key = RemoteKeys.Back or key = RemoteKeys.Left
-            if m.page <> ""
+            if m.page <> "" and m.directPage
+                m.top.closed = true
+            else if m.page <> ""
                 ShowRoot()
             else if key = RemoteKeys.Back
                 m.top.closed = true

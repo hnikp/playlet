@@ -4,6 +4,9 @@
 <component name="PlayerMenu" extends="Group" includes="AutoBind,Focus">
     <interface>
         <field id="state" type="assocarray" onChange="Render" />
+        <!-- the page to open on: "" = root, or a sub page id (audio, captions...) opened directly from an overlay
+             button; picking a value or going back then closes the menu instead of showing the root page -->
+        <field id="page" type="string" />
         <field id="open" type="boolean" alwaysNotify="true" onChange="OnOpen" />
         <field id="action" type="assocarray" alwaysNotify="true" />
         <field id="closed" type="boolean" alwaysNotify="true" />

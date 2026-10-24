@@ -9,9 +9,13 @@ const SCREEN_CENTER_X = 640
 const TRACKBAR_RIGHT_X = 1212
 
 function Init()
-    ' Focus order MUST match PlayerCoordinatorLogic.PlayerButton (playPause=0, menu=1, minimize=2).
+    ' Focus order MUST match PlayerCoordinatorLogic.PlayerButton (playPause=0, audio=1, captions=2, comments=3,
+    ' menu=4, minimize=5).
     m.buttons = [
         m.top.findNode("PlayPauseButton")
+        m.top.findNode("AudioButton")
+        m.top.findNode("CaptionsButton")
+        m.top.findNode("CommentsButton")
         m.top.findNode("MenuButton")
         m.top.findNode("MinimizeButton")
     ]

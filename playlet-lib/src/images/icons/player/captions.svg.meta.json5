@@ -1,0 +1,11 @@
+{
+  inputHash: 'd039369ec4347b9cbd57b87604a034ba',
+  outputs: [
+    {
+      outputFilePath: 'images/icons/player/captions.png',
+      outputHash: '04df37732781977d46f04a304fef8a51',
+      width: 64,
+      height: 64,
+    },
+  ],
+}

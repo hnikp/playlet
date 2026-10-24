@@ -30,12 +30,12 @@ namespace Tests
 
         @it("exposes its button count and auto-positions the clusters (centered + right-aligned)")
         function _()
-            m.assertEqual(m.top.buttonCount, 3)
-            ' one 42px button in the center cluster: centered on 640 -> x=619. Two in the right cluster (menu +
-            ' minimize, 42+20+42=104px) right-aligned to 1212 -> x=1108. Pins the ClusterWidth math so a drift in
-            ' BUTTON_WIDTH/itemSpacings can't silently de-center.
+            m.assertEqual(m.top.buttonCount, 6)
+            ' one 42px button in the center cluster: centered on 640 -> x=619. Five in the right cluster (audio,
+            ' captions, comments, menu, minimize: 5*42+4*20=290px) right-aligned to 1212 -> x=922. Pins the
+            ' ClusterWidth math so a drift in BUTTON_WIDTH/itemSpacings can't silently de-center.
             m.assertEqual(m.top.findNode("CenterCluster").translation[0], 619.0)
-            m.assertEqual(m.top.findNode("RightCluster").translation[0], 1108.0)
+            m.assertEqual(m.top.findNode("RightCluster").translation[0], 922.0)
         end function
 
         @describe("virtual-focus highlight")
@@ -57,9 +57,15 @@ namespace Tests
             m.assertFalse(m.top.findNode("MinimizeButton").focused)
             m.top.focusedIndex = 1
             m.assertFalse(m.top.findNode("PlayPauseButton").focused)
+            m.assertTrue(m.top.findNode("AudioButton").focused)
+            m.top.focusedIndex = 2
+            m.assertTrue(m.top.findNode("CaptionsButton").focused)
+            m.top.focusedIndex = 3
+            m.assertTrue(m.top.findNode("CommentsButton").focused)
+            m.top.focusedIndex = 4
             m.assertTrue(m.top.findNode("MenuButton").focused)
             m.assertFalse(m.top.findNode("MinimizeButton").focused)
-            m.top.focusedIndex = 2
+            m.top.focusedIndex = 5
             m.assertFalse(m.top.findNode("MenuButton").focused)
             m.assertTrue(m.top.findNode("MinimizeButton").focused)
         end function
@@ -69,7 +75,7 @@ namespace Tests
         @it("nudge pulses the focused button's animation")
         function _()
             m.top.rowFocused = true
-            m.top.focusedIndex = 2
+            m.top.focusedIndex = 5
             anim = m.top.findNode("MinimizeButton").findNode("nudgeAnim")
             anim.control = "stop"
             m.top.nudge = true
@@ -79,7 +85,7 @@ namespace Tests
         @it("a nudge with an out-of-range focusedIndex is a safe no-op")
         function _()
             m.top.rowFocused = true
-            m.top.focusedIndex = 5
+            m.top.focusedIndex = 6 ' one past minimize
             playAnim = m.top.findNode("PlayPauseButton").findNode("nudgeAnim")
             minimizeAnim = m.top.findNode("MinimizeButton").findNode("nudgeAnim")
             playAnim.control = "stop"
