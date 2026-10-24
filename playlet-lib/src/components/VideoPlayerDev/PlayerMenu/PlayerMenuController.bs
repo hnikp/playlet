@@ -42,7 +42,7 @@ function OnAvailableAudioTracks() as void
 end function
 
 ' The device starts on the track in its own language, so a Spanish video with an English auto-dub plays the dub.
-' With playback.original_audio, switch to the original audio (the "main" track, see GetAudioTracks) once per stream;
+' Unless playback.audio_track is "device", switch to the original audio (the "main" track, see GetAudioTracks) once per stream;
 ' a track picked later in the menu is left alone.
 function PreferOriginalAudio() as void
     if not m.originalAudioPending
@@ -53,7 +53,7 @@ function PreferOriginalAudio() as void
         return
     end if
     m.originalAudioPending = false
-    if m.top.preferences["playback.original_audio"] = false
+    if m.top.preferences["playback.audio_track"] = "device"
         return
     end if
     original = tracks[0]
@@ -304,6 +304,10 @@ function OpenPlayerComments() as void
     m.playerComments.videoId = videoId
     m.playerComments.ObserveField("closed", FuncName(OnPlayerCommentsClosed))
     NodeSetFocus(m.playerComments, true)
+    ' the SponsorBlock notice sits under the panel: hide it (and its OK/Back prompt) until the panel closes
+    if m.sponsorblock <> invalid
+        m.sponsorblock.SetCommentsOpen(true)
+    end if
 end function
 
 function OnPlayerCommentsClosed()
@@ -318,6 +322,9 @@ function ClosePlayerComments(refocus as boolean) as void
     m.playerComments.dispose = true
     m.top.removeChild(m.playerComments)
     m.playerComments = invalid
+    if m.sponsorblock <> invalid
+        m.sponsorblock.SetCommentsOpen(false)
+    end if
     if refocus and m.container.fullscreen
         NodeSetFocus(m.top, true)
     end if

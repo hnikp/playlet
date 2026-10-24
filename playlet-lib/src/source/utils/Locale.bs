@@ -271,10 +271,10 @@ namespace Locale
         PreferredQualityDescription = "Preferred video quality"
         AutoQuality = "Auto"
 
-        DisableAutoDubbedAudio = "Disable auto-dubbed audio"
-        DisableAutoDubbedAudioDescription = "Remove AI-generated dubbed audio tracks."
-        OriginalAudio = "Original audio"
-        OriginalAudioDescription = "Start videos in their original language, not in a dubbed audio track in the device's language"
+        ' "Audio track" and "Original" are in PlayerMenu
+        AudioTrackDescription = "Start videos on their original audio track (optionally removing AI auto-dubbed tracks), or let the device pick a track in its language"
+        AudioTrackOriginalNoDubs = "Original, hide auto-dubbed"
+        AudioTrackDevice = "Device language"
 
         Backend = "Backend"
         BackendPreferences = "Backend preferences"

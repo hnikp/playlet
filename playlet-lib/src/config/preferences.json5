@@ -28,18 +28,25 @@
         svelteComponent: "EditQualityControl",
       },
       {
-        displayText: "Original audio",
-        key: "playback.original_audio",
-        description: "Start videos in their original language, not in a dubbed audio track in the device's language",
-        type: "boolean",
-        defaultValue: true,
-      },
-      {
-        displayText: "Disable auto-dubbed audio",
-        key: "playback.disable_auto_dubbed",
-        description: "Remove AI-generated dubbed audio tracks.",
-        type: "boolean",
-        defaultValue: false,
+        displayText: "Audio track",
+        key: "playback.audio_track",
+        description: "Start videos on their original audio track (optionally removing AI auto-dubbed tracks), or let the device pick a track in its language",
+        type: "radio",
+        defaultValue: "original",
+        options: [
+          {
+            displayText: "Original",
+            value: "original",
+          },
+          {
+            displayText: "Original, hide auto-dubbed",
+            value: "original_no_dubs",
+          },
+          {
+            displayText: "Device language",
+            value: "device",
+          },
+        ],
       },
       {
         displayText: "Queue notifications",

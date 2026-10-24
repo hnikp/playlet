@@ -817,12 +817,16 @@
         <translation>Feed preferences</translation>
     </message>
     <message>
-        <source>Disable auto-dubbed audio</source>
-        <translation>Disable auto-dubbed audio</translation>
+        <source>Start videos on their original audio track (optionally removing AI auto-dubbed tracks), or let the device pick a track in its language</source>
+        <translation>Start videos on their original audio track (optionally removing AI auto-dubbed tracks), or let the device pick a track in its language</translation>
     </message>
     <message>
-        <source>Remove AI-generated dubbed audio tracks.</source>
-        <translation>Remove AI-generated dubbed audio tracks.</translation>
+        <source>Original, hide auto-dubbed</source>
+        <translation>Original, hide auto-dubbed</translation>
+    </message>
+    <message>
+        <source>Device language</source>
+        <translation>Device language</translation>
     </message>
     <message>
         <source>Disable Shorts</source>
@@ -1827,14 +1831,6 @@
     <message>
         <source>Show the AI Search page in the menu</source>
         <translation>Show the AI Search page in the menu</translation>
-    </message>
-    <message>
-        <source>Original audio</source>
-        <translation>Original audio</translation>
-    </message>
-    <message>
-        <source>Start videos in their original language, not in a dubbed audio track in the device&apos;s language</source>
-        <translation>Start videos in their original language, not in a dubbed audio track in the device&apos;s language</translation>
     </message>
     <message>
         <source>Original video titles</source>

@@ -110,7 +110,7 @@ namespace Http
             end if
 
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
-            m.dashManifest.disableAutoDubbed = ValidBool(m.preferencesNode["playback.disable_auto_dubbed"])
+            m.dashManifest.disableAutoDubbed = ValidString(m.preferencesNode["playback.audio_track"]) = "original_no_dubs"
             isLocal = ValidString(local) = "true"
 
             if ValidBool(metadata.liveNow)

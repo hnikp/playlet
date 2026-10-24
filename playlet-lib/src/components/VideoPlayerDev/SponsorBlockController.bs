@@ -47,6 +47,10 @@ namespace SponsorBlockController
         private quietUntilMs as integer = -1
         ' UUIDs already reported to the service: one report per segment per viewing.
         private reportedSegmentIds as object = {}
+        ' the notice shows only while the player is fullscreen and the comments panel is closed. While the
+        ' comments panel is open the manual prompt is also inert: OK/Back that reach the player don't act on it.
+        private fullscreen as boolean = true
+        private commentsOpen as boolean = false
 
         function new(deps as object)
             m.jobQueue = deps.jobQueue
@@ -138,6 +142,7 @@ namespace SponsorBlockController
 
             if segment.showNotification
                 SponsorBlock.ShowNotifcation(m.notifications, segment)
+                m.ApplyVisibility()
             end if
             if segment.option = SponsorBlock.SegmentAction.ManualSkip
                 m.manualSkipIndex = index
@@ -206,7 +211,7 @@ namespace SponsorBlockController
         end function
 
         function IsManualPromptShowing(index as integer) as boolean
-            if index = -1
+            if index = -1 or m.commentsOpen
                 return false
             end if
             notification = SponsorBlock.GetCurrentNotification(m.notifications)
@@ -231,8 +236,19 @@ namespace SponsorBlockController
 
         ' Show/hide the SponsorBlock notification overlay (hidden while the player is minimized).
         function SetVisible(visible as boolean) as void
+            m.fullscreen = visible
+            m.ApplyVisibility()
+        end function
+
+        ' Hide the notification overlay while the player comments panel covers the right side.
+        function SetCommentsOpen(open as boolean) as void
+            m.commentsOpen = open
+            m.ApplyVisibility()
+        end function
+
+        function ApplyVisibility() as void
             if m.notifications <> invalid
-                SponsorBlock.SetVisible(m.notifications, visible)
+                SponsorBlock.SetVisible(m.notifications, m.fullscreen and not m.commentsOpen)
             end if
         end function
 

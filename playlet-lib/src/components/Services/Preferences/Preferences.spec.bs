@@ -15,7 +15,7 @@ namespace Tests
             isDirty = MigrateExistingPreferences(userPrefs)
 
             m.assertTrue(isDirty)
-            m.assertEqual(userPrefs.__version, 10)
+            m.assertEqual(userPrefs.__version, 11)
             m.assertEqual(userPrefs["misc.thumbnail_preview_mode"], "off")
             m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview"))
         end function
@@ -29,7 +29,7 @@ namespace Tests
             isDirty = MigrateExistingPreferences(userPrefs)
 
             m.assertTrue(isDirty)
-            m.assertEqual(userPrefs.__version, 10)
+            m.assertEqual(userPrefs.__version, 11)
             m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview"))
             m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview_mode"))
         end function
@@ -39,8 +39,54 @@ namespace Tests
             userPrefs = { __version: 9 }
             MigrateExistingPreferences(userPrefs)
 
-            m.assertEqual(userPrefs.__version, 10)
+            m.assertEqual(userPrefs.__version, 11)
             m.assertFalse(userPrefs.DoesExist("misc.thumbnail_preview_mode"))
+        end function
+
+        @describe("MigrateExistingPreferences v10 -> v11")
+
+        @it("Turns disabled auto-dubbed audio into original_no_dubs, even with original audio off")
+        function _()
+            userPrefs = {
+                __version: 10
+                "playback.disable_auto_dubbed": true
+                "playback.original_audio": false
+            }
+            isDirty = MigrateExistingPreferences(userPrefs)
+
+            m.assertTrue(isDirty)
+            m.assertEqual(userPrefs.__version, 11)
+            m.assertEqual(userPrefs["playback.audio_track"], "original_no_dubs")
+            m.assertFalse(userPrefs.DoesExist("playback.disable_auto_dubbed"))
+            m.assertFalse(userPrefs.DoesExist("playback.original_audio"))
+        end function
+
+        @it("Turns original audio off into device")
+        function _()
+            userPrefs = {
+                __version: 10
+                "playback.disable_auto_dubbed": false
+                "playback.original_audio": false
+            }
+            MigrateExistingPreferences(userPrefs)
+
+            m.assertEqual(userPrefs.__version, 11)
+            m.assertEqual(userPrefs["playback.audio_track"], "device")
+            m.assertFalse(userPrefs.DoesExist("playback.disable_auto_dubbed"))
+            m.assertFalse(userPrefs.DoesExist("playback.original_audio"))
+        end function
+
+        @it("Leaves the audio track unset for original audio on, so the default (original) applies")
+        function _()
+            userPrefs = {
+                __version: 10
+                "playback.original_audio": true
+            }
+            MigrateExistingPreferences(userPrefs)
+
+            m.assertEqual(userPrefs.__version, 11)
+            m.assertFalse(userPrefs.DoesExist("playback.audio_track"))
+            m.assertFalse(userPrefs.DoesExist("playback.original_audio"))
         end function
 
     end class

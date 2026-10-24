@@ -1321,14 +1321,6 @@
         <translation>Preferencias de el feed</translation>
     </message>
     <message>
-        <source>Disable auto-dubbed audio</source>
-        <translation>Desactivar el doblaje automatico</translation>
-    </message>
-    <message>
-        <source>Remove AI-generated dubbed audio tracks.</source>
-        <translation>Elimina el doblaje generado por AI.</translation>
-    </message>
-    <message>
         <source>Disable Shorts</source>
         <translation>Desactivar Shorts</translation>
     </message>
