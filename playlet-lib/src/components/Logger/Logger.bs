@@ -132,6 +132,12 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 
+    ' Original title lookups (OriginalTitles.bs) get 401/404 for private videos and videos that can't be embedded:
+    ' expected, and frequent
+    if httpCode >= 400 and httpCode < 500 and IsString(info.OrigUrl) and info.OrigUrl.InStr("youtube.com/oembed") <> -1
+        return
+    end if
+
     urlType = GetSysLogUrlType(info.OrigUrl)
     fingerprint = `SysLog-${urlType}-${info.Status}-${info.LogType}-${httpCode}-${info.Method}`
 

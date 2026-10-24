@@ -3,12 +3,13 @@ import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/StoryboardUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
-' Fetches the storyboards of a video and sets the thumbnail preview frames on its content node
-' (VideoContentNode.previewStoryboard), which VideoRowCell animates.
+' Fetches the storyboards of a video and returns its thumbnail preview frames (JobSuccessData). VideoRowList sets
+' them on the content node (VideoContentNode.previewStoryboard), which VideoRowCell animates, if the video still has
+' the focus: a job cancelled late would otherwise animate a cell that lost it.
+' Failures are expected (shorts, new uploads, offline) and not reported to telemetry.
 @job("StoryboardPreviewJob")
 function ExecuteJob() as void
     input = JobGetInput()
-    node = input.node
 
     if JobIsCancelled()
         JobCancel()
@@ -30,20 +31,20 @@ function ExecuteJob() as void
     end if
 
     if not response.IsSuccess()
-        JobError("Failed to load storyboards: " + response.ErrorMessage())
+        JobErrorNoTelemetry("Failed to load storyboards: " + response.ErrorMessage())
         return
     end if
 
     json = response.Json()
     if not IsAssociativeArray(json)
-        JobError("Invalid storyboards response")
+        JobErrorNoTelemetry("Invalid storyboards response")
         return
     end if
 
     preview = StoryboardUtils.GetPreviewFrames(json.storyboards, instance, 8, 160)
     if preview = invalid
-        JobError("No usable storyboard")
+        JobErrorNoTelemetry("No usable storyboard")
         return
     end if
-    node.previewStoryboard = preview
+    JobSuccessData(preview)
 end function

@@ -56,7 +56,7 @@ function OnWeatherJobDone(event as object) as void
     end if
     if not info.success
         ' keep the last reading on a network hiccup
-        LogWarn("Weather unavailable:", info.error)
+        LogWarnNoTelemetry("Weather unavailable:", info.error)
         return
     end if
     SetWeather(info.data)

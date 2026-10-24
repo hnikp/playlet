@@ -1,68 +1,142 @@
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' YouTube auto-translates video titles into the request's language (a Spanish video shows up in English) and its
 ' API has no flag against it: feed and search results only carry the translated title. The oEmbed endpoint
-' answers with the original one, a small request per video, sent in parallel and cached on disk.
+' answers with the original one, a small request per video.
+' Titles are kept in one store shared by the jobs (the Invidious node's originalTitles field, saved to a single
+' cachefs file), so a video is looked up once a week, and a video without an answer (private, embedding disabled)
+' once a day.
 namespace OriginalTitles
     const OEMBED_URL = "https://www.youtube.com/oembed"
     const PARALLEL_REQUESTS = 10
     const ATTEMPT_TIMEOUT_MS = 4000
-    ' titles rarely change
-    const CACHE_SECONDS = 604800
+    const TITLE_MAX_AGE_SECONDS = 604800
+    const MISS_MAX_AGE_SECONDS = 86400
+    const MAX_ENTRIES = 2000
+    ' the file is rewritten once this many new titles came in (and when the store is loaded/pruned)
+    const SAVE_EVERY = 25
+    const STORE_FILE = "cachefs:/original_titles_v1.json"
 
     ' Replaces the title of each video in items (Invidious API items, or a video's metadata) with its original
-    ' title. Videos without an answer (private, embedding disabled, a timeout) keep theirs. Blocks: task threads only.
-    function Apply(items as object, cancellation = invalid as dynamic) as void
+    ' title. Videos without one keep theirs. storeNode: the node with the originalTitles field (Invidious).
+    ' Blocks: task threads only.
+    function Apply(items as object, storeNode as object, cancellation = invalid as dynamic) as void
         videos = []
         for each item in ValidArray(items)
             if IsAssociativeArray(item) and (item.type = invalid or item.type = "video") and IsString(item.videoId) and item.videoId <> ""
                 videos.Push(item)
             end if
         end for
+        if videos.Count() = 0
+            return
+        end if
 
-        count = videos.Count()
-        startIndex = 0
-        while startIndex < count
-            if CancellationUtils.IsCancelled(cancellation)
-                return
+        store = LoadStore(storeNode)
+        nowSeconds = CreateObject("roDateTime").AsSeconds()
+        missingIds = []
+        missingDict = {}
+        for each video in videos
+            entry = store.entries[video.videoId]
+            if IsFresh(entry, nowSeconds)
+                continue for
             end if
-            endIndex = startIndex + PARALLEL_REQUESTS - 1
-            if endIndex >= count
-                endIndex = count - 1
+            if not missingDict.DoesExist(video.videoId)
+                missingDict[video.videoId] = true
+                missingIds.Push(video.videoId)
             end if
+        end for
 
-            pending = []
-            for i = startIndex to endIndex
-                pending.Push({
-                    item: videos[i]
-                    fetch: CreateRequest(videos[i].videoId, cancellation).Send()
-                })
-            end for
-            for each entry in pending
-                title = ParseTitle(entry.fetch.Await())
-                if title <> ""
-                    entry.item.title = title
-                end if
-            end for
+        if missingIds.Count() > 0
+            fetched = Fetch(missingIds, cancellation)
+            if fetched.Count() > 0
+                ' read again: another job may have added titles meanwhile
+                store = LoadStore(storeNode)
+                for each videoId in fetched
+                    store.entries[videoId] = [fetched[videoId], nowSeconds]
+                end for
+                store.unsaved += fetched.Count()
+                SaveStore(storeNode, store, nowSeconds)
+            end if
+        end if
 
-            startIndex = endIndex + 1
-        end while
+        for each video in videos
+            entry = store.entries[video.videoId]
+            if IsArray(entry) and IsString(entry[0]) and entry[0] <> ""
+                video.title = entry[0]
+            end if
+        end for
     end function
 
-    function CreateRequest(videoId as string, cancellation as dynamic) as object
+    ' entry: [title, savedAtSeconds]; title "" for a video without an answer
+    function IsFresh(entry as dynamic, nowSeconds as integer) as boolean
+        if not IsArray(entry) or entry.Count() < 2 or not IsString(entry[0])
+            return false
+        end if
+        maxAge = TITLE_MAX_AGE_SECONDS
+        if entry[0] = ""
+            maxAge = MISS_MAX_AGE_SECONDS
+        end if
+        return nowSeconds - ValidInt(entry[1]) < maxAge
+    end function
+
+    ' Looks the titles up, PARALLEL_REQUESTS at a time (a new request starts as soon as one ends).
+    ' Returns { videoId: title }, "" for the videos without an answer; a timeout or a cancelled request isn't
+    ' remembered.
+    function Fetch(videoIds as object, cancellation as dynamic) as object
+        titles = {}
+        port = CreateObject("roMessagePort")
+        active = []
+        nextIndex = 0
+        count = videoIds.Count()
+        while nextIndex < count or active.Count() > 0
+            if CancellationUtils.IsCancelled(cancellation)
+                for each entry in active
+                    entry.fetch.Cancel()
+                end for
+                exit while
+            end if
+            while active.Count() < PARALLEL_REQUESTS and nextIndex < count
+                videoId = videoIds[nextIndex]
+                active.Push({ videoId: videoId, fetch: CreateRequest(videoId).SendOn(port) })
+                nextIndex += 1
+            end while
+
+            waitMs = 1000
+            for each entry in active
+                entryWaitMs = entry.fetch.MaxWaitMs()
+                if entryWaitMs < waitMs
+                    waitMs = entryWaitMs
+                end if
+            end for
+            message = wait(waitMs, port)
+
+            for i = active.Count() - 1 to 0 step -1
+                response = active[i].fetch.Handle(message)
+                if response <> invalid
+                    title = ParseTitle(response)
+                    if title <> "" or IsMissingVideo(response)
+                        titles[active[i].videoId] = title
+                    end if
+                    active.Delete(i)
+                end if
+            end for
+        end while
+        return titles
+    end function
+
+    function CreateRequest(videoId as string) as object
         request = HttpClient.Get(OEMBED_URL)
         request.QueryParam("format", "json")
         request.QueryParam("url", "https://www.youtube.com/watch?v=" + videoId)
         request.AttemptTimeoutMs(ATTEMPT_TIMEOUT_MS)
         request.RetryCount(0)
-        request.CacheForSeconds(CACHE_SECONDS)
+        ' the store is the cache: no file per video
+        request.NoCache()
         ' 401/404 for videos that can't be embedded or are private: expected, not worth reporting
         request.NoTelemetry()
-        if cancellation <> invalid
-            request.Cancellation(cancellation)
-        end if
         return request
     end function
 
@@ -75,5 +149,68 @@ namespace OriginalTitles
             return ""
         end if
         return json.title.Trim()
+    end function
+
+    ' oEmbed's answer for a private video or one that can't be embedded: worth remembering (for a day)
+    function IsMissingVideo(response as object) as boolean
+        statusCode = response.StatusCode()
+        return statusCode = 400 or statusCode = 401 or statusCode = 403 or statusCode = 404
+    end function
+
+    ' { entries: { videoId: [title, savedAtSeconds] }, unsaved }: from the node, or from the file the first time
+    function LoadStore(storeNode as object) as object
+        store = invalid
+        if storeNode <> invalid
+            store = storeNode.originalTitles
+        end if
+        if IsAssociativeArray(store) and IsAssociativeArray(store.entries)
+            return store
+        end if
+
+        store = { entries: {}, unsaved: 0 }
+        fileSystem = CreateObject("roFileSystem")
+        if fileSystem.Exists(STORE_FILE)
+            entries = StringUtils.ParseJsonSafe(ReadAsciiFile(STORE_FILE))
+            if IsAssociativeArray(entries)
+                store.entries = entries
+            end if
+        end if
+        if storeNode <> invalid
+            storeNode.originalTitles = store
+        end if
+        return store
+    end function
+
+    function SaveStore(storeNode as object, store as object, nowSeconds as integer) as void
+        if store.entries.Count() > MAX_ENTRIES
+            Prune(store.entries, nowSeconds)
+            store.unsaved = SAVE_EVERY
+        end if
+        if store.unsaved >= SAVE_EVERY
+            if WriteAsciiFile(STORE_FILE, FormatJson(store.entries))
+                store.unsaved = 0
+            end if
+        end if
+        if storeNode <> invalid
+            storeNode.originalTitles = store
+        end if
+    end function
+
+    ' Drops the expired entries, then, if still too many, the older half
+    function Prune(entries as object, nowSeconds as integer) as void
+        for each videoId in entries.Keys()
+            if not IsFresh(entries[videoId], nowSeconds)
+                entries.Delete(videoId)
+            end if
+        end for
+        if entries.Count() <= MAX_ENTRIES
+            return
+        end if
+        cutoff = nowSeconds - TITLE_MAX_AGE_SECONDS / 2
+        for each videoId in entries.Keys()
+            if ValidInt(entries[videoId][1]) < cutoff
+                entries.Delete(videoId)
+            end if
+        end for
     end function
 end namespace

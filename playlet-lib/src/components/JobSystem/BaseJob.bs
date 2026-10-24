@@ -51,6 +51,18 @@ end function
 function JobError(error as dynamic) as void
     error = ErrorUtils.Format(error)
     LogError(`[${m.top.subtype()}]${error}`)
+    SetJobErrorState(error)
+end function
+
+' For expected failures (offline, a video without storyboards, a city that wasn't found): logged, not reported
+' to telemetry.
+function JobErrorNoTelemetry(error as dynamic) as void
+    error = ErrorUtils.Format(error)
+    LogWarnNoTelemetry(`[${m.top.subtype()}]${error}`)
+    SetJobErrorState(error)
+end function
+
+function SetJobErrorState(error as string) as void
     callbackNode = JobGetCallbackNode()
     if callbackNode = invalid
         return

@@ -1,0 +1,84 @@
+namespace Tests
+
+    @suite
+    class OriginalTitlesTests extends Rooibos.BaseTestSuite
+
+        function JsonResponse(statusCode as integer, body as dynamic) as object
+            text = ""
+            if body <> invalid
+                text = FormatJson(body)
+            end if
+            return new HttpClient.Response({ statusCode: statusCode, headers: {}, text: text })
+        end function
+
+        @describe("OriginalTitles.ParseTitle")
+
+        @it("reads the title of an oEmbed answer")
+        function _()
+            m.assertEqual(OriginalTitles.ParseTitle(m.JsonResponse(200, { title: " Me Pasé Minecraft en 30 Minutos " })), "Me Pasé Minecraft en 30 Minutos")
+            m.assertEqual(OriginalTitles.ParseTitle(m.JsonResponse(200, { author_name: "x" })), "")
+            m.assertEqual(OriginalTitles.ParseTitle(m.JsonResponse(401, invalid)), "")
+        end function
+
+        @it("remembers private and non-embeddable videos, not server errors")
+        function _()
+            m.assertTrue(OriginalTitles.IsMissingVideo(m.JsonResponse(401, invalid)))
+            m.assertTrue(OriginalTitles.IsMissingVideo(m.JsonResponse(404, invalid)))
+            m.assertFalse(OriginalTitles.IsMissingVideo(m.JsonResponse(500, invalid)))
+        end function
+
+        @describe("OriginalTitles.IsFresh")
+
+        @it("keeps titles a week and misses a day")
+        function _()
+            now = 1000000
+            m.assertTrue(OriginalTitles.IsFresh(["Title", now - 86400 * 6], now))
+            m.assertFalse(OriginalTitles.IsFresh(["Title", now - 86400 * 8], now))
+            m.assertTrue(OriginalTitles.IsFresh(["", now - 3600], now))
+            m.assertFalse(OriginalTitles.IsFresh(["", now - 86400 * 2], now))
+            m.assertFalse(OriginalTitles.IsFresh(invalid, now))
+            m.assertFalse(OriginalTitles.IsFresh(["Title"], now))
+        end function
+
+        @describe("OriginalTitles.Prune")
+
+        @it("drops expired entries")
+        function _()
+            now = 1000000
+            entries = {
+                fresh: ["Fresh", now - 60]
+                old: ["Old", now - 86400 * 8]
+                missOld: ["", now - 86400 * 2]
+            }
+            OriginalTitles.Prune(entries, now)
+            m.assertEqual(entries.Keys(), ["fresh"])
+        end function
+
+        @describe("OriginalTitles.Apply")
+
+        @it("uses stored titles without a request, and leaves other items alone")
+        function _()
+            now = CreateObject("roDateTime").AsSeconds()
+            storeNode = CreateObject("roSGNode", "Node")
+            storeNode.addField("originalTitles", "assocarray", false)
+            storeNode.originalTitles = {
+                entries: {
+                    abc: ["Título original", now]
+                    priv: ["", now]
+                }
+                unsaved: 0
+            }
+            items = [
+                { type: "video", videoId: "abc", title: "Translated title" }
+                { type: "video", videoId: "priv", title: "Private video" }
+                { type: "playlist", playlistId: "PL1", title: "A playlist" }
+            ]
+            OriginalTitles.Apply(items, storeNode)
+            m.assertEqual(items[0].title, "Título original")
+            m.assertEqual(items[1].title, "Private video")
+            m.assertEqual(items[2].title, "A playlist")
+        end function
+
+    end class
+
+end namespace

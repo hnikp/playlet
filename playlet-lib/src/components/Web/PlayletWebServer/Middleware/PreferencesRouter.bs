@@ -37,6 +37,8 @@ namespace Http
                 return true
             end if
 
+            ' A key only goes to the server it was entered for: a new provider or server url needs it again
+            SensitivePreferences.ClearValuesBoundToChanges(payload, m.preferencesNode@.GetUserPreferences())
             ' The web app only knows the masked values: never save a mask over the real value
             SensitivePreferences.DropMaskedValues(payload, m.sensitiveKeys)
             m.preferencesNode@.ApplyUserPreferences(payload)

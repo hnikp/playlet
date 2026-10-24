@@ -16,9 +16,8 @@ namespace VideoMetadataLoader
     ' loggedIn) is set for the playlet backend when metadata is an AA, invalid otherwise.
     function Load(videoId as string, backend as string, service as Invidious.InvidiousService, innertubeNode as object, loungeServiceNode as object, profilesService as object, cancellation as object) as object
         if backend <> "playlet"
-            ' m.top.cancellation is what VideoContentJob always passed here (jobs have no such field)
             return {
-                metadata: service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+                metadata: service.GetVideoMetadata(videoId, { cancellation: cancellation })
                 playletFields: invalid
             }
         end if
@@ -57,10 +56,6 @@ namespace VideoMetadataLoader
             "profileNode": profileNode
             "profilesService": profilesService
         })
-
-        if IsAssociativeArray(metadata)
-            service.ApplyOriginalTitles([metadata], cancellation)
-        end if
 
         playletFields = invalid
         if IsAssociativeArray(metadata)

@@ -492,23 +492,35 @@ function OnPreviewTimerFire() as void
 end function
 
 function QueueStoryboardPreviewJob(item as object)
-    m.previewJob = JobSystem.CreateCallback(OnPreviewJobDone)
+    m.previewJob = JobSystem.CreateCallback(OnStoryboardPreviewJobDone)
     JobSystem.QueueJob(m.jobQueue, Jobs.StoryboardPreviewJob, {
         invidious: m.invidious
         videoId: item.videoId
-        node: item
     }, m.previewJob)
+    m.storyboardPreviewItem = item
 end function
 
-function OnPreviewJobDone(event as object) as void
+function OnStoryboardPreviewJobDone(event as object) as void
     JobSystem.UnobserveCallback(event.getRoSGNode())
-    if m.previewJob <> invalid and m.previewJob.isSameNode(event.getRoSGNode())
-        m.previewJob = invalid
+    ' a stale job (focus moved on, StopPreview cancelled it) must not set frames
+    if m.previewJob = invalid or not m.previewJob.isSameNode(event.getRoSGNode())
+        return
     end if
+    m.previewJob = invalid
+    item = m.storyboardPreviewItem
+    m.storyboardPreviewItem = invalid
+
     info = event.getInfo()
-    if not info.success and not info.cancel
-        LogDebug("No thumbnail preview:", info.error)
+    if not info.success
+        if not info.cancel
+            LogDebug("No thumbnail preview:", info.error)
+        end if
+        return
     end if
+    if item = invalid or m.previewNode = invalid or not item.isSameNode(m.previewNode)
+        return
+    end if
+    item.previewStoryboard = info.data
 end function
 
 function QueueVideoPreviewJob(item as object)
@@ -686,6 +698,11 @@ function StopPreviewVideo() as void
     m.previewVideoItem.previewVideoActive = false
     m.previewVideoItem = invalid
     m.videoQueue.previewContent = invalid
+    ' the global slot would otherwise keep this list's Video node (and its observers) after the list is disposed
+    globalPlayer = m.global.thumbnailPreviewPlayer
+    if globalPlayer <> invalid and globalPlayer.isSameNode(player)
+        m.global.thumbnailPreviewPlayer = invalid
+    end if
 end function
 
 ' Stops the preview of the previously focused item and frees its frames (VideoRowCell stops animating)

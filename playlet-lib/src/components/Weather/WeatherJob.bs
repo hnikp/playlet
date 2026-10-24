@@ -21,7 +21,7 @@ function ExecuteJob() as void
         return
     end if
     if not response.IsSuccess()
-        JobError("Geocoding failed: " + response.ErrorMessage())
+        JobErrorNoTelemetry("Geocoding failed: " + response.ErrorMessage())
         return
     end if
 
@@ -52,13 +52,13 @@ function ExecuteJob() as void
         return
     end if
     if not response.IsSuccess()
-        JobError("Forecast failed: " + response.ErrorMessage())
+        JobErrorNoTelemetry("Forecast failed: " + response.ErrorMessage())
         return
     end if
 
     text = WeatherUtils.Format(response.Json(), fahrenheit)
     if text = ""
-        JobError("Invalid forecast response")
+        JobErrorNoTelemetry("Invalid forecast response")
         return
     end if
     JobSuccessData({ text: text, city: ValidString(place.name) })

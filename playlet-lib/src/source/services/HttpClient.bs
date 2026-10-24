@@ -370,6 +370,10 @@ namespace HttpClient
                         value = "<REDACTED>"
                     end if
                 #end if
+                ' third-party API keys (AI search): never logged, debug builds included
+                if LCase(key) = "x-api-key"
+                    value = "<REDACTED>"
+                end if
                 command += ` \\\n  -H '${key}: ${value}'`
             end for
             if not StringUtils.IsNullOrEmpty(m._textBody)

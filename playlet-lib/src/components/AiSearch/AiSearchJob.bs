@@ -25,6 +25,8 @@ function ExecuteJob() as void
     request.Headers(llmRequest.headers)
     request.JsonBody(llmRequest.body)
     request.NoTelemetry()
+    ' debug builds log curl commands with their headers, and the logs are served on the LAN (/logs)
+    request.LogCurlCommand(false)
     request.AttemptTimeoutMs(60000)
     request.Cancellation(JobGetCancellation())
     response = request.Await()

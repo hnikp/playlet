@@ -180,7 +180,11 @@ namespace Invidious
             if Invidious.NeedsLiveStreamInfo(metadata)
                 Innertube.GetLiveStreamInfo(metadata, metadata.adaptiveFormats, 0, invalid, cancellation)
             end if
-            m.ApplyOriginalTitles([metadata], cancellation)
+            ' only where the title is shown from the metadata (the video page): playback and previews keep the feed's
+            ' title, and an extra request there would delay the start
+            if OptionUtils.Get(options, "originalTitles") = true
+                m.ApplyOriginalTitles([metadata], cancellation)
+            end if
 
             return metadata
         end function
@@ -194,7 +198,7 @@ namespace Invidious
             if m.preferences["browsing.original_titles"] = false
                 return
             end if
-            OriginalTitles.Apply(items, cancellation)
+            OriginalTitles.Apply(items, m.invidiousNode, cancellation)
         end function
 
         ' Comments (or replies, with a replies continuation) of a video. sortBy is "top" or "new".
@@ -887,12 +891,12 @@ namespace Invidious
                 end if
 
                 if not response.IsSuccess()
-                    LogWarn(`Failed to load videos of channel ${entry.ucid}: ${response.ErrorMessage()}`)
+                    LogWarnNoTelemetry(`Failed to load videos of channel ${entry.ucid}: ${response.ErrorMessage()}`)
                     continue for
                 end if
                 json = response.Json()
                 if not IsAssociativeArray(json) or not IsArray(json.videos)
-                    LogWarn(`Invalid videos response of channel ${entry.ucid}`)
+                    LogWarnNoTelemetry(`Invalid videos response of channel ${entry.ucid}`)
                     continue for
                 end if
                 if entry.name <> ""

@@ -21,7 +21,7 @@ function ExecuteJob() as void
 
     auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
     if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
-        JobError("No usable access token to subscribe/unsubscribe: " + auth.state)
+        JobErrorNoTelemetry("No usable access token to subscribe/unsubscribe: " + auth.state)
         return
     end if
 
@@ -31,6 +31,10 @@ function ExecuteJob() as void
         response = service.Subscribe(auth, ucid, cancellation)
     else
         response = service.Unsubscribe(auth, ucid, cancellation)
+    end if
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     if not response.IsSuccess()

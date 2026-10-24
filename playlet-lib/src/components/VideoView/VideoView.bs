@@ -123,7 +123,7 @@ function OnDetailsJobDone(event as object) as void
 
     info = event.getInfo()
     if not info.success and not info.cancel
-        LogWarn("Video details:", info.error)
+        LogWarnNoTelemetry("Video details:", info.error)
     end if
 end function
 
@@ -328,6 +328,8 @@ end function
 
 function CancelDetailsJob()
     if m.detailsJob <> invalid
+        ' a cancelled job still completes: its callback must not stop the newer job's spinner
+        JobSystem.UnobserveCallback(m.detailsJob)
         m.detailsJob.cancel = true
         m.detailsJob = invalid
     end if

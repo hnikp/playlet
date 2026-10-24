@@ -44,7 +44,7 @@ function ExecuteJob() as void
             headers = service.GetAuthenticationHeaders(auth.token)
             activeIdentifyToken = ValidString(auth.activeIdentifyToken)
         else
-            LogWarn("No usable access token for topic shelves, loading them logged out:", auth.state)
+            LogWarnNoTelemetry("No usable access token for topic shelves, loading them logged out:", auth.state)
         end if
     end if
 
@@ -69,13 +69,13 @@ function ExecuteJob() as void
     end if
 
     if not response.IsSuccess()
-        JobError(`Failed to list ${topic} shelves: ${response.ErrorMessage()}`)
+        JobErrorNoTelemetry(`Failed to list ${topic} shelves: ${response.ErrorMessage()}`)
         return
     end if
 
     json = response.Json()
     if not IsAssociativeArray(json)
-        JobError(`Failed to list ${topic} shelves: invalid response`)
+        JobErrorNoTelemetry(`Failed to list ${topic} shelves: invalid response`)
         return
     end if
 

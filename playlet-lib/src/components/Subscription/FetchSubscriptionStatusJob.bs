@@ -22,7 +22,7 @@ function ExecuteJob() as void
 
     auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
     if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
-        JobError("No usable access token to fetch subscription status: " + auth.state)
+        JobErrorNoTelemetry("No usable access token to fetch subscription status: " + auth.state)
         return
     end if
 
@@ -32,6 +32,11 @@ function ExecuteJob() as void
             accessToken: auth.token
             onBehalfOfUser: auth.activeIdentifyToken
         })
+        ' a cancelled request (the page closed) is not an error, and its target may be gone
+        if JobIsCancelled()
+            JobCancel()
+            return
+        end if
 
         if subscriptionStatus.error <> invalid
             JobError("Failed to fetch subscription status: " + ToString(subscriptionStatus.error))
@@ -51,6 +56,10 @@ function ExecuteJob() as void
 
     service = new Invidious.InvidiousService(invidiousNode)
     subscriptionsResponse = service.GetSubscriptions(auth, cancellation)
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
     if not subscriptionsResponse.IsSuccess()
         JobError("Failed to fetch subscriptions: " + subscriptionsResponse.ErrorMessage())
         return

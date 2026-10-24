@@ -91,12 +91,15 @@ function UpdateText()
     m.top.text = text
 end function
 
+' A cancelled job still completes: unobserve it, or its done callback would clear the newer job and `loading`
 function CancelJobs()
     if m.fetchJob <> invalid
+        JobSystem.UnobserveCallback(m.fetchJob)
         m.fetchJob.cancel = true
         m.fetchJob = invalid
     end if
     if m.subscribeJob <> invalid
+        JobSystem.UnobserveCallback(m.subscribeJob)
         m.subscribeJob.cancel = true
         m.subscribeJob = invalid
     end if

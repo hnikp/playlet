@@ -119,9 +119,9 @@ function OnPageLoaded(event as object) as void
     if not info.success or not IsAssociativeArray(data) or data.error <> invalid
         state.hasMore = false
         if data <> invalid and data.error <> invalid
-            LogWarn("Failed to load comments:", data.error)
+            LogWarnNoTelemetry("Failed to load comments:", data.error)
         else
-            LogWarn("Failed to load comments:", info.error)
+            LogWarnNoTelemetry("Failed to load comments:", info.error)
         end if
         if state.content.getChildCount() = 0
             ShowMessage(Tr(Locale.Comments.CommentsUnavailable))

@@ -9,6 +9,8 @@
 
         <!-- Subscription list cache, see SubscriptionCache.bs -->
         <field id="subscriptionsCache" type="assocarray" />
+        <!-- OriginalTitles' store, shared by the jobs: { entries: { videoId: [title, savedAtSeconds] }, unsaved } -->
+        <field id="originalTitles" type="assocarray" />
         <!-- Set after a successful subscribe/unsubscribe: { ucid, isSubscribed } -->
         <field id="subscriptionChanged" type="assocarray" alwaysNotify="true" />
 

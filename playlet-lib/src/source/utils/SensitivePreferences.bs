@@ -5,6 +5,13 @@ import "pkg:/source/utils/Types.bs"
 ' are never sent back to the web app in clear text: they are replaced by a mask.
 namespace SensitivePreferences
 
+    ' A sensitive value only goes to the endpoint it was entered for. If one of these preferences changes, the
+    ' value is cleared unless a new one comes with it: otherwise anyone on the network could point the AI search
+    ' to their own server (the web API has no login) and receive the stored key.
+    const BOUND_TO = {
+        "ai_search.api_key": ["ai_search.provider", "ai_search.base_url"]
+    }
+
     ' Returns a dictionary of the keys of sensitive preferences, from the preferences model.
     function GetKeys(prefsModel as object) as object
         keysDict = {}
@@ -57,6 +64,27 @@ namespace SensitivePreferences
     ' True if the value is a mask (a real key never starts with the dots)
     function IsMasked(value as dynamic) as boolean
         return IsString(value) and Left(value, 4) = "••••"
+    end function
+
+    ' Adds an empty value for each sensitive key (BOUND_TO) whose endpoint the payload changes, unless the payload
+    ' also brings a new value for it. currentValues: the preferences as they are now. Returns the same payload.
+    function ClearValuesBoundToChanges(payload as object, currentValues as object) as object
+        if not IsAssociativeArray(payload) or not IsAssociativeArray(currentValues)
+            return payload
+        end if
+        bindings = BOUND_TO
+        for each sensitiveKey in bindings
+            if payload.DoesExist(sensitiveKey) and not IsMasked(payload[sensitiveKey])
+                continue for
+            end if
+            for each boundKey in bindings[sensitiveKey]
+                if payload.DoesExist(boundKey) and ValidString(payload[boundKey]) <> ValidString(currentValues[boundKey])
+                    payload[sensitiveKey] = ""
+                    exit for
+                end if
+            end for
+        end for
+        return payload
     end function
 
     ' Removes from the payload the sensitive values that are a mask (like the one GET returned),

@@ -20,7 +20,7 @@ function ExecuteJob() as void
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
-    metadata = service.GetVideoMetadata(videoId, { cancellation: JobGetCancellation() })
+    metadata = service.GetVideoMetadata(videoId, { cancellation: JobGetCancellation(), originalTitles: true })
 
     if JobIsCancelled()
         JobCancel()
@@ -32,7 +32,7 @@ function ExecuteJob() as void
         if IsAssociativeArray(metadata)
             error = ToString(metadata.error)
         end if
-        JobError("Failed to load video details: " + error)
+        JobErrorNoTelemetry("Failed to load video details: " + error)
         return
     end if
 

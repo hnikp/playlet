@@ -88,7 +88,7 @@ function OnTopicShelvesJobDone(event as object) as void
     info = event.getInfo()
     if not info.success
         if not info.cancel
-            LogWarn("Topic shelves:", info.error)
+            LogWarnNoTelemetry("Topic shelves:", info.error)
             ShowStaticFeeds()
         end if
         return
