@@ -23,6 +23,9 @@
         <!-- set by VideoRowList while a thumbnail video preview plays a DASH stream:
         a ContentNode with videoLoadId and metadata, read by DashRouter -->
         <field id="previewContent" type="node" />
+        <!-- set by VideoRowList when a previewing video is selected: { videoId, seconds, atSeconds }.
+        Playing that video soon after resumes it from the preview (see ApplyPreviewResume). -->
+        <field id="previewResume" type="assocarray" />
         <field id="nowPlaying" type="node" />
 
         <field id="innertube" type="node" />

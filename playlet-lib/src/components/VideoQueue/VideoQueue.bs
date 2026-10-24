@@ -6,6 +6,7 @@ import "pkg:/components/VideoQueue/Notifications/VideoQueueNotificationUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/Types.bs"
 import "VideoQueueFunctions.bs"
 
 function Init()
@@ -119,6 +120,7 @@ function OnPlayVideo() as void
     nodeParent = videoNode.getParent()
     if not m.content.isSameNode(nodeParent)
         videoNode = videoNode.clone(false)
+        ApplyPreviewResume(videoNode)
     end if
 
     queueCount = m.content.getChildCount()
@@ -134,6 +136,38 @@ function OnPlayVideo() as void
 
     RemovePlayer()
     m.top.play = true
+end function
+
+' Selecting a video while its thumbnail preview plays, then playing it within PREVIEW_RESUME_WINDOW_SECONDS
+' (directly, or from the video page it opened), continues from the preview, a few seconds back.
+' Playing it later starts as usual. One-shot: the handoff is cleared.
+const PREVIEW_RESUME_WINDOW_SECONDS = 60
+const PREVIEW_RESUME_REWIND_SECONDS = 5
+
+function ApplyPreviewResume(videoNode as object) as void
+    resume = m.top.previewResume
+    if not IsAssociativeArray(resume) or resume.Count() = 0
+        return
+    end if
+    m.top.previewResume = {}
+
+    if resume.videoId <> videoNode.videoId or not videoNode.hasField("timestamp")
+        return
+    end if
+    ' an explicit start (a link with a time, a cast) wins
+    if ValidInt(videoNode.timestamp) <> -1
+        return
+    end if
+    elapsed = CreateObject("roDateTime").AsSeconds() - ValidInt(resume.atSeconds)
+    if elapsed < 0 or elapsed > PREVIEW_RESUME_WINDOW_SECONDS
+        return
+    end if
+    seconds = ValidInt(resume.seconds) - PREVIEW_RESUME_REWIND_SECONDS
+    if seconds <= 0
+        return
+    end if
+    LogInfo("Resuming from the thumbnail preview at", seconds, "s, videoId:", videoNode.videoId)
+    videoNode.timestamp = seconds
 end function
 
 function OnPlayPlaylist() as void

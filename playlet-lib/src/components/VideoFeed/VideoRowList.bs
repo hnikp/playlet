@@ -92,6 +92,7 @@ function OnRowItemFocused(event as object) as void
 end function
 
 function OnRowItemSelected(index as object) as void
+    RememberPreviewPosition()
     ' the preview video must be gone before the real player starts (Roku can't decode two videos)
     StopPreview()
     content = m.top.content
@@ -649,6 +650,22 @@ function OnVideoPlayerChange() as void
     if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue)
         StopPreviewVideo()
     end if
+end function
+
+' Hands the preview's position to the queue, so playing the selected video soon resumes from it
+' (VideoQueue.ApplyPreviewResume). Selecting without a playing preview clears an older handoff.
+function RememberPreviewPosition() as void
+    item = m.previewVideoItem
+    player = m.previewVideo
+    if item = invalid or player = invalid or item.liveNow = true or player.position < 1
+        m.videoQueue.previewResume = {}
+        return
+    end if
+    m.videoQueue.previewResume = {
+        videoId: item.videoId
+        seconds: Int(player.position)
+        atSeconds: CreateObject("roDateTime").AsSeconds()
+    }
 end function
 
 ' Synchronous on purpose: the preview video must be stopped before a real player starts
