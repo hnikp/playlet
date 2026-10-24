@@ -48,9 +48,11 @@
                     translation="[16, 65]" />
             </Poster>
 
+            <!-- 11 rows (every optional page on) must end inside the screen: 125 + 11*48 + 10*4 = 693.
+                 Rows are 48 high so the 32px icons (y 8) and the 40px profile icon (y 4) stay centred. -->
             <MarkupList
                 id="ItemsList"
-                itemSize="[190,50]"
+                itemSize="[190,48]"
                 itemComponentName="NavBarComponent"
                 focusFootprintBitmapUri=""
                 focusBitmapUri="pkg:/images/white.$$RES$$.9.png"
@@ -58,8 +60,8 @@
                 vertFocusAnimationStyle="floatingFocus"
                 numRows="11"
                 scrollSpeed="99999"
-                itemSpacing="[0, 5]"
-                translation="[13, 145]">
+                itemSpacing="[0, 4]"
+                translation="[13, 125]">
             </MarkupList>
         </Rectangle>
 

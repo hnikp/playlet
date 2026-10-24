@@ -22,6 +22,33 @@ namespace Tests
             }]
         end function
 
+        @describe("ApplyNextSubtitle")
+
+        @it("Keeps only the channel as the author and fills views and date")
+        function _()
+            bullet = " " + Chr(8226) + " "
+            result = m.top@.Innertube_ApplyNextSubtitle({}, "Some Channel" + bullet + "1.2M views" + bullet + "2 years ago")
+            m.assertEqual(result.author, "Some Channel")
+            m.assertEqual(result.viewCountText, "1.2M views")
+            m.assertEqual(result.publishedText, "2 years ago")
+        end function
+
+        @it("Does not replace a view count or publish date from the player response")
+        function _()
+            bullet = " " + Chr(8226) + " "
+            result = m.top@.Innertube_ApplyNextSubtitle({ viewCount: 1200, publishDate: "2024-05-01" }, "Some Channel" + bullet + "1.2K views" + bullet + "2 years ago")
+            m.assertEqual(result.author, "Some Channel")
+            m.assertInvalid(result.viewCountText)
+            m.assertInvalid(result.publishedText)
+        end function
+
+        @it("Uses a subtitle without separators as the author")
+        function _()
+            result = m.top@.Innertube_ApplyNextSubtitle({}, "Some Channel")
+            m.assertEqual(result.author, "Some Channel")
+            m.assertInvalid(result.viewCountText)
+        end function
+
     end class
 
 end namespace

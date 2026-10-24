@@ -7,7 +7,8 @@
             screensContainer="bind:./AppScreens"
             root="bind:./AppRoot"
             stack="bind:./Stack"
-            videoQueue="bind:./VideoQueue">
+            videoQueue="bind:./VideoQueue"
+            clockGroup="bind:./ClockGroup">
             <!-- Scaled toward the screen centre so the UI stays inside TV overscan -->
             <Group id="Stack" scale="[0.92,0.92]" scaleRotateCenter="[640,360]">
                 <AppRoot id="AppRoot">
@@ -70,7 +71,8 @@
                 </AppRoot>
             </Group>
 
-            <Group scale="[0.92,0.92]" scaleRotateCenter="[640,360]">
+            <!-- Shown over the root screens only (AppController hides it while a view is pushed on top) -->
+            <Group id="ClockGroup" scale="[0.92,0.92]" scaleRotateCenter="[640,360]">
                 <Clock />
                 <Weather />
             </Group>

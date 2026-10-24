@@ -93,7 +93,8 @@ function Initialize()
     m.titleFont = m.titleLabel.font
     m.secondaryTitleFont = m.secondaryTitleLabel.font
     m.clock = m.top.findNode("clock")
-    m.endTimeLabel = m.top.findNode("endTimeLabel")
+    ' the minute the shown "Ends at" time points to (-1 = none shown): the bar text is only rewritten when it moves.
+    m.endTimeMinute = -1
     ' translated once: code-assigned strings don't get the automatic XML lookup.
     m.endsAtText = Tr(Locale.VideoPlayer.EndsAt)
     m.weatherLabel = m.top.findNode("weatherLabel")
@@ -965,11 +966,16 @@ function OnDuration(event as object) as void
     ApplyTransport()
 end function
 
-' "Ends at H:MM" above the right end of the trackbar: now + what's left at the current playback speed. Live has no end.
+' "Ends at H:MM" on the trackbar's time line: now + what's left at the current playback speed. Live has no end.
+' Runs with every renderer push (only while the chrome or a transport shows), but only writes the bar's text
+' when the end time moves to another minute, so a playing video doesn't repaint the bar for it every second.
 function UpdateEndTime() as void
     durationMs = m.transport.durationMs
     if m.transport.isLive or durationMs <= 0
-        m.endTimeLabel.text = ""
+        if m.endTimeMinute <> -1
+            m.endTimeMinute = -1
+            m.trickPlayBar.endTimeText = ""
+        end if
         return
     end if
     speed = ValidFloat(m.top.playbackSpeed)
@@ -980,7 +986,13 @@ function UpdateEndTime() as void
     if remainingSeconds < 0
         remainingSeconds = 0
     end if
-    m.endTimeLabel.text = m.endsAtText + " " + ClockUtils.FormatEpochSeconds(NowSeconds() + Int(remainingSeconds))
+    endSeconds = NowSeconds() + Int(remainingSeconds)
+    endMinute = endSeconds \ 60
+    if endMinute = m.endTimeMinute
+        return
+    end if
+    m.endTimeMinute = endMinute
+    m.trickPlayBar.endTimeText = m.endsAtText + " " + ClockUtils.FormatEpochSeconds(endSeconds)
 end function
 
 function OnWeatherChange() as void

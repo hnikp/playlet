@@ -106,7 +106,6 @@
                 <Clock id="clock" />
                 <Label id="weatherLabel" />
                 <Label id="weatherCityLabel" />
-                <Label id="endTimeLabel" />
             </Group>
             <TrickPlayBar id="trickPlayBar" />
             <ButtonRow id="buttonRow" />

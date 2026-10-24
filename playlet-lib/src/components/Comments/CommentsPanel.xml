@@ -7,11 +7,14 @@
         <field id="closed" type="boolean" alwaysNotify="true" />
         <field id="invidious" type="node" bind="/Invidious" />
         <field id="jobQueue" type="node" bind="/JobQueue" />
+        <!-- the player (not scaled for overscan) moves the panel left and widens the background to the screen edge -->
+        <field id="backgroundWidth" type="float" alias="background.width" />
     </interface>
     <children>
         <Font id="regularFont" uri="font:SystemFontFile" size="18" />
         <Font id="boldFont" uri="font:BoldSystemFontFile" size="18" />
         <Rectangle
+            id="background"
             width="560"
             height="720"
             color="#141414FF">

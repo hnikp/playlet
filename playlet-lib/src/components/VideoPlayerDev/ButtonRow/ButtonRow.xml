@@ -43,5 +43,10 @@
             <VideoPlayerButton id="MinimizeButton"
                 iconUri="pkg:/images/icons/player/minimize.png" />
         </Group>
+        <!-- the focused button's name, above it while the row holds focus (the buttons are icon-only) -->
+        <Label id="captionLabel" visible="false" height="24"
+            color="0xFEFEFEFF" vertAlign="top">
+            <Font role="font" uri="font:SystemFontFile" size="18" />
+        </Label>
     </children>
 </component>

@@ -221,6 +221,10 @@
         <translation>Failed to load playlist %1</translation>
     </message>
     <message>
+        <source>Couldn&apos;t load the video details</source>
+        <translation>Couldn&apos;t load the video details</translation>
+    </message>
+    <message>
         <source>No results found</source>
         <translation>No results found</translation>
     </message>
@@ -1007,6 +1011,14 @@
     <message>
         <source>Ends at</source>
         <translation>Ends at</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translation>Pause</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>More</translation>
     </message>
     <message>
         <source>Video load error</source>

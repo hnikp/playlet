@@ -97,33 +97,31 @@
                      whole HUD continuously (~25fps) for as long as the chrome is up. The LayoutGroup keeps the
                      secondary title flowing under however many lines the title takes. -->
                 <LayoutGroup translation="[68, 40]" layoutDirection="vert" itemSpacings="[5]">
-                    <Label id="titleLabel" width="900" wrap="true" maxLines="3"
+                    <Label id="titleLabel" width="840" wrap="true" maxLines="3"
                         color="0xFEFEFEFF" horizAlign="left">
                         <Font role="font" uri="font:BoldSystemFontFile" size="30" />
                     </Label>
-                    <Label id="secondaryTitleLabel" width="900" height="26"
+                    <Label id="secondaryTitleLabel" width="840" height="26"
                         color="0xFEFEFEFF" horizAlign="left" vertAlign="top" wrap="false">
                         <Font role="font" uri="font:SystemFontFile" size="24" />
                     </Label>
                 </LayoutGroup>
-                <Clock id="clock" />
+                <!-- the player is not scaled for overscan like the screens: the clock and weather end at x 1212
+                     (Clock's own Init places it for the scaled screens; XML fields are applied after Init) -->
+                <Clock id="clock" translation="[1012, 34]" />
                 <!-- the main screen's weather (m.global.weather), under the clock -->
-                <Label id="weatherLabel" translation="[734, 58]" width="500" height="22"
+                <Label id="weatherLabel" translation="[712, 58]" width="500" height="22"
                     color="0xFEFEFEFF" horizAlign="right" vertAlign="top">
                     <Font role="font" uri="font:SystemFontFile" size="18" />
                 </Label>
-                <Label id="weatherCityLabel" translation="[734, 80]" width="500" height="20"
+                <Label id="weatherCityLabel" translation="[712, 80]" width="500" height="20"
                     color="0xCCCCCCFF" horizAlign="right" vertAlign="top">
                     <Font role="font" uri="font:SystemFontFile" size="16" />
                 </Label>
             </Group>
 
+            <!-- also shows when the video ends ("Ends at", on the time line under the bar; set from UpdateEndTime) -->
             <TrickPlayBar id="trickPlayBar" translation="[68, 632]" />
-            <!-- when the video ends at the current speed, above the right end of the trackbar (hidden on live) -->
-            <Label id="endTimeLabel" translation="[912, 604]" width="300" height="22"
-                color="0xFEFEFEFF" horizAlign="right" vertAlign="top">
-                <Font role="font" uri="font:SystemFontFile" size="18" />
-            </Label>
 
             <!-- Round-icon control buttons above the trackbar; virtual focus, self-positions its clusters,
                  visible only while idle + chrome up. -->

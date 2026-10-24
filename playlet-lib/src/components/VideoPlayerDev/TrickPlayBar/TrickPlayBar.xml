@@ -21,6 +21,8 @@
         <field id="sbBarUri" type="uri" alias="trackBg.uri" />
         <field id="sbFillBlend" type="color" />
         <field id="chapterText" type="string" alias="chapterLabel.text" />
+        <!-- VOD: "Ends at 9:58 a.m." appended to the right label (set by the player once a minute; "" hides it) -->
+        <field id="endTimeText" type="string" />
     </interface>
     <children>
         <!-- bundled bar: the OS osd_sliderControl_small.9.png is missing on some firmware (Roku OS 15.3),
@@ -56,8 +58,9 @@
             color="0xFEFEFEFF" horizAlign="left" vertAlign="top">
             <Font role="font" uri="font:SystemFontFile" size="24" />
         </Label>
-        <!-- right label. VOD: "-remaining / total". LIVE: offset M:SS (hidden at edge). -->
-        <Label id="remainingLabel" translation="[744, 24]" width="400" height="24"
+        <!-- right label. VOD: "-remaining / total · Ends at 9:58 a.m.". LIVE: offset M:SS (hidden at edge).
+             Starts right of the chapter label (111..461), so the longest 24h/12h text fits. -->
+        <Label id="remainingLabel" translation="[484, 24]" width="660" height="24"
             color="0xFEFEFEFF" horizAlign="right" vertAlign="top">
             <Font role="font" uri="font:SystemFontFile" size="24" />
         </Label>

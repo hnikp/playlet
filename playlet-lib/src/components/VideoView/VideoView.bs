@@ -124,6 +124,10 @@ function OnDetailsJobDone(event as object) as void
     info = event.getInfo()
     if not info.success and not info.cancel
         LogWarnNoTelemetry("Video details:", info.error)
+        ' nothing arrived (offline, unavailable video...): say so instead of leaving the page blank under the title
+        if m.top.details = invalid
+            RtlText.ApplyToLabel(m.descriptionLabel, Tr(Locale.Dialogs.FailedToLoadVideoDetails), "font:SmallestSystemFont")
+        end if
     end if
 end function
 

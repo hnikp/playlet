@@ -21,6 +21,7 @@ end function
 
 function PushScreen(node as object)
     m.stack.appendChild(node)
+    UpdateClockVisibility()
     FocusTopScreen(invalid)
 end function
 
@@ -28,8 +29,18 @@ function PopScreen(_unused as dynamic)
     childCount = m.stack.getChildCount()
     if childCount > 1
         m.stack.removeChildIndex(childCount - 1)
+        UpdateClockVisibility()
         FocusTopScreen(invalid)
     end if
+end function
+
+' The clock and weather sit in the top right corner, where pushed views (video page, channel...)
+' have their own content, so they only show over the root screens (the root is the first child of the stack).
+function UpdateClockVisibility() as void
+    if m.clockGroup = invalid
+        return
+    end if
+    m.clockGroup.visible = m.stack.getChildCount() <= 1
 end function
 
 function FocusTopScreen(_unused as dynamic)

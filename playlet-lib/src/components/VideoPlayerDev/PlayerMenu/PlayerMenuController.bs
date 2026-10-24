@@ -299,7 +299,9 @@ function OpenPlayerComments() as void
         return
     end if
     m.playerComments = m.top.createChild("CommentsPanel")
-    m.playerComments.translation = [720, 0]
+    ' the player isn't scaled for overscan: the text (24..536 in the panel) ends at x 1212, the background at the edge
+    m.playerComments.translation = [676, 0]
+    m.playerComments.backgroundWidth = 604
     m.playerComments@.BindNode()
     m.playerComments.videoId = videoId
     m.playerComments.ObserveField("closed", FuncName(OnPlayerCommentsClosed))

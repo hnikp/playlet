@@ -72,11 +72,30 @@ namespace Innertube
 
         if StringUtils.IsNullOrEmpty(parsedResponse.author)
             subtitle = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "subtitle"]))
-            if not StringUtils.IsNullOrEmpty(subtitle)
-                parsedResponse.author = subtitle
-            end if
+            ApplyNextSubtitle(parsedResponse, subtitle)
         end if
 
+        return parsedResponse
+    end function
+
+    ' The overlay subtitle is "Channel • 1.2M views • 2 years ago": the author is only the first part,
+    ' the rest fills the view count and published text when the /player response had none.
+    function ApplyNextSubtitle(parsedResponse as object, subtitle as dynamic) as object
+        if StringUtils.IsNullOrEmpty(subtitle)
+            return parsedResponse
+        end if
+
+        parts = subtitle.Split(" " + Chr(8226) + " ")
+        author = parts[0].Trim()
+        if StringUtils.IsNullOrEmpty(parsedResponse.author) and author <> ""
+            parsedResponse.author = author
+        end if
+        if parts.Count() > 1 and parsedResponse.viewCount = invalid and StringUtils.IsNullOrEmpty(parsedResponse.viewCountText)
+            parsedResponse.viewCountText = parts[1].Trim()
+        end if
+        if parts.Count() > 2 and StringUtils.IsNullOrEmpty(parsedResponse.publishedText) and StringUtils.IsNullOrEmpty(parsedResponse.publishDate) and ValidInt(parsedResponse.published) = 0
+            parsedResponse.publishedText = parts[2].Trim()
+        end if
         return parsedResponse
     end function
 

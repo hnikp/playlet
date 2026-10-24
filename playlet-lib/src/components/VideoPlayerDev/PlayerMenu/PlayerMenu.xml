@@ -17,9 +17,10 @@
         <field id="jobQueue" type="node" bind="/JobQueue" />
     </interface>
     <children>
+        <!-- the player isn't scaled for overscan: the panel reaches the screen edge, its text ends at x 1212 -->
         <Rectangle
-            translation="[800,0]"
-            width="480"
+            translation="[762,0]"
+            width="518"
             height="720"
             color="#141414F2">
             <Label

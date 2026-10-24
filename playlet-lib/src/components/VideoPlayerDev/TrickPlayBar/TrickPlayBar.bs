@@ -26,7 +26,7 @@ function Init()
     ' language — "EN DIRECT" is far wider than "LIVE"); measured lazily, once.
     m.liveBadgeLaidOut = false
 
-    for each field in ["transportMode", "positionMs", "durationMs", "cursorMs", "isLive", "liveOffsetMs", "liveFloorMs", "atLiveEdge", "forceLiveBadge"]
+    for each field in ["transportMode", "positionMs", "durationMs", "cursorMs", "isLive", "liveOffsetMs", "liveFloorMs", "atLiveEdge", "forceLiveBadge", "endTimeText"]
         m.top.ObserveField(field, FuncName(Repaint))
     end for
     m.top.ObserveField("focused", FuncName(OnFocusChange))
@@ -67,7 +67,12 @@ function RenderVodBar() as void
     m.trackFill.clippingRect = [0, 0, fillW, 12]
     PositionPlayhead(fillW)
     m.currentLabel.text = FormatBarTime(displayMs / 1000.0)
-    m.remainingLabel.text = "-" + FormatBarTime((durationMs - displayMs) / 1000.0) + " / " + FormatBarTime(durationMs / 1000.0)
+    remainingText = "-" + FormatBarTime((durationMs - displayMs) / 1000.0) + " / " + FormatBarTime(durationMs / 1000.0)
+    endTimeText = m.top.endTimeText
+    if endTimeText <> ""
+        remainingText += " " + Chr(183) + " " + endTimeText
+    end if
+    m.remainingLabel.text = remainingText
 
     ' Raise the handle while scrubbing so the scanGlyph sits at screen-center over the center tile; rest it
     ' low otherwise (the idle InstantReplay icon rides the resting handle).

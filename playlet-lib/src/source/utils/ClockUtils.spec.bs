@@ -1,0 +1,32 @@
+namespace Tests
+
+    @suite
+    class ClockUtilsTests extends Rooibos.BaseTestSuite
+
+        @describe("ClockUtils")
+
+        @it("formats the time in the 12-hour and 24-hour formats")
+        @params("2024-05-01T00:05:00Z", "12h", "12:05 a.m.")
+        @params("2024-05-01T09:58:00Z", "12h", "9:58 a.m.")
+        @params("2024-05-01T12:00:00Z", "12h", "12:00 p.m.")
+        @params("2024-05-01T21:07:00Z", "12h", "9:07 p.m.")
+        @params("2024-05-01T00:05:00Z", "24h", "00:05")
+        @params("2024-05-01T09:58:00Z", "24h", "09:58")
+        @params("2024-05-01T21:07:00Z", "24h", "21:07")
+        function _(isoDate as string, clockFormat as string, expected as string)
+            dateTime = CreateObject("roDateTime")
+            dateTime.FromISO8601String(isoDate)
+            m.assertEqual(ClockUtils.FormatTime(dateTime, clockFormat), expected)
+        end function
+
+        @it("uses the device clock format by default")
+        function _()
+            dateTime = CreateObject("roDateTime")
+            dateTime.FromISO8601String("2024-05-01T21:07:00Z")
+            expected = ClockUtils.FormatTime(dateTime, ClockUtils.GetClockFormat())
+            m.assertEqual(ClockUtils.FormatTime(dateTime), expected)
+        end function
+
+    end class
+
+end namespace

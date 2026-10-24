@@ -1,5 +1,6 @@
 ' ButtonRow @SGNode suite — instantiates just the row, sets its scalar input fields, and asserts the derived
 ' visibility + the virtual-focus highlight on the child buttons (no coordinator, no Video node).
+import "pkg:/source/utils/Locale.bs"
 
 namespace Tests
 
@@ -93,6 +94,44 @@ namespace Tests
             m.top.nudge = true
             m.assertEqual(playAnim.control, "stop")
             m.assertEqual(minimizeAnim.control, "stop")
+        end function
+
+        @describe("caption")
+
+        @it("no caption until the row holds focus")
+        function _()
+            m.top.rowFocused = false
+            m.assertFalse(m.top.findNode("captionLabel").visible)
+        end function
+
+        @it("names the focused button above it, Pause/Play following the play state")
+        function _()
+            caption = m.top.findNode("captionLabel")
+            m.top.rowFocused = true
+            m.top.focusedIndex = 0
+            m.assertTrue(caption.visible)
+            m.assertEqual(caption.text, Tr(Locale.VideoPlayer.Pause))
+            m.assertTrue(caption.translation[1] < 560, "above the buttons")
+            m.top.playing = false
+            m.assertEqual(caption.text, Tr(Locale.Buttons.Play))
+            m.top.focusedIndex = 1
+            m.assertEqual(caption.text, Tr(Locale.PlayerMenu.AudioTrack))
+            m.top.focusedIndex = 3
+            m.assertEqual(caption.text, Tr(Locale.Buttons.Comments))
+            m.top.focusedIndex = 4
+            m.assertEqual(caption.text, Tr(Locale.VideoPlayer.More))
+            m.top.rowFocused = false
+            m.assertFalse(caption.visible)
+        end function
+
+        @it("keeps the last button's caption inside the trackbar's right edge")
+        function _()
+            caption = m.top.findNode("captionLabel")
+            m.top.rowFocused = true
+            m.top.focusedIndex = 5
+            m.assertEqual(caption.text, Tr(Locale.PlayerMenu.PictureInPicture))
+            right = caption.translation[0] + caption.boundingRect().width
+            m.assertTrue(right <= 1212.5, "caption ends at " + right.ToStr())
         end function
 
         @describe("play/pause icon tracks the play state")

@@ -2,6 +2,7 @@
     <interface>
         <function name="Innertube_GetEncodedSearchFilters" />
         <function name="Innertube_GetEncodedNextParams" />
+        <function name="Innertube_ApplyNextSubtitle" />
         <function name="Innertube_ParseCommentsResponse" />
         <function name="Innertube_ParseAbbreviatedCount" />
     </interface>

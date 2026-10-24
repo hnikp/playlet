@@ -101,6 +101,15 @@ namespace Tests
             m.assertEqual(m.top.findNode("remainingLabel").text, "-02:15 / 03:20") ' 135s left of 200s
         end function
 
+        @it("appends the end time to the remaining / total, and drops it when cleared")
+        function _()
+            m.top.positionMs = 65000
+            m.top.endTimeText = "Ends at 9:58 a.m."
+            m.assertEqual(m.top.findNode("remainingLabel").text, "-02:15 / 03:20 " + Chr(183) + " Ends at 9:58 a.m.")
+            m.top.endTimeText = ""
+            m.assertEqual(m.top.findNode("remainingLabel").text, "-02:15 / 03:20")
+        end function
+
         @describe("TrickPlayBar — glyph swap (handle child)")
 
         @it("swaps the scanGlyph uri for skipAhead and hides on none")

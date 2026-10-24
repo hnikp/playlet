@@ -30,7 +30,7 @@ function FirstUpdate()
     Update()
 end function
 
-' format time "H:MM a.m./p.m." (12-hour, no leading zero on the hour)
+' in the device clock format (12h "9:58 a.m." or 24h "09:58")
 function Update()
     m.dateTime.Mark()
     m.dateTime.ToLocalTime()

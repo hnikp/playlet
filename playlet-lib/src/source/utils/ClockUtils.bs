@@ -2,11 +2,19 @@ import "pkg:/source/utils/Types.bs"
 
 namespace ClockUtils
 
-    ' "H:MM a.m./p.m." (12-hour, no leading zero on the hour), the format of the Clock component.
-    ' dateTime must already be in local time.
-    function FormatTime(dateTime as object) as string
+    ' The time in the device's clock format (Settings > System > Time): "H:MM a.m./p.m." for 12-hour
+    ' (no leading zero on the hour), "HH:MM" for 24-hour. Used by the Clock component and the player.
+    ' dateTime must already be in local time. clockFormat is "12h" or "24h"; empty reads the device setting.
+    function FormatTime(dateTime as object, clockFormat = "" as string) as string
+        if clockFormat = ""
+            clockFormat = ClockUtils.GetClockFormat()
+        end if
         hours = dateTime.GetHours()
         minutes = dateTime.GetMinutes()
+        if clockFormat = "24h"
+            return hours.ToStr("%02d") + ":" + minutes.ToStr("%02d")
+        end if
+
         if hours >= 12
             ampm = "p.m."
         else
@@ -20,11 +28,19 @@ namespace ClockUtils
     end function
 
     ' The local time of an epoch (UTC) seconds value, formatted like FormatTime.
-    function FormatEpochSeconds(epochSeconds as integer) as string
+    function FormatEpochSeconds(epochSeconds as integer, clockFormat = "" as string) as string
         dateTime = CreateObject("roDateTime")
         dateTime.FromSeconds(epochSeconds)
         dateTime.ToLocalTime()
-        return ClockUtils.FormatTime(dateTime)
+        return ClockUtils.FormatTime(dateTime, clockFormat)
+    end function
+
+    ' "12h" or "24h", read each time since the user can change it while the app runs.
+    function GetClockFormat() as string
+        if CreateObject("roDeviceInfo").GetClockFormat() = "24h"
+            return "24h"
+        end if
+        return "12h"
     end function
 
 end namespace
