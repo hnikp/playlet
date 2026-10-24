@@ -60,7 +60,7 @@ function OnContentSet() as void
     end if
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:MediumBoldSystemFont", true, 24)
+    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:MediumBoldSystemFont")
 
     subCountText = content.authorSubTitle
     if StringUtils.IsNullOrEmpty(subCountText)

@@ -92,8 +92,8 @@ end function
 
 
 function OnTitleChange() as void
-    RtlText.ApplyToLabel(m.titleLabel, m.top.title, "font:MediumBoldSystemFont", true, 24)
-    RtlText.ApplyToLabel(m.subtitleLabel, m.top.subtitle, "font:SmallestBoldSystemFont", true, 18)
+    RtlText.ApplyToLabel(m.titleLabel, m.top.title, "font:MediumBoldSystemFont")
+    RtlText.ApplyToLabel(m.subtitleLabel, m.top.subtitle, "font:SmallestBoldSystemFont")
 end function
 function Show(_unused as dynamic)
     m.optionsList.ObserveField("itemSelected", FuncName(OnItemSelected))

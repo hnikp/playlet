@@ -87,7 +87,7 @@ function OnContentSet() as void
     end if
 
     RtlText.ApplyToLabel(m.titleLabel, content.title, m.titleFont, true, 30)
-    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:SmallestBoldSystemFont", true, 18)
+    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:SmallestBoldSystemFont")
     m.thumbnail.uri = content.thumbnail
     m.infoLabel.text = JoinNonEmpty([content.viewCountText, content.publishedText, content.lengthText])
     m.subscribeButton.authorId = ValidString(content.authorId)
@@ -137,11 +137,11 @@ function OnDetailsSet() as void
         RtlText.ApplyToLabel(m.titleLabel, details.title, m.titleFont, true, 30)
     end if
     if details.author <> ""
-        RtlText.ApplyToLabel(m.authorLabel, details.author, "font:SmallestBoldSystemFont", true, 18)
+        RtlText.ApplyToLabel(m.authorLabel, details.author, "font:SmallestBoldSystemFont")
     end if
     m.authorThumbnail.uri = details.authorThumbnail
     m.subCountLabel.text = details.subCountText
-    RtlText.SetLabelText(m.descriptionLabel, details.description, details.descriptionPrepared, "font:SmallestSystemFont", 18, false)
+    RtlText.SetLabelText(m.descriptionLabel, details.description, details.descriptionPrepared, "font:SmallestSystemFont")
 
     content = m.top.content
     m.infoLabel.text = JoinNonEmpty([details.viewCountText, details.publishedText, content.lengthText])

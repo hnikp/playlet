@@ -1,469 +1,143 @@
+import "pkg:/source/utils/ArabicShaping.bs"
 import "pkg:/source/utils/Types.bs"
 
-' Arabic-script (Persian/Arabic) text support for SceneGraph labels.
-' Roku labels render code points as-is: no contextual shaping and no bidi reordering. This module:
-'   1. Shape: replaces Arabic letters with their contextual presentation forms (U+FB50-FEFF)
-'   2. ToVisual: reorders a line into visual (left-to-right drawing) order, a simplified Unicode Bidi Algorithm
-'   3. Wrap: breaks logical text into lines before reordering, so multi-line labels keep the right line order
-' The bundled Vazirmatn font covers the presentation forms needed by Persian and Arabic. It also has Noto Emoji's
-' black-and-white emoji (tools/build-emoji-fonts.py): the system font has none, so labels with emoji use it too.
+' Arabic-script (Persian/Arabic) text, emoji and Vietnamese letters in SceneGraph labels.
+' The text work (analysis, shaping, bidi, wrapping) is in ArabicShaping.bs; this module picks fonts and sets
+' labels. The bundled Vazirmatn font covers the presentation forms needed by Persian and Arabic. It also has
+' Noto Emoji's black-and-white emoji and Noto Sans' Vietnamese letters (tools/build-emoji-fonts.py): the system
+' font has neither, so labels with them use it too.
 namespace RtlText
     const FONT_REGULAR_URI = "pkg:/fonts/Vazirmatn-Regular.ttf"
     const FONT_BOLD_URI = "pkg:/fonts/Vazirmatn-Bold.ttf"
     const FONT_REGULAR_FILE = "libpkg:/fonts/Vazirmatn-Regular.ttf"
     const FONT_BOLD_FILE = "libpkg:/fonts/Vazirmatn-Bold.ttf"
     const FONT_FAMILY = "Vazirmatn"
-    ' Vazirmatn looks larger (and its lines are taller) than the system font at the same size
+    ' Vazirmatn's Arabic script looks larger (and its lines are taller) than the system font at the same size.
+    ' Its Latin letters and emoji match the system font's size unscaled.
     const FONT_SCALE = 0.9
-
-    const ZWNJ = &h200C
-    const ZWJ = &h200D
-    const TATWEEL = &h0640
-    const LAM = &h0644
-    const ELLIPSIS = "…"
+    const LATIN_FONT_SCALE = 1.0
+    ' Size of the bundled font when nothing else tells it
+    const DEFAULT_FONT_SIZE = 24
+    ' A RowList's default row label font size
+    const ROW_LABEL_FONT_SIZE = 26
 
     function ContainsArabicScript(text as dynamic) as boolean
-        if not IsString(text)
-            return false
-        end if
-        for each char in Chars(text)
-            if IsArabicScriptCodePoint(Asc(char))
-                return true
-            end if
-        end for
-        return false
+        return ArabicShaping.ContainsArabicScript(text)
     end function
 
-    function IsArabicScriptCodePoint(c as integer) as boolean
-        return (c >= &h0600 and c <= &h06FF) or (c >= &h0750 and c <= &h077F) or (c >= &h08A0 and c <= &h08FF) or (c >= &hFB50 and c <= &hFDFF) or (c >= &hFE70 and c <= &hFEFF)
-    end function
-
-    ' Single code point emoji, as added to the bundled font by tools/build-emoji-fonts.py
-    function IsEmojiCodePoint(c as integer) as boolean
-        return (c >= &h1F000 and c <= &h1FAFF) or (c >= &h2600 and c <= &h27BF) or (c >= &h2300 and c <= &h23FF) or (c >= &h2B00 and c <= &h2BFF)
-    end function
-
-    ' Parts of emoji sequences that Roku can't combine: variation selectors, skin tones, regional indicators (flags)
-    ' and tags. They are dropped, as are joiners between emoji: a family shows as its members.
-    function IsEmojiSequenceCodePoint(c as integer) as boolean
-        return (c >= &hFE00 and c <= &hFE0F) or (c >= &h1F3FB and c <= &h1F3FF) or (c >= &h1F1E6 and c <= &h1F1FF) or (c >= &hE0020 and c <= &hE007F)
-    end function
-
-    function ContainsEmoji(text as dynamic) as boolean
-        if not IsString(text)
-            return false
-        end if
-        for each char in Chars(text)
-            if IsEmojiCodePoint(Asc(char))
-                return true
-            end if
-        end for
-        return false
-    end function
-
-    ' True if the text needs the bundled font: Arabic-script letters or emoji. Call it on cleaned text (CleanEmoji).
+    ' True if the text needs the bundled font: Arabic-script letters, emoji or Vietnamese letters.
     function NeedsBundledFont(text as dynamic) as boolean
-        if not IsString(text)
-            return false
-        end if
-        for each char in Chars(text)
-            c = Asc(char)
-            if IsArabicScriptCodePoint(c) or IsEmojiCodePoint(c)
-                return true
-            end if
-        end for
-        return false
+        return ArabicShaping.Analyze(text).needsBundledFont
     end function
 
-    ' Removes the parts of emoji sequences that would show as boxes (see IsEmojiSequenceCodePoint).
+    ' Removes the parts of emoji sequences that would show as boxes (see ArabicShaping.IsEmojiSequenceCodePoint).
     function CleanEmoji(text as dynamic) as string
-        if not IsString(text)
-            return ""
-        end if
-        characters = Chars(text)
-        found = false
-        for each char in characters
-            c = Asc(char)
-            if IsEmojiSequenceCodePoint(c) or IsEmojiCodePoint(c)
-                found = true
-                exit for
-            end if
-        end for
-        if not found
-            return text
-        end if
-
-        out = []
-        previousIsEmoji = false
-        for each char in characters
-            c = Asc(char)
-            if IsEmojiSequenceCodePoint(c) or (c = ZWJ and previousIsEmoji)
-                continue for
-            end if
-            out.Push(char)
-            previousIsEmoji = IsEmojiCodePoint(c)
-        end for
-        return out.Join("")
+        return ArabicShaping.Analyze(text).text
     end function
 
-    ' True if the first strong character of the text is right-to-left.
-    function IsRtlParagraph(text as dynamic) as boolean
-        if not IsString(text)
-            return false
+    ' The bundled font's scale for text with (or without) Arabic script
+    function FontScaleFor(hasArabic as boolean) as float
+        if hasArabic
+            return FONT_SCALE
         end if
-        for each char in Chars(text)
-            t = BidiClass(Asc(char))
-            if t = "R"
-                return true
-            else if t = "L"
-                return false
-            end if
-        end for
-        return false
+        return LATIN_FONT_SCALE
     end function
 
-    ' Replaces Arabic-script letters with their contextual presentation forms (logical order is kept).
-    ' ZWNJ/ZWJ are consumed: they only affect joining.
-    function Shape(text as dynamic) as string
-        if not ContainsArabicScript(text)
-            return ValidString(text)
-        end if
-
-        forms = GetFormsTable()
-        cps = ToCodePoints(text)
-        n = cps.Count()
-        types = []
-        for each c in cps
-            types.Push(JoiningType(c, forms))
-        end for
-
-        out = []
-        i = 0
-        while i < n
-            c = cps[i]
-            t = types[i]
-            if c = ZWNJ or c = ZWJ
-                i += 1
-                continue while
-            end if
-
-            letterForms = forms[StrI(c)]
-            if letterForms = invalid
-                out.Push(c)
-                i += 1
-                continue while
-            end if
-
-            prevIndex = PrevJoiningIndex(types, i)
-            nextIndex = NextJoiningIndex(types, i)
-            joinsPrev = prevIndex >= 0 and (types[prevIndex] = "D" or types[prevIndex] = "C")
-
-            if c = LAM and nextIndex >= 0
-                ligature = LamAlefLigature(cps[nextIndex])
-                if ligature <> 0
-                    if joinsPrev
-                        out.Push(ligature + 1)
-                    else
-                        out.Push(ligature)
-                    end if
-                    ' keep marks between the lam and the alef
-                    for j = i + 1 to nextIndex - 1
-                        out.Push(cps[j])
-                    end for
-                    i = nextIndex + 1
-                    continue while
-                end if
-            end if
-
-            joinsNext = (t = "D") and nextIndex >= 0 and (types[nextIndex] = "D" or types[nextIndex] = "R" or types[nextIndex] = "C")
-
-            if t = "D"
-                if joinsPrev and joinsNext
-                    out.Push(letterForms[3])
-                else if joinsNext
-                    out.Push(letterForms[2])
-                else if joinsPrev
-                    out.Push(letterForms[1])
-                else
-                    out.Push(letterForms[0])
-                end if
-            else if t = "R" and joinsPrev
-                out.Push(letterForms[1])
-            else
-                out.Push(letterForms[0])
-            end if
-            i += 1
-        end while
-
-        return FromCodePoints(out)
-    end function
-
-    ' Reorders text into visual order, line by line (lines are separated by "\n").
-    function ToVisual(text as dynamic) as string
-        if not IsString(text) or text = ""
-            return ValidString(text)
-        end if
-        lines = text.Split(Chr(10))
-        result = []
-        for each line in lines
-            result.Push(ToVisualLine(line))
-        end for
-        return result.Join(Chr(10))
-    end function
-
-    ' Simplified UBA for a single line: resolve weak/neutral types, assign embedding levels, reverse (rule L2)
-    ' and mirror brackets at odd levels.
-    function ToVisualLine(line as string) as string
-        cps = ToCodePoints(line)
-        n = cps.Count()
-        if n = 0
-            return line
-        end if
-
-        types = []
-        paragraphLevel = -1
-        hasRtl = false
-        for each c in cps
-            t = BidiClass(c)
-            types.Push(t)
-            if t = "R"
-                hasRtl = true
-            end if
-            if paragraphLevel = -1
-                if t = "R"
-                    paragraphLevel = 1
-                else if t = "L"
-                    paragraphLevel = 0
-                end if
-            end if
-        end for
-        if not hasRtl
-            ' no right-to-left character: nothing to reorder
-            return line
-        end if
-        if paragraphLevel = -1
-            paragraphLevel = 0
-        end if
-        paragraphDir = "L"
-        if paragraphLevel = 1
-            paragraphDir = "R"
-        end if
-
-        ' W7: European numbers preceded by left-to-right text behave as left-to-right.
-        ' Extension: text like "<persian author>   2,986 views   14 hours ago" is a list of segments (separated by
-        ' 2+ spaces or "•"); a number starting a segment takes the direction of the segment's first word, so
-        ' "2,986 views" stays together instead of the number joining the Persian text.
-        lastStrong = paragraphDir
-        for i = 0 to n - 1
-            if IsSegmentSeparator(cps, i)
-                lastStrong = SegmentDirection(types, i + 1, lastStrong)
-            end if
-            if types[i] = "R" or types[i] = "L"
-                lastStrong = types[i]
-            else if types[i] = "EN" and lastStrong = "L"
-                types[i] = "L"
-            end if
-        end for
-
-        ' W4: a single separator between two numbers joins them (1,000 / 12:30 / 1.5)
-        for i = 1 to n - 2
-            if types[i] = "N" and IsNumberSeparator(cps[i]) and types[i - 1] = "EN" and types[i + 1] = "EN"
-                types[i] = "EN"
-            end if
-        end for
-
-        ' N1/N2: neutrals take the surrounding direction if both sides agree, else the paragraph direction
-        i = 0
-        while i < n
-            if types[i] <> "N"
-                i += 1
-                continue while
-            end if
-            runStart = i
-            while i < n and types[i] = "N"
-                i += 1
-            end while
-            runEnd = i - 1
-
-            leftDir = paragraphDir
-            if runStart > 0
-                leftDir = StrongDirection(types[runStart - 1])
-            end if
-            rightDir = paragraphDir
-            if runEnd < n - 1
-                rightDir = StrongDirection(types[runEnd + 1])
-            end if
-
-            resolved = paragraphDir
-            if leftDir = rightDir
-                resolved = leftDir
-            end if
-            for j = runStart to runEnd
-                types[j] = resolved
-            end for
-        end while
-
-        ' I1/I2: embedding levels. Even paragraph level: R -> 1, EN -> 2, L -> 0.
-        ' Odd paragraph level: R -> 1, L and EN -> 2.
-        levels = []
-        maxLevel = 1
-        for i = 0 to n - 1
-            t = types[i]
-            if t = "R"
-                level = 1
-            else if t = "EN" or paragraphLevel = 1
-                level = 2
-            else
-                level = 0
-            end if
-            levels.Push(level)
-            if level > maxLevel
-                maxLevel = level
-            end if
-        end for
-
-        ' L2: from the highest level down to the lowest odd level, reverse every run at or above that level
-        for level = maxLevel to 1 step -1
-            i = 0
-            while i < n
-                if levels[i] < level
-                    i += 1
-                    continue while
-                end if
-                runStart = i
-                while i < n and levels[i] >= level
-                    i += 1
-                end while
-                ReverseRange(cps, runStart, i - 1)
-                ReverseRange(levels, runStart, i - 1)
-            end while
-        end for
-
-        ' L4: mirrored characters at odd (right-to-left) levels
-        mirrors = GetMirrorTable()
-        for i = 0 to n - 1
-            if levels[i] mod 2 = 1
-                mirrored = mirrors[StrI(cps[i])]
-                if mirrored <> invalid
-                    cps[i] = mirrored
-                end if
-            end if
-        end for
-
-        return FromCodePoints(cps)
-    end function
-
-    ' Breaks (shaped, logical-order) text into at most maxLines lines that fit maxWidth,
-    ' adding an ellipsis when truncated. font is an roFont.
-    function Wrap(text as string, font as object, maxWidth as integer, maxLines as integer) as object
-        if font = invalid or maxWidth <= 0 or maxLines <= 0
-            return [text]
-        end if
-
-        words = text.Split(" ")
-        lines = []
-        current = ""
-        wordIndex = 0
-        wordCount = words.Count()
-        while wordIndex < wordCount
-            word = words[wordIndex]
-            if current = ""
-                candidate = word
-            else
-                candidate = current + " " + word
-            end if
-
-            if current = "" or font.GetOneLineWidth(candidate, 100000) <= maxWidth
-                current = candidate
-                wordIndex += 1
-                continue while
-            end if
-
-            if lines.Count() = maxLines - 1
-                exit while
-            end if
-            lines.Push(current)
-            current = ""
-        end while
-
-        truncated = wordIndex < wordCount
-        if truncated or font.GetOneLineWidth(current, 100000) > maxWidth
-            while Len(current) > 0 and font.GetOneLineWidth(current + ELLIPSIS, 100000) > maxWidth
-                current = Left(current, Len(current) - 1)
-            end while
-            current = current.Trim() + ELLIPSIS
-        end if
-        lines.Push(current)
-        return lines
-    end function
-
-    ' Shapes + wraps + reorders text for display. Returns { text, isRtl } ready to assign to a label.
-    ' font (an roFont, see GetMeasureFont) is optional: without it the text is not wrapped.
+    ' Shapes + wraps + reorders text for display. Returns { text, isRtl, useBundledFont, fontScale, hasArabic }:
+    ' text is ready to assign to a label, in the bundled font at fontScale when useBundledFont is true.
+    ' font (something with GetOneLineWidth, see GetMeasureFont) is optional: without it the text is not wrapped.
     function Prepare(text as dynamic, font = invalid as object, maxWidth = 0 as integer, maxLines = 1 as integer) as object
-        text = CleanEmoji(text)
-        if not ContainsArabicScript(text)
-            return { text: text, isRtl: false }
+        return PrepareAnalyzed(ArabicShaping.Analyze(text), font, maxWidth, maxLines)
+    end function
+
+    ' Prepare for text already analyzed (ArabicShaping.Analyze).
+    function PrepareAnalyzed(analysis as object, font as object, maxWidth as integer, maxLines as integer) as object
+        text = analysis.text
+        prepared = {
+            text: text
+            isRtl: false
+            useBundledFont: analysis.needsBundledFont
+            fontScale: FontScaleFor(analysis.hasArabic)
+            hasArabic: analysis.hasArabic
+        }
+        if not analysis.hasArabic
+            return prepared
         end if
 
-        shaped = Shape(text)
+        wrap = font <> invalid and maxWidth > 0
+        truncated = false
+        if wrap
+            ' a long description would be shaped in full for a few visible lines
+            cut = ArabicShaping.Truncate(text, ArabicShaping.MaxVisibleChars(maxWidth, maxLines))
+            text = cut.text
+            truncated = cut.truncated
+        end if
+
+        paragraphs = ArabicShaping.Shape(text).Split(Chr(10))
+        lastParagraph = paragraphs.Count() - 1
         lines = []
-        for each paragraph in shaped.Split(Chr(10))
+        for i = 0 to lastParagraph
             remaining = maxLines - lines.Count()
             if remaining <= 0
                 exit for
             end if
-            if font <> invalid and maxWidth > 0
-                lines.Append(Wrap(paragraph, font, maxWidth, remaining))
+            if wrap
+                lines.Append(ArabicShaping.Wrap(paragraphs[i], font, maxWidth, remaining, truncated and i = lastParagraph))
             else
-                lines.Push(paragraph)
+                lines.Push(paragraphs[i])
             end if
         end for
 
         visualLines = []
         for each line in lines
-            visualLines.Push(ToVisualLine(line))
+            visualLines.Push(ArabicShaping.ToVisualLine(line))
         end for
 
-        return { text: visualLines.Join(Chr(10)), isRtl: IsRtlParagraph(text) }
-    end function
-
-    ' For text prepared in a task thread and shown later in a label: returns
-    ' { text, isRtl, useBundledFont }. When useBundledFont is true, the label should use
-    ' GetLabelFont(size, bold) and horizAlign "right" if isRtl.
-    function PrepareForLabel(text as dynamic, size as integer, bold as boolean, width as integer, maxLines as integer) as object
-        text = CleanEmoji(text)
-        if not NeedsBundledFont(text)
-            return { text: text, isRtl: false, useBundledFont: false }
-        end if
-        ' see ApplyToLabel for the slack
-        prepared = Prepare(text, GetMeasureFont(size, bold), Int(width * 0.95), maxLines)
-        prepared.useBundledFont = true
+        prepared.text = visualLines.Join(Chr(10))
+        prepared.isRtl = analysis.isRtl
         return prepared
     end function
 
-    ' Sets text on a Label, switching to the bundled font for Arabic-script text or emoji and back to
-    ' defaultFont otherwise. The label's width and maxLines are honored.
-    ' defaultFont is a Font node or a font name ("font:SmallestSystemFont"); size is the font size to use for the
-    ' bundled font (0 = the size of the defaultFont node).
-    function ApplyToLabel(label as object, text as dynamic, defaultFont as dynamic, bold = false as boolean, size = 0 as integer) as void
+    ' Prepare, measuring with the bundled font at the given size (only measured for Arabic script, which is
+    ' wrapped here; other text is wrapped by the label).
+    function PrepareSized(text as dynamic, size as integer, bold as boolean, maxWidth as integer, maxLines as integer) as object
+        analysis = ArabicShaping.Analyze(text)
+        measurer = invalid
+        if analysis.hasArabic
+            measurer = GetMeasureFont(size, bold, FONT_SCALE)
+        end if
+        return PrepareAnalyzed(analysis, measurer, maxWidth, maxLines)
+    end function
+
+    ' For text prepared in a task thread and shown later in a label (see SetLabelText): returns
+    ' { text, isRtl, useBundledFont, fontScale, hasArabic, width, maxLines }. When useBundledFont is true, the
+    ' label should use GetLabelFont(size, bold, fontScale) and horizAlign "right" if isRtl.
+    function PrepareForLabel(text as dynamic, size as integer, bold as boolean, width as integer, maxLines as integer) as object
+        ' see ApplyToLabel for the slack
+        prepared = PrepareSized(text, size, bold, Int(width * 0.95), maxLines)
+        ' the label size it was wrapped for
+        prepared.width = width
+        prepared.maxLines = maxLines
+        return prepared
+    end function
+
+    ' Sets text on a Label, switching to the bundled font for Arabic-script text, emoji or Vietnamese letters and
+    ' back to defaultFont otherwise. The label's width and maxLines are honored.
+    ' defaultFont is a Font node or a font name ("font:SmallestSystemFont"). size and bold are those of the
+    ' bundled font; by default they come from the system font name (see SystemFontInfo) or the Font node's size.
+    function ApplyToLabel(label as object, text as dynamic, defaultFont as dynamic, bold = invalid as dynamic, size = 0 as integer) as void
         if label = invalid
             return
         end if
-        text = CleanEmoji(text)
-        if not NeedsBundledFont(text)
+        analysis = ArabicShaping.Analyze(text)
+        if not analysis.needsBundledFont
             SetDefaultFont(label, defaultFont)
             label.horizAlign = "left"
-            label.text = text
+            label.text = analysis.text
             return
         end if
 
-        if size <= 0
-            size = 24
-            if IsNode(defaultFont) and defaultFont.size > 0
-                size = defaultFont.size
-            end if
-        end if
-
+        fontInfo = ResolveFontInfo(defaultFont, size, bold)
         maxLines = 1
         if label.wrap
             maxLines = label.maxLines
@@ -472,13 +146,57 @@ namespace RtlText
             end if
         end if
 
+        measurer = invalid
+        if analysis.hasArabic
+            measurer = GetMeasureFont(fontInfo.size, fontInfo.bold, FONT_SCALE)
+        end if
         ' a little slack: SceneGraph and roFont measurements can differ by a few pixels, and an overflowing
         ' line would be re-wrapped by the label in the wrong order.
-        maxWidth = Int(label.width * 0.95)
-        prepared = Prepare(text, GetMeasureFont(size, bold), maxWidth, maxLines)
+        prepared = PrepareAnalyzed(analysis, measurer, Int(label.width * 0.95), maxLines)
+        ShowPrepared(label, prepared, fontInfo.size, fontInfo.bold)
+    end function
 
-        SetRtlFont(label, size, bold)
-        if prepared.isRtl
+    ' Sets a label's text, using text prepared in a task thread (PrepareForLabel) when available, so the render
+    ' thread doesn't shape/wrap. Without prepared text, or text prepared for another label size, it is prepared
+    ' here (ApplyToLabel). size and bold: see ApplyToLabel.
+    function SetLabelText(label as object, text as dynamic, prepared as dynamic, defaultFont as dynamic, size = 0 as integer, bold = invalid as dynamic) as void
+        if not IsAssociativeArray(prepared) or not prepared.DoesExist("useBundledFont")
+            ApplyToLabel(label, text, defaultFont, bold, size)
+            return
+        end if
+        if prepared.useBundledFont <> true
+            SetDefaultFont(label, defaultFont)
+            label.horizAlign = "left"
+            label.text = prepared.text
+            return
+        end if
+        if not IsPreparedFor(prepared, label)
+            ApplyToLabel(label, text, defaultFont, bold, size)
+            return
+        end if
+        fontInfo = ResolveFontInfo(defaultFont, size, bold)
+        ShowPrepared(label, prepared, fontInfo.size, fontInfo.bold)
+    end function
+
+    ' True if prepared text was wrapped for the label's width and lines (text without Arabic script isn't wrapped)
+    function IsPreparedFor(prepared as object, label as object) as boolean
+        if prepared.hasArabic <> true or not prepared.DoesExist("width")
+            return true
+        end if
+        maxLines = 1
+        if label.wrap
+            maxLines = label.maxLines
+        end if
+        return prepared.width = label.width and prepared.maxLines = maxLines
+    end function
+
+    function ShowPrepared(label as object, prepared as object, size as integer, bold as boolean) as void
+        fontScale = prepared.fontScale
+        if fontScale = invalid
+            fontScale = FONT_SCALE
+        end if
+        SetRtlFont(label, size, bold, fontScale)
+        if prepared.isRtl = true
             label.horizAlign = "right"
         else
             label.horizAlign = "left"
@@ -486,37 +204,15 @@ namespace RtlText
         label.text = prepared.text
     end function
 
-    ' Sets a label's text, using text prepared in a task thread (PrepareForLabel) when available, so the render
-    ' thread doesn't shape/wrap. Without prepared text, it is prepared here (ApplyToLabel).
-    function SetLabelText(label as object, text as dynamic, prepared as dynamic, defaultFont as dynamic, size as integer, bold as boolean) as void
-        if not IsAssociativeArray(prepared) or not prepared.DoesExist("useBundledFont")
-            ApplyToLabel(label, text, defaultFont, bold, size)
-            return
-        end if
-        if prepared.useBundledFont = true
-            SetRtlFont(label, size, bold)
-            if prepared.isRtl = true
-                label.horizAlign = "right"
-            else
-                label.horizAlign = "left"
-            end if
-            label.text = prepared.text
-            return
-        end if
-        SetDefaultFont(label, defaultFont)
-        label.horizAlign = "left"
-        label.text = CleanEmoji(text)
-    end function
-
     ' Vazirmatn's lines are much taller than the system font's (~38px vs ~28px at size 18), which pushes the
     ' labels below a multi-line title out of their cell: tighten the line spacing while it is used.
-    function SetRtlFont(label as object, size as integer, bold as boolean) as void
+    function SetRtlFont(label as object, size as integer, bold as boolean, fontScale = FONT_SCALE as float) as void
         if not label.hasField("rtlDefaultLineSpacing")
             label.addField("rtlDefaultLineSpacing", "float", false)
             label.rtlDefaultLineSpacing = label.lineSpacing
         end if
-        label.font = GetLabelFont(size, bold)
-        label.lineSpacing = label.rtlDefaultLineSpacing - Int(ScaledFontSize(size) * 0.5)
+        label.font = GetLabelFont(size, bold, fontScale)
+        label.lineSpacing = label.rtlDefaultLineSpacing - Int(ScaledFontSize(size, fontScale) * 0.5)
     end function
 
     function SetDefaultFont(label as object, defaultFont as dynamic) as void
@@ -528,18 +224,131 @@ namespace RtlText
         end if
     end function
 
-    function ScaledFontSize(size as integer) as integer
-        return Int(size * FONT_SCALE + 0.5)
+    ' The font for a label showing prepared text (Prepare): the bundled font at the system font's size, or the
+    ' system font (a name like "font:SmallestBoldSystemFont").
+    function FontFor(fontName as string, prepared as object) as dynamic
+        if prepared.useBundledFont <> true
+            return fontName
+        end if
+        fontInfo = ResolveFontInfo(fontName, 0, invalid)
+        return GetLabelFont(fontInfo.size, fontInfo.bold, prepared.fontScale)
+    end function
+
+    ' Sets a ButtonGroup's buttons. A ButtonGroup has one font for all buttons: when a text needs the bundled
+    ' font, the whole group uses it (focused buttons in bold), else the group's own fonts.
+    ' textWidth: the width the texts are wrapped (ellipsized) to.
+    function SetButtonGroupTexts(group as object, texts as object, size as integer, textWidth as integer) as void
+        buttonTexts = []
+        useBundledFont = false
+        hasArabic = false
+        for each text in texts
+            prepared = PrepareSized(text, size, false, textWidth, 1)
+            buttonTexts.Push(prepared.text)
+            useBundledFont = useBundledFont or prepared.useBundledFont
+            hasArabic = hasArabic or prepared.hasArabic
+        end for
+
+        fontScale = FontScaleFor(hasArabic)
+        SwitchFontField(group, "textFont", useBundledFont, size, false, fontScale)
+        SwitchFontField(group, "focusedTextFont", useBundledFont, size, true, fontScale)
+        group.buttons = buttonTexts
+    end function
+
+    ' Returns a copy of a RowList's feeds ([{ title, ... }]) with the titles prepared, and switches the RowList's
+    ' row label font: the bundled font when a title needs it, else its own font.
+    function PrepareRowListFeeds(rowList as object, feeds as object, size = ROW_LABEL_FONT_SIZE as integer) as object
+        result = []
+        useBundledFont = false
+        hasArabic = false
+        for each feed in feeds
+            if not IsAssociativeArray(feed) or not IsString(feed.title)
+                result.Push(feed)
+                continue for
+            end if
+            ' a copy: preparing prepared (visual order) text again would reverse it back
+            copy = {}
+            copy.Append(feed)
+            prepared = Prepare(feed.title)
+            copy.title = prepared.text
+            useBundledFont = useBundledFont or prepared.useBundledFont
+            hasArabic = hasArabic or prepared.hasArabic
+            result.Push(copy)
+        end for
+        SwitchFontField(rowList, "rowLabelFont", useBundledFont, size, false, FontScaleFor(hasArabic))
+        return result
+    end function
+
+    ' Sets a node's font field to the bundled font, or back to the field's original value (saved on the node
+    ' the first time, like SetRtlFont's line spacing).
+    function SwitchFontField(node as object, fieldName as string, useBundledFont as boolean, size as integer, bold as boolean, fontScale as float) as void
+        defaultField = "rtlDefault_" + fieldName
+        if not node.hasField(defaultField)
+            node.addField(defaultField, "node", false)
+            node[defaultField] = node[fieldName]
+        end if
+        if useBundledFont
+            node[fieldName] = GetLabelFont(size, bold, fontScale)
+        else if node[defaultField] <> invalid
+            node[fieldName] = node[defaultField]
+        end if
+    end function
+
+    ' Size and boldness of the system fonts at the app's (HD) resolution, so callers can pass just the name.
+    function SystemFontInfo(fontName as string) as dynamic
+        fonts = m.__rtlSystemFonts
+        if fonts = invalid
+            fonts = {
+                "font:SmallestSystemFont": { size: 18, bold: false }
+                "font:SmallestBoldSystemFont": { size: 18, bold: true }
+                "font:SmallSystemFont": { size: 22, bold: false }
+                "font:SmallBoldSystemFont": { size: 22, bold: true }
+                "font:MediumSystemFont": { size: 24, bold: false }
+                "font:MediumBoldSystemFont": { size: 24, bold: true }
+                "font:LargeSystemFont": { size: 30, bold: false }
+                "font:LargeBoldSystemFont": { size: 30, bold: true }
+            }
+            m.__rtlSystemFonts = fonts
+        end if
+        return fonts[fontName]
+    end function
+
+    ' { size, bold } of the bundled font standing in for defaultFont: explicit size (> 0) and bold (a boolean)
+    ' win, else they come from the system font name or the Font node's size.
+    function ResolveFontInfo(defaultFont as dynamic, size as integer, bold as dynamic) as object
+        info = invalid
+        if IsString(defaultFont)
+            info = SystemFontInfo(defaultFont)
+        end if
+        if size <= 0
+            size = DEFAULT_FONT_SIZE
+            if info <> invalid
+                size = info.size
+            else if IsNode(defaultFont) and defaultFont.size > 0
+                size = defaultFont.size
+            end if
+        end if
+        if not IsBool(bold)
+            bold = info <> invalid and info.bold
+        end if
+        return { size: size, bold: bold }
+    end function
+
+    function ScaledFontSize(size as integer, fontScale = FONT_SCALE as float) as integer
+        return Int(size * fontScale + 0.5)
+    end function
+
+    function FontKey(size as integer, bold as boolean, fontScale as float) as string
+        return `${size}_${bold}_${Int(fontScale * 100 + 0.5)}`
     end function
 
     ' A SceneGraph Font node for the bundled font, cached per thread.
-    function GetLabelFont(size as integer, bold as boolean) as object
+    function GetLabelFont(size as integer, bold as boolean, fontScale = FONT_SCALE as float) as object
         cache = m.__rtlLabelFonts
         if cache = invalid
             cache = {}
             m.__rtlLabelFonts = cache
         end if
-        key = `${size}_${bold}`
+        key = FontKey(size, bold, fontScale)
         font = cache[key]
         if font = invalid
             font = CreateObject("roSGNode", "Font")
@@ -548,7 +357,7 @@ namespace RtlText
             else
                 font.uri = FONT_REGULAR_URI
             end if
-            font.size = ScaledFontSize(size)
+            font.size = ScaledFontSize(size, fontScale)
             cache[key] = font
         end if
         return font
@@ -556,32 +365,26 @@ namespace RtlText
 
     ' Something with GetOneLineWidth(text, maxWidth) to measure text in the bundled font, cached per thread.
     ' roFontRegistry can't be created on the render thread, so there a hidden Label measures instead.
-    function GetMeasureFont(size as integer, bold as boolean) as object
+    function GetMeasureFont(size as integer, bold as boolean, fontScale = FONT_SCALE as float) as object
         cache = m.__rtlMeasureFonts
         if cache = invalid
             cache = {}
             m.__rtlMeasureFonts = cache
         end if
-        key = `${size}_${bold}`
+        key = FontKey(size, bold, fontScale)
         measurer = cache[key]
         if measurer <> invalid
             return measurer
         end if
 
         if IsRenderThread()
-            measurer = CreateLabelMeasurer(GetLabelFont(size, bold))
+            measurer = CreateLabelMeasurer(GetLabelFont(size, bold, fontScale))
         else
-            registry = m.__rtlFontRegistry
+            registry = GetFontRegistry(bold)
             if registry = invalid
-                registry = CreateObject("roFontRegistry")
-                if registry = invalid
-                    return invalid
-                end if
-                registry.Register(FONT_REGULAR_FILE)
-                registry.Register(FONT_BOLD_FILE)
-                m.__rtlFontRegistry = registry
+                return invalid
             end if
-            measurer = registry.GetFont(FONT_FAMILY, ScaledFontSize(size), bold, false)
+            measurer = registry.GetFont(FONT_FAMILY, ScaledFontSize(size, fontScale), bold, false)
         end if
 
         if measurer = invalid
@@ -589,6 +392,29 @@ namespace RtlText
         end if
         cache[key] = measurer
         return measurer
+    end function
+
+    ' The thread's roFontRegistry with the needed weight registered: each font file is ~900KB, and jobs
+    ' (new nodes, so a new registry each time) often need only one weight.
+    function GetFontRegistry(bold as boolean) as object
+        registry = m.__rtlFontRegistry
+        if registry = invalid
+            registry = CreateObject("roFontRegistry")
+            if registry = invalid
+                return invalid
+            end if
+            m.__rtlFontRegistry = registry
+            m.__rtlRegisteredFonts = {}
+        end if
+        file = FONT_REGULAR_FILE
+        if bold
+            file = FONT_BOLD_FILE
+        end if
+        if m.__rtlRegisteredFonts[file] = invalid
+            registry.Register(file)
+            m.__rtlRegisteredFonts[file] = true
+        end if
+        return registry
     end function
 
     ' Jobs run in Task nodes (m.top is a Task); components run on the render thread.
@@ -610,200 +436,5 @@ namespace RtlText
                 return m.label.boundingRect().width
             end function
         }
-    end function
-
-    ' The characters of a string. Split("") does it in one pass (Mid() in a loop is quadratic on long
-    ' descriptions); falls back to Mid() if Split("") doesn't split into characters.
-    function Chars(text as string) as object
-        characters = text.Split("")
-        length = Len(text)
-        if characters.Count() = length
-            return characters
-        end if
-        characters = []
-        for i = 1 to length
-            characters.Push(Mid(text, i, 1))
-        end for
-        return characters
-    end function
-
-    function ToCodePoints(text as string) as object
-        cps = []
-        for each char in Chars(text)
-            cps.Push(Asc(char))
-        end for
-        return cps
-    end function
-
-    function FromCodePoints(cps as object) as string
-        characters = []
-        for each c in cps
-            characters.Push(Chr(c))
-        end for
-        return characters.Join("")
-    end function
-
-    function ReverseRange(arr as object, startIndex as integer, endIndex as integer) as void
-        while startIndex < endIndex
-            tmp = arr[startIndex]
-            arr[startIndex] = arr[endIndex]
-            arr[endIndex] = tmp
-            startIndex += 1
-            endIndex -= 1
-        end while
-    end function
-
-    ' Bidi class, simplified to: "R" (right-to-left), "L" (left-to-right), "EN" (number), "N" (neutral)
-    function BidiClass(c as integer) as string
-        if (c >= &h30 and c <= &h39) or (c >= &h06F0 and c <= &h06F9) or (c >= &h0660 and c <= &h0669)
-            return "EN"
-        end if
-        if (c >= &h0590 and c <= &h08FF) or (c >= &hFB1D and c <= &hFDFF) or (c >= &hFE70 and c <= &hFEFF)
-            return "R"
-        end if
-        if c < &h41 or (c >= &h5B and c <= &h60) or (c >= &h7B and c <= &hBF) or c = &hD7 or c = &hF7
-            return "N"
-        end if
-        if (c >= &h2000 and c <= &h2BFF) or (c >= &h3000 and c <= &h303F) or (c >= &hFE30 and c <= &hFE4F) or c >= &h1F000
-            return "N"
-        end if
-        return "L"
-    end function
-
-    function IsSegmentSeparator(cps as object, index as integer) as boolean
-        c = cps[index]
-        if c = &h2022
-            return true
-        end if
-        return c = &h20 and index + 1 < cps.Count() and cps[index + 1] = &h20
-    end function
-
-    ' The direction of the first strong character from index (to the end), or fallback
-    function SegmentDirection(types as object, index as integer, fallback as string) as string
-        for i = index to types.Count() - 1
-            if types[i] = "R" or types[i] = "L"
-                return types[i]
-            end if
-        end for
-        return fallback
-    end function
-
-    ' N1: numbers count as right-to-left when resolving neutrals
-    function StrongDirection(t as string) as string
-        if t = "L"
-            return "L"
-        end if
-        return "R"
-    end function
-
-    function IsNumberSeparator(c as integer) as boolean
-        return c = &h2C or c = &h2E or c = &h3A or c = &h2F or c = &h066B or c = &h066C
-    end function
-
-    ' Joining type: "D" dual, "R" right, "C" join-causing, "T" transparent, "U" non-joining
-    function JoiningType(c as integer, forms as object) as string
-        letterForms = forms[StrI(c)]
-        if letterForms <> invalid
-            if letterForms.Count() = 4
-                return "D"
-            else if letterForms.Count() = 2
-                return "R"
-            end if
-            return "U"
-        end if
-        if c = TATWEEL or c = ZWJ
-            return "C"
-        end if
-        if (c >= &h064B and c <= &h065F) or c = &h0670 or (c >= &h06D6 and c <= &h06DC) or (c >= &h06DF and c <= &h06E4) or c = &h06E7 or c = &h06E8 or (c >= &h06EA and c <= &h06ED)
-            return "T"
-        end if
-        return "U"
-    end function
-
-    function PrevJoiningIndex(types as object, index as integer) as integer
-        i = index - 1
-        while i >= 0 and types[i] = "T"
-            i -= 1
-        end while
-        return i
-    end function
-
-    function NextJoiningIndex(types as object, index as integer) as integer
-        i = index + 1
-        n = types.Count()
-        while i < n and types[i] = "T"
-            i += 1
-        end while
-        if i >= n
-            return -1
-        end if
-        return i
-    end function
-
-    ' Isolated lam-alef ligature for the given alef (final form is +1), or 0
-    function LamAlefLigature(alef as integer) as integer
-        if alef = &h0622
-            return &hFEF5
-        else if alef = &h0623
-            return &hFEF7
-        else if alef = &h0625
-            return &hFEF9
-        else if alef = &h0627
-            return &hFEFB
-        end if
-        return 0
-    end function
-
-    ' code point -> [isolated, final, initial, medial] (dual-joining) or [isolated, final] (right-joining)
-    function GetFormsTable() as object
-        if m.__rtlFormsTable <> invalid
-            return m.__rtlFormsTable
-        end if
-
-        table = {}
-        ' Arabic letters U+0621-U+064A map to consecutive runs in Presentation Forms-B, starting at U+FE80
-        letters = [
-            [&h0621, 1], [&h0622, 2], [&h0623, 2], [&h0624, 2], [&h0625, 2], [&h0626, 4], [&h0627, 2], [&h0628, 4],
-            [&h0629, 2], [&h062A, 4], [&h062B, 4], [&h062C, 4], [&h062D, 4], [&h062E, 4], [&h062F, 2], [&h0630, 2],
-            [&h0631, 2], [&h0632, 2], [&h0633, 4], [&h0634, 4], [&h0635, 4], [&h0636, 4], [&h0637, 4], [&h0638, 4],
-            [&h0639, 4], [&h063A, 4], [&h0641, 4], [&h0642, 4], [&h0643, 4], [&h0644, 4], [&h0645, 4], [&h0646, 4],
-            [&h0647, 4], [&h0648, 2], [&h0649, 2], [&h064A, 4]
-        ]
-        nextForm = &hFE80
-        for each letter in letters
-            forms = []
-            for i = 0 to letter[1] - 1
-                forms.Push(nextForm + i)
-            end for
-            table[StrI(letter[0])] = forms
-            nextForm += letter[1]
-        end for
-
-        ' Persian and other letters in Presentation Forms-A
-        table[StrI(&h0671)] = [&hFB50, &hFB51] ' alef wasla
-        table[StrI(&h067E)] = [&hFB56, &hFB57, &hFB58, &hFB59] ' peh
-        table[StrI(&h0686)] = [&hFB7A, &hFB7B, &hFB7C, &hFB7D] ' tcheh
-        table[StrI(&h0698)] = [&hFB8A, &hFB8B] ' jeh
-        table[StrI(&h06A9)] = [&hFB8E, &hFB8F, &hFB90, &hFB91] ' keheh
-        table[StrI(&h06AF)] = [&hFB92, &hFB93, &hFB94, &hFB95] ' gaf
-        table[StrI(&h06C0)] = [&hFBA4, &hFBA5] ' heh with yeh above
-        table[StrI(&h06CC)] = [&hFBFC, &hFBFD, &hFBFE, &hFBFF] ' farsi yeh
-
-        m.__rtlFormsTable = table
-        return table
-    end function
-
-    function GetMirrorTable() as object
-        if m.__rtlMirrorTable <> invalid
-            return m.__rtlMirrorTable
-        end if
-        pairs = [[&h28, &h29], [&h5B, &h5D], [&h7B, &h7D], [&h3C, &h3E], [&hAB, &hBB], [&h2039, &h203A]]
-        table = {}
-        for each pair in pairs
-            table[StrI(pair[0])] = pair[1]
-            table[StrI(pair[1])] = pair[0]
-        end for
-        m.__rtlMirrorTable = table
-        return table
     end function
 end namespace

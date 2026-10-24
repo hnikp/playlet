@@ -46,5 +46,8 @@
         <!-- videoId is Mix continuation (playlistId starts with "RD") -->
         <field id="videoId" type="string" />
         <field id="lines" type="stringarray" />
+        <!-- Persian/Arabic title and author prepared for PlaylistRowCell's labels (see RtlText.PrepareForLabel) -->
+        <field id="titlePrepared" type="assocarray" />
+        <field id="authorPrepared" type="assocarray" />
     </interface>
 </component>

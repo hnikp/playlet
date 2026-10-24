@@ -21,7 +21,7 @@ function OnContentSet() as void
 
     ' Persian/Arabic text needs RtlText; the title was prepared off the render thread for this label size
     ' (same as VideoRowCell's), the author line is combined here so it is shaped here.
-    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont", 18, true)
+    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont")
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     author = content._author
     if not StringUtils.IsNullOrEmpty(author)
@@ -38,7 +38,7 @@ function OnContentSet() as void
             end if
         end if
     end if
-    RtlText.ApplyToLabel(m.authorLabel, author, "font:SmallestSystemFont", false, 18)
+    RtlText.ApplyToLabel(m.authorLabel, author, "font:SmallestSystemFont")
 
     m.top.thumbnailUri = content.thumbnail
 

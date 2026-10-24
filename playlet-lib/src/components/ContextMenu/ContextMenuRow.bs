@@ -1,7 +1,7 @@
 import "pkg:/source/utils/RtlText.bs"
 
 function Init()
-    m.useBundledFont = false
+    m.prepared = { useBundledFont: false }
 end function
 
 function OnContentSet() as void
@@ -13,7 +13,7 @@ function OnContentSet() as void
     ' options can carry names (e.g. a bookmark group named after a Persian channel): shaped like other labels.
     ' A ScrollingLabel has no wrap, so the text is prepared as one line.
     prepared = RtlText.Prepare(content.title)
-    m.useBundledFont = RtlText.NeedsBundledFont(prepared.text)
+    m.prepared = prepared
     if prepared.isRtl
         m.top.findNode("label").horizAlign = "right"
     else
@@ -45,11 +45,9 @@ end function
 
 ' The system fonts lack Persian and emoji glyphs: such options use RtlText's font at the same size.
 function SetBold(bold as boolean) as void
-    if m.useBundledFont
-        m.top.font = RtlText.GetLabelFont(18, bold)
-    else if bold
-        m.top.font = "font:SmallestBoldSystemFont"
+    if bold
+        m.top.font = RtlText.FontFor("font:SmallestBoldSystemFont", m.prepared)
     else
-        m.top.font = "font:SmallestSystemFont"
+        m.top.font = RtlText.FontFor("font:SmallestSystemFont", m.prepared)
     end if
 end function

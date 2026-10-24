@@ -22,5 +22,7 @@
         <field id="thumbnail" type="string" />
         <field id="videoCount" type="integer" />
         <field id="videoCountText" type="string" />
+        <!-- Persian/Arabic name prepared for ChannelRowCell's label (see RtlText.PrepareForLabel) -->
+        <field id="authorPrepared" type="assocarray" />
     </interface>
 </component>

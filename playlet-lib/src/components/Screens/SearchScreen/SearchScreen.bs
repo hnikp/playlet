@@ -26,8 +26,6 @@ function Init()
     m.suggestions = m.top.FindNode("suggestions")
     m.filtersButton = m.top.FindNode("filtersButton")
 
-    m.suggestionsDefaultFont = m.suggestions.textFont
-    m.suggestionsDefaultFocusedFont = m.suggestions.focusedTextFont
     ' The raw queries behind the suggestion buttons (the buttons show them shaped for Persian)
     m.suggestionQueries = []
 
@@ -154,33 +152,9 @@ function OnSearchSuggestions(event as object) as void
         buttonFocused = suggestions.Count() - 1
     end if
 
-    buttonTexts = []
-    useBundledFont = false
-    for each suggestion in suggestions
-        if RtlText.NeedsBundledFont(RtlText.CleanEmoji(suggestion))
-            useBundledFont = true
-            prepared = RtlText.Prepare(suggestion, RtlText.GetMeasureFont(SUGGESTIONS_FONT_SIZE, false), SUGGESTIONS_TEXT_WIDTH, 1)
-            buttonTexts.Push(prepared.text)
-        else
-            buttonTexts.Push(suggestion)
-        end if
-    end for
-
-    ' The system font has no Persian presentation forms or emoji: switch the whole group to the bundled font
-    if useBundledFont
-        m.suggestions.textFont = RtlText.GetLabelFont(SUGGESTIONS_FONT_SIZE, false)
-        m.suggestions.focusedTextFont = RtlText.GetLabelFont(SUGGESTIONS_FONT_SIZE, true)
-    else
-        if m.suggestionsDefaultFont <> invalid
-            m.suggestions.textFont = m.suggestionsDefaultFont
-        end if
-        if m.suggestionsDefaultFocusedFont <> invalid
-            m.suggestions.focusedTextFont = m.suggestionsDefaultFocusedFont
-        end if
-    end if
-
     m.suggestionQueries = suggestions
-    m.suggestions.buttons = buttonTexts
+    ' The buttons show the suggestions shaped for Persian, in the bundled font when needed
+    RtlText.SetButtonGroupTexts(m.suggestions, suggestions, SUGGESTIONS_FONT_SIZE, SUGGESTIONS_TEXT_WIDTH)
     if buttonFocused <> -1
         m.suggestions.focusButton = buttonFocused
     end if
@@ -269,20 +243,11 @@ function Search(text as string)
         end if
     end for
 
-    ' The row label font has no Persian or emoji glyphs: switch to the bundled font when the query needs it
-    if m.defaultRowLabelFont = invalid
-        m.defaultRowLabelFont = m.rowList.rowLabelFont
-    end if
-    if RtlText.NeedsBundledFont(RtlText.CleanEmoji(text))
-        m.rowList.rowLabelFont = RtlText.GetLabelFont(26, false)
-    else
-        m.rowList.rowLabelFont = m.defaultRowLabelFont
-    end if
-
-    m.rowList.feeds = [{
-        "title": RtlText.Prepare(`${Tr(Locale.NavBar.Search)} - ${text}`).text
+    ' The row title is shaped for Persian, in the bundled font when the query needs it
+    m.rowList.feeds = RtlText.PrepareRowListFeeds(m.rowList, [{
+        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
         "feedSources": [feedSource]
-    }]
+    }])
 end function
 
 function OnSearchContentReady() as void

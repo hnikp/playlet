@@ -15,8 +15,9 @@ function OnContentSet() as void
         return
     end if
 
-    ' (not content.titlePrepared: that is wrapped for the feed cells' width)
-    RtlText.ApplyToLabel(m.titleLabel, content.title, "font:SmallestBoldSystemFont", true, 18)
+    ' titlePrepared is wrapped for the feed cells' width: Persian/Arabic titles are prepared again here
+    ' (SetLabelText checks the size), other titles are used as prepared
+    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont")
     m.top.thumbnailUri = content.thumbnail
 
     SetDurationText(content.lengthText)

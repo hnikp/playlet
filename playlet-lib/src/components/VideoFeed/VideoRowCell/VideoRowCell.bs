@@ -33,7 +33,7 @@ function OnContentSet() as void
         return
     end if
 
-    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont", 18, true)
+    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont")
     lines = content.lines
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
@@ -43,7 +43,7 @@ function OnContentSet() as void
             author = lines[0]
         end if
     end if
-    RtlText.SetLabelText(m.authorLabel, author, content.authorPrepared, "font:SmallestSystemFont", 18, false)
+    RtlText.SetLabelText(m.authorLabel, author, content.authorPrepared, "font:SmallestSystemFont")
 
     viewCountDate = ""
     if content.isUpcoming = true

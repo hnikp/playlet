@@ -7,6 +7,7 @@ import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/RtlText.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -48,7 +49,7 @@ function LoadFeeds() as void
     ' With topic shelves coming, the rows are set once they arrive: replacing rows that are loading cancels
     ' their requests (logged as errors).
     if m.top.dynamicTopic = "" or m.preferences["backend.selected"] <> "playlet"
-        m.rowList.feeds = m.staticFeeds
+        SetFeeds(m.staticFeeds)
     end if
 
     QueueTopicShelvesJob()
@@ -134,13 +135,18 @@ function OnTopicShelvesJobDone(event as object) as void
     end for
     feeds.Append(m.staticFeeds)
 
-    m.rowList.feeds = feeds
+    SetFeeds(feeds)
+end function
+
+' Shelf titles can be Persian (e.g. on a Persian profile): shaped, in the bundled font when one needs it
+function SetFeeds(feeds as object)
+    m.rowList.feeds = RtlText.PrepareRowListFeeds(m.rowList, feeds)
 end function
 
 ' The layout's rows, unless rows are already showing (a refresh that found no shelves keeps them)
 function ShowStaticFeeds() as void
     if not IsArray(m.rowList.feeds) or m.rowList.feeds.Count() = 0
-        m.rowList.feeds = m.staticFeeds
+        SetFeeds(m.staticFeeds)
     end if
 end function
 

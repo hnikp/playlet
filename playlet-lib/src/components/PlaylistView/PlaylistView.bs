@@ -60,7 +60,7 @@ function OnContentSet() as void
         end if
     end if
     m.updatedLabel.text = content.updatedText
-    RtlText.ApplyToLabel(m.descriptionLabel, content.description, "font:SmallestSystemFont", false, 18)
+    RtlText.ApplyToLabel(m.descriptionLabel, content.description, "font:SmallestSystemFont")
 
     ' We use two Posters to cross fade from the low res thumbnail to the high res thumbnail.
     ' We can't use a single Poster because we're using the blendColor. There's no loadingBitmapBlendColor.

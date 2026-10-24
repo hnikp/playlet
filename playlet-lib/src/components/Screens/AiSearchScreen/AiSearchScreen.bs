@@ -40,8 +40,6 @@ function Init()
     textEditBox.voiceEnabled = true
     textEditBox.hintText = Tr(Locale.AiSearch.Hint)
 
-    m.historyDefaultFont = m.history.textFont
-    m.historyDefaultFocusedFont = m.history.focusedTextFont
     ' The raw queries behind the history buttons (the buttons show them shaped for Persian)
     m.historyQueries = []
 
@@ -216,7 +214,8 @@ function OnAiSearchJobDone(event as object) as void
 
     m.rowList.UnobserveFieldScoped("someContentReady")
     m.rowList.ObserveFieldScoped("someContentReady", FuncName(OnAiContentReady))
-    m.rowList.feeds = aiFeeds
+    ' Row titles are shaped for Persian, in the bundled font when one needs it
+    m.rowList.feeds = RtlText.PrepareRowListFeeds(m.rowList, aiFeeds)
 end function
 
 ' Rows like SearchScreen's search feed: "AI picks" (one search per pick, reduced to one video by
@@ -259,18 +258,13 @@ function BuildAiFeeds(data as object) as object
         })
     end if
 
-    ' The row label font has no Persian or emoji glyphs: when a title needs them, all rows use the bundled font
-    useBundledFont = false
     for each suggestedQuery in ValidArray(data.queries)
         suggestedQuery = ValidString(suggestedQuery).Trim()
         if suggestedQuery = ""
             continue for
         end if
-        if RtlText.NeedsBundledFont(RtlText.CleanEmoji(suggestedQuery))
-            useBundledFont = true
-        end if
         aiFeeds.Push({
-            "title": RtlText.Prepare(suggestedQuery).text
+            "title": suggestedQuery
             "feedSources": [{
                 "id": `inv_search_${CryptoUtils.GetMd5(suggestedQuery)}`
                 "title": suggestedQuery
@@ -282,15 +276,6 @@ function BuildAiFeeds(data as object) as object
             }]
         })
     end for
-
-    if m.defaultRowLabelFont = invalid
-        m.defaultRowLabelFont = m.rowList.rowLabelFont
-    end if
-    if useBundledFont
-        m.rowList.rowLabelFont = RtlText.GetLabelFont(26, false)
-    else
-        m.rowList.rowLabelFont = m.defaultRowLabelFont
-    end if
 
     return aiFeeds
 end function
@@ -382,44 +367,23 @@ end function
 function LoadAiHistory()
     queries = SearchHistoryUtils.GetAllSaved(m.preferences, SearchHistoryUtils.AI_SEARCH_HISTORY_KEY)
     shownQueries = []
-    buttonTexts = []
-    useBundledFont = false
     for each savedQuery in queries
         if not IsString(savedQuery) or savedQuery = ""
             continue for
         end if
         shownQueries.Push(savedQuery)
-        if RtlText.NeedsBundledFont(RtlText.CleanEmoji(savedQuery))
-            useBundledFont = true
-            prepared = RtlText.Prepare(savedQuery, RtlText.GetMeasureFont(AI_HISTORY_FONT_SIZE, false), AI_HISTORY_TEXT_WIDTH, 1)
-            buttonTexts.Push(prepared.text)
-        else
-            buttonTexts.Push(savedQuery)
-        end if
         if shownQueries.Count() >= AI_HISTORY_MAX_SHOWN
             exit for
         end if
     end for
 
-    ' The system font has no Persian presentation forms or emoji: switch the whole group to the bundled font
-    if useBundledFont
-        m.history.textFont = RtlText.GetLabelFont(AI_HISTORY_FONT_SIZE, false)
-        m.history.focusedTextFont = RtlText.GetLabelFont(AI_HISTORY_FONT_SIZE, true)
-    else
-        if m.historyDefaultFont <> invalid
-            m.history.textFont = m.historyDefaultFont
-        end if
-        if m.historyDefaultFocusedFont <> invalid
-            m.history.focusedTextFont = m.historyDefaultFocusedFont
-        end if
-    end if
-
     hadFocus = m.history.isInFocusChain()
     m.historyQueries = shownQueries
-    m.history.buttons = buttonTexts
-    m.history.focusable = buttonTexts.Count() > 0
+    ' The buttons show the queries shaped for Persian, in the bundled font when needed
+    RtlText.SetButtonGroupTexts(m.history, shownQueries, AI_HISTORY_FONT_SIZE, AI_HISTORY_TEXT_WIDTH)
+    m.history.focusable = shownQueries.Count() > 0
     if hadFocus
-        if buttonTexts.Count() > 0
+        if shownQueries.Count() > 0
             m.history.focusButton = 0
         else
             NodeSetFocus(m.askButton, true)

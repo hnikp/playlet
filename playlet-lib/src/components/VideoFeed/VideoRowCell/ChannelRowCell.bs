@@ -13,7 +13,8 @@ function OnContentSet() as void
     end if
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    RtlText.ApplyToLabel(m.authorLabel, content._author, "font:SmallestBoldSystemFont", true, 18)
+    ' Persian/Arabic text was prepared off the render thread (InvidiousContent.ToChannelContentNode)
+    RtlText.SetLabelText(m.authorLabel, content._author, content.authorPrepared, "font:SmallestBoldSystemFont")
     subCountText = content.authorSubTitle
     if StringUtils.IsNullOrEmpty(subCountText)
         if content.subCount > 0

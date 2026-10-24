@@ -143,6 +143,14 @@ namespace InvidiousContent
 
         node.continuation = ValidString(item.continuation)
 
+        ' Sizes match PlaylistRowCell's labels (see ToVideoContentNode)
+        node.titlePrepared = RtlText.PrepareForLabel(node.title, 18, true, 350, 2)
+        author = node._author
+        if author = "" and IsArray(node.lines) and node.lines.Count() > 0
+            author = node.lines[0]
+        end if
+        node.authorPrepared = RtlText.PrepareForLabel(author, 18, false, 350, 1)
+
         return node
     end function
 
@@ -170,6 +178,9 @@ namespace InvidiousContent
         SetIfExists(node, "tabsParams", item, "tabsParams")
         SetIfExists(node, "tabsTitles", item, "tabsTitles")
         SetIfExists(node, "tabs", item, "tabs")
+
+        ' Sizes match ChannelRowCell's label (see ToVideoContentNode)
+        node.authorPrepared = RtlText.PrepareForLabel(node._author, 18, true, 196, 2)
 
         return node
     end function

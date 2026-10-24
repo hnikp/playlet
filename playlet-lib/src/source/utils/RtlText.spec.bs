@@ -24,6 +24,8 @@ namespace Tests
         @params("سلام", true)
         @params("Goal 😀", true)
         @params("I ❤ it", true)
+        @params("Gấu mèo TV", true)
+        @params("Café crème", false)
         function _(text as dynamic, expected as boolean)
             m.assertEqual(RtlText.NeedsBundledFont(text), expected)
         end function
@@ -42,126 +44,130 @@ namespace Tests
             m.assertEqual(RtlText.CleanEmoji("می" + Chr(&h200C) + "روم 😀"), "می" + Chr(&h200C) + "روم 😀")
         end function
 
-        @describe("RtlText.Chars")
+        @describe("RtlText.Prepare")
 
-        @it("Splits a string into characters")
+        @it("Leaves text without special characters as it is")
         function _()
-            m.assertEqual(RtlText.Chars("سلام"), ["س", "ل", "ا", "م"])
-            m.assertEqual(RtlText.Chars("ab"), ["a", "b"])
-            m.assertEqual(RtlText.Chars(""), [])
+            prepared = RtlText.Prepare("Hello (world)", m.FakeMeasurer(), 100, 2)
+            m.assertEqual(prepared.text, "Hello (world)")
+            m.assertFalse(prepared.useBundledFont)
+            m.assertFalse(prepared.isRtl)
         end function
 
-        @describe("RtlText.IsRtlParagraph")
+        @it("Uses the bundled font unscaled for emoji and Vietnamese letters")
+        function _()
+            measurer = m.FakeMeasurer()
+            prepared = RtlText.Prepare("Goal " + Chr(&h1F600) + Chr(&hFE0F), measurer, 100, 2)
+            m.assertEqual(prepared.text, "Goal " + Chr(&h1F600))
+            m.assertTrue(prepared.useBundledFont)
+            m.assertFalse(prepared.hasArabic)
+            m.assertEqual(prepared.fontScale, RtlText.LATIN_FONT_SCALE)
+            ' not wrapped (the label wraps it)
+            m.assertEqual(measurer.calls, 0)
 
-        @it("Uses the first strong character")
-        @params("سلام world", true)
-        @params("Hello سلام", false)
-        @params("15 سلام", true)
-        @params("123", false)
-        function _(text as dynamic, expected as boolean)
-            m.assertEqual(RtlText.IsRtlParagraph(text), expected)
+            prepared = RtlText.Prepare("Gấu mèo TV")
+            m.assertTrue(prepared.useBundledFont)
+            m.assertEqual(prepared.fontScale, RtlText.LATIN_FONT_SCALE)
         end function
 
-        @describe("RtlText.Shape")
-
-        @it("Leaves non-Arabic text unchanged")
+        @it("Shapes, wraps and reorders Arabic script, scaled")
         function _()
-            m.assertEqual(RtlText.Shape("Hello (world) 123"), "Hello (world) 123")
+            ' "ا د ا د" (alef, dal: no joining) at 10px per character, 30px per line: "ا د" per line
+            text = m.Cps([&h0627, &h20, &h062F, &h20, &h0627, &h20, &h062F])
+            prepared = RtlText.Prepare(text, m.FakeMeasurer(), 30, 2)
+            line = m.Cps([&hFEA9, &h20, &hFE8D])
+            m.assertEqual(prepared.text, line + Chr(10) + line)
+            m.assertTrue(prepared.isRtl)
+            m.assertTrue(prepared.useBundledFont)
+            m.assertTrue(prepared.hasArabic)
+            m.assertEqual(prepared.fontScale, RtlText.FONT_SCALE)
         end function
 
-        @it("Shapes initial, medial, final and isolated forms")
+        @it("Cuts long text before shaping, keeping the ellipsis")
         function _()
-            ' دنیا: dal (isolated), noon (initial), farsi yeh (medial), alef (final)
-            m.assertEqual(RtlText.Shape("دنیا"), m.Cps([&hFEA9, &hFEE7, &hFBFF, &hFE8E]))
+            words = []
+            for i = 1 to 1000
+                words.Push(Chr(&h0627))
+            end for
+            measurer = m.FakeMeasurer()
+            ' 40px, one line: "ا ا…" fits
+            prepared = RtlText.Prepare(words.Join(" "), measurer, 40, 1)
+            m.assertEqual(prepared.text, m.Cps([&h2026, &hFE8D, &h20, &hFE8D]))
+            m.assertTrue(measurer.calls < 20)
         end function
 
-        @it("Uses the lam-alef ligature")
+        @it("Ends cut text with an ellipsis")
         function _()
-            ' سلام: seen (initial), lam-alef (final), meem (isolated: alef doesn't join to the left)
-            m.assertEqual(RtlText.Shape("سلام"), m.Cps([&hFEB3, &hFEFC, &hFEE1]))
-            ' لا alone: isolated ligature
-            m.assertEqual(RtlText.Shape("لا"), m.Cps([&hFEFB]))
+            ' 5 characters at most (1 * 16 / 4 + 1) are shaped, and the line ends with an ellipsis
+            text = m.Cps([&h0627, &h0627, &h0627, &h0627, &h0627, &h0627, &h0627, &h0627])
+            prepared = RtlText.Prepare(text, m.FakeMeasurer(), 16, 1)
+            m.assertEqual(prepared.text, Chr(&h2026))
         end function
 
-        @it("Shapes Persian letters")
+        @describe("RtlText.PrepareForLabel")
+
+        @it("Remembers the label size it was prepared for")
         function _()
-            ' پژ: peh (initial), jeh (final; right-joining)
-            m.assertEqual(RtlText.Shape("پژ"), m.Cps([&hFB58, &hFB8B]))
-            ' گک: gaf (initial), keheh (final)
-            m.assertEqual(RtlText.Shape("گک"), m.Cps([&hFB94, &hFB8F]))
+            prepared = RtlText.PrepareForLabel("Goal " + Chr(&h1F600), 18, true, 350, 2)
+            m.assertTrue(prepared.useBundledFont)
+            m.assertEqual(prepared.width, 350)
+            m.assertEqual(prepared.maxLines, 2)
+
+            prepared = RtlText.PrepareForLabel("Hello", 18, true, 350, 2)
+            m.assertFalse(prepared.useBundledFont)
+            m.assertEqual(prepared.text, "Hello")
         end function
 
-        @it("Breaks joining at ZWNJ and removes it")
+        @describe("RtlText.IsPreparedFor")
+
+        @it("Compares the size of Arabic-script text only")
         function _()
-            ' می‌خواهم: meem (initial), yeh (final) | ZWNJ | khah (initial), waw (final), alef (isolated), heh (initial), meem (final)
-            text = "می" + Chr(&h200C) + "خواهم"
-            expected = m.Cps([&hFEE3, &hFBFD, &hFEA7, &hFEEE, &hFE8D, &hFEEB, &hFEE2])
-            m.assertEqual(RtlText.Shape(text), expected)
+            label = { width: 350, maxLines: 2, wrap: true }
+            m.assertTrue(RtlText.IsPreparedFor({ hasArabic: true, width: 350, maxLines: 2 }, label))
+            m.assertFalse(RtlText.IsPreparedFor({ hasArabic: true, width: 350, maxLines: 2 }, { width: 260, maxLines: 3, wrap: true }))
+            m.assertFalse(RtlText.IsPreparedFor({ hasArabic: true, width: 350, maxLines: 2 }, { width: 350, maxLines: 2, wrap: false }))
+            m.assertTrue(RtlText.IsPreparedFor({ hasArabic: false, width: 350, maxLines: 2 }, { width: 260, maxLines: 3, wrap: true }))
         end function
 
-        @it("Skips transparent marks when joining")
+        @describe("RtlText fonts")
+
+        @it("Scales the bundled font for Arabic script only")
         function _()
-            ' بَب: beh (initial), fatha, beh (final)
-            text = m.Cps([&h0628, &h064E, &h0628])
-            m.assertEqual(RtlText.Shape(text), m.Cps([&hFE91, &h064E, &hFE90]))
+            m.assertEqual(RtlText.FontScaleFor(true), RtlText.FONT_SCALE)
+            m.assertEqual(RtlText.FontScaleFor(false), RtlText.LATIN_FONT_SCALE)
+            m.assertEqual(RtlText.ScaledFontSize(18), 16)
+            m.assertEqual(RtlText.ScaledFontSize(18, RtlText.LATIN_FONT_SCALE), 18)
+            m.assertNotEqual(RtlText.FontKey(18, false, RtlText.FONT_SCALE), RtlText.FontKey(18, false, RtlText.LATIN_FONT_SCALE))
         end function
 
-        @describe("RtlText.ToVisualLine")
-
-        @it("Leaves left-to-right text unchanged")
-        function _()
-            m.assertEqual(RtlText.ToVisualLine("Hello (world) 123"), "Hello (world) 123")
+        @it("Takes size and boldness from system font names")
+        @params("font:SmallestBoldSystemFont", 0, invalid, 18, true)
+        @params("font:SmallestSystemFont", 0, invalid, 18, false)
+        @params("font:MediumBoldSystemFont", 0, invalid, 24, true)
+        @params("font:SmallSystemFont", 0, invalid, 22, false)
+        @params("font:LargeBoldSystemFont", 0, invalid, 30, true)
+        @params("font:SmallestBoldSystemFont", 30, false, 30, false)
+        @params("font:UnknownFont", 0, invalid, 24, false)
+        @params(invalid, 0, true, 24, true)
+        function _(fontName as dynamic, size as integer, bold as dynamic, expectedSize as integer, expectedBold as boolean)
+            info = RtlText.ResolveFontInfo(fontName, size, bold)
+            m.assertEqual(info.size, expectedSize)
+            m.assertEqual(info.bold, expectedBold)
         end function
 
-        @it("Reverses right-to-left text")
-        function _()
-            m.assertEqual(RtlText.ToVisualLine(m.Cps([&h0627, &h0628, &h062A])), m.Cps([&h062A, &h0628, &h0627]))
-        end function
-
-        @it("Keeps embedded English and numbers in order")
-        function _()
-            ' "<a b> iPhone 15" in a right-to-left paragraph -> "iPhone 15 <b a>"
-            text = m.Cps([&h0627, &h0628]) + " iPhone 15"
-            m.assertEqual(RtlText.ToVisualLine(text), "iPhone 15 " + m.Cps([&h0628, &h0627]))
-        end function
-
-        @it("Keeps Persian digit order")
-        function _()
-            ' "<a b> ۱۴۰۳" -> "۱۴۰۳ <b a>"
-            digits = m.Cps([&h06F1, &h06F4, &h06F0, &h06F3])
-            text = m.Cps([&h0627, &h0628]) + " " + digits
-            m.assertEqual(RtlText.ToVisualLine(text), digits + " " + m.Cps([&h0628, &h0627]))
-        end function
-
-        @it("Keeps number separators inside numbers")
-        function _()
-            text = m.Cps([&h0627]) + " 12:30"
-            m.assertEqual(RtlText.ToVisualLine(text), "12:30 " + m.Cps([&h0627]))
-        end function
-
-        @it("Keeps a number with the English words of its segment")
-        function _()
-            ' "<a b>   2,986 views   14 hours ago" -> the English segments stay in reading order, left of <b a>
-            text = m.Cps([&h0627, &h0628]) + "   2,986 views   14 hours ago"
-            m.assertEqual(RtlText.ToVisualLine(text), "2,986 views   14 hours ago   " + m.Cps([&h0628, &h0627]))
-        end function
-
-        @it("Mirrors brackets in right-to-left runs")
-        function _()
-            ' "(<a b>)" -> "(<b a>)" after mirroring
-            text = "(" + m.Cps([&h0627, &h0628]) + ")"
-            m.assertEqual(RtlText.ToVisualLine(text), "(" + m.Cps([&h0628, &h0627]) + ")")
-        end function
-
-        @it("Reorders right-to-left words inside left-to-right text")
-        function _()
-            text = "Hi " + m.Cps([&h0627, &h0628]) + " " + m.Cps([&h062A, &h062B]) + " end"
-            expected = "Hi " + m.Cps([&h062B, &h062A]) + " " + m.Cps([&h0628, &h0627]) + " end"
-            m.assertEqual(RtlText.ToVisualLine(text), expected)
+        ' Measures 10px per character and counts measurements
+        function FakeMeasurer() as object
+            return {
+                calls: 0
+                GetOneLineWidth: function(text as string, _maxWidth as integer) as float
+                    m.calls += 1
+                    return Len(text) * 10
+                end function
+            }
         end function
 
         function Cps(cps as object) as string
-            return RtlText.FromCodePoints(cps)
+            return ArabicShaping.FromCodePoints(cps)
         end function
 
     end class

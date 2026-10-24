@@ -1,0 +1,252 @@
+namespace Tests
+
+    @suite
+    class ArabicShapingTests extends Rooibos.BaseTestSuite
+
+        @describe("ArabicShaping.IsAscii")
+
+        @it("Is true for ASCII-only text")
+        @params("Hello world 123 (!)", true)
+        @params("", true)
+        @params("Café", false)
+        @params("سلام", false)
+        @params("Goal 😀", false)
+        @params("Gấu", false)
+        function _(text as string, expected as boolean)
+            m.assertEqual(ArabicShaping.IsAscii(text), expected)
+        end function
+
+        @describe("ArabicShaping.Analyze")
+
+        @it("Returns ASCII text as it is")
+        function _()
+            analysis = ArabicShaping.Analyze("Hello world")
+            m.assertEqual(analysis.text, "Hello world")
+            m.assertFalse(analysis.needsBundledFont)
+            m.assertFalse(analysis.hasArabic)
+            m.assertFalse(analysis.isRtl)
+        end function
+
+        @it("Handles invalid")
+        function _()
+            analysis = ArabicShaping.Analyze(invalid)
+            m.assertEqual(analysis.text, "")
+            m.assertFalse(analysis.needsBundledFont)
+        end function
+
+        @it("Finds Arabic script and the paragraph direction")
+        function _()
+            analysis = ArabicShaping.Analyze("15 سلام world")
+            m.assertTrue(analysis.hasArabic)
+            m.assertTrue(analysis.needsBundledFont)
+            m.assertTrue(analysis.isRtl)
+            m.assertFalse(analysis.hasEmoji)
+
+            analysis = ArabicShaping.Analyze("Hi سلام")
+            m.assertTrue(analysis.hasArabic)
+            m.assertFalse(analysis.isRtl)
+        end function
+
+        @it("Finds emoji and cleans their sequences")
+        function _()
+            analysis = ArabicShaping.Analyze("Iran " + Chr(&h1F1EE) + Chr(&h1F1F7) + " " + Chr(&h1F468) + Chr(&h200D) + Chr(&h1F469))
+            m.assertEqual(analysis.text, "Iran  " + Chr(&h1F468) + Chr(&h1F469))
+            m.assertTrue(analysis.hasEmoji)
+            m.assertTrue(analysis.needsBundledFont)
+            m.assertFalse(analysis.hasArabic)
+        end function
+
+        @it("Keeps ZWNJ/ZWJ in Persian text")
+        function _()
+            text = "می" + Chr(&h200C) + "روم" + Chr(&h200D)
+            m.assertEqual(ArabicShaping.Analyze(text).text, text)
+        end function
+
+        @it("Finds Vietnamese letters")
+        function _()
+            analysis = ArabicShaping.Analyze("Gấu mèo TV")
+            m.assertTrue(analysis.hasExtendedLatin)
+            m.assertTrue(analysis.needsBundledFont)
+            m.assertFalse(analysis.hasArabic)
+            m.assertEqual(analysis.text, "Gấu mèo TV")
+
+            ' Latin-1 letters are in the system font
+            m.assertFalse(ArabicShaping.Analyze("Café crème").needsBundledFont)
+        end function
+
+        @describe("ArabicShaping.Truncate")
+
+        @it("Cuts text longer than maxChars")
+        function _()
+            cut = ArabicShaping.Truncate("abcdef", 4)
+            m.assertEqual(cut.text, "abcd")
+            m.assertTrue(cut.truncated)
+
+            cut = ArabicShaping.Truncate("abcd", 4)
+            m.assertEqual(cut.text, "abcd")
+            m.assertFalse(cut.truncated)
+
+            m.assertEqual(ArabicShaping.MaxVisibleChars(350, 2), 176)
+        end function
+
+        @describe("ArabicShaping.Wrap")
+
+        @it("Breaks text into lines that fit")
+        function _()
+            m.assertEqual(ArabicShaping.Wrap("aaa bbb ccc", m.FakeMeasurer(), 70, 2), ["aaa bbb", "ccc"])
+            m.assertEqual(ArabicShaping.Wrap("aaa bbb ccc", invalid, 70, 2), ["aaa bbb ccc"])
+        end function
+
+        @it("Ends the last line with an ellipsis when the text doesn't fit")
+        function _()
+            m.assertEqual(ArabicShaping.Wrap("aaa bbb ccc ddd eee", m.FakeMeasurer(), 70, 2), ["aaa bbb", "ccc dd…"])
+            ' a single word wider than the line
+            m.assertEqual(ArabicShaping.Wrap("abcdefghijkl", m.FakeMeasurer(), 50, 1), ["abcd…"])
+            ' forced (the text was cut before)
+            m.assertEqual(ArabicShaping.Wrap("abc", m.FakeMeasurer(), 100, 1, true), ["abc…"])
+        end function
+
+        @it("Finds the ellipsis position with few measurements")
+        function _()
+            measurer = m.FakeMeasurer()
+            m.assertEqual(ArabicShaping.FitWithEllipsis(String(200, "a"), measurer, 50), "aaaa…")
+            m.assertTrue(measurer.calls <= 10)
+            m.assertEqual(ArabicShaping.FitWithEllipsis("ab", m.FakeMeasurer(), 5), "…")
+        end function
+
+        @describe("ArabicShaping.Chars")
+
+        @it("Splits a string into characters")
+        function _()
+            m.assertEqual(ArabicShaping.Chars("سلام"), ["س", "ل", "ا", "م"])
+            m.assertEqual(ArabicShaping.Chars("ab"), ["a", "b"])
+            m.assertEqual(ArabicShaping.Chars(""), [])
+        end function
+
+        @describe("ArabicShaping.IsRtlParagraph")
+
+        @it("Uses the first strong character")
+        @params("سلام world", true)
+        @params("Hello سلام", false)
+        @params("15 سلام", true)
+        @params("123", false)
+        function _(text as dynamic, expected as boolean)
+            m.assertEqual(ArabicShaping.IsRtlParagraph(text), expected)
+        end function
+
+        @describe("ArabicShaping.Shape")
+
+        @it("Leaves non-Arabic text unchanged")
+        function _()
+            m.assertEqual(ArabicShaping.Shape("Hello (world) 123"), "Hello (world) 123")
+        end function
+
+        @it("Shapes initial, medial, final and isolated forms")
+        function _()
+            ' دنیا: dal (isolated), noon (initial), farsi yeh (medial), alef (final)
+            m.assertEqual(ArabicShaping.Shape("دنیا"), m.Cps([&hFEA9, &hFEE7, &hFBFF, &hFE8E]))
+        end function
+
+        @it("Uses the lam-alef ligature")
+        function _()
+            ' سلام: seen (initial), lam-alef (final), meem (isolated: alef doesn't join to the left)
+            m.assertEqual(ArabicShaping.Shape("سلام"), m.Cps([&hFEB3, &hFEFC, &hFEE1]))
+            ' لا alone: isolated ligature
+            m.assertEqual(ArabicShaping.Shape("لا"), m.Cps([&hFEFB]))
+        end function
+
+        @it("Shapes Persian letters")
+        function _()
+            ' پژ: peh (initial), jeh (final; right-joining)
+            m.assertEqual(ArabicShaping.Shape("پژ"), m.Cps([&hFB58, &hFB8B]))
+            ' گک: gaf (initial), keheh (final)
+            m.assertEqual(ArabicShaping.Shape("گک"), m.Cps([&hFB94, &hFB8F]))
+        end function
+
+        @it("Breaks joining at ZWNJ and removes it")
+        function _()
+            ' می‌خواهم: meem (initial), yeh (final) | ZWNJ | khah (initial), waw (final), alef (isolated), heh (initial), meem (final)
+            text = "می" + Chr(&h200C) + "خواهم"
+            expected = m.Cps([&hFEE3, &hFBFD, &hFEA7, &hFEEE, &hFE8D, &hFEEB, &hFEE2])
+            m.assertEqual(ArabicShaping.Shape(text), expected)
+        end function
+
+        @it("Skips transparent marks when joining")
+        function _()
+            ' بَب: beh (initial), fatha, beh (final)
+            text = m.Cps([&h0628, &h064E, &h0628])
+            m.assertEqual(ArabicShaping.Shape(text), m.Cps([&hFE91, &h064E, &hFE90]))
+        end function
+
+        @describe("ArabicShaping.ToVisualLine")
+
+        @it("Leaves left-to-right text unchanged")
+        function _()
+            m.assertEqual(ArabicShaping.ToVisualLine("Hello (world) 123"), "Hello (world) 123")
+        end function
+
+        @it("Reverses right-to-left text")
+        function _()
+            m.assertEqual(ArabicShaping.ToVisualLine(m.Cps([&h0627, &h0628, &h062A])), m.Cps([&h062A, &h0628, &h0627]))
+        end function
+
+        @it("Keeps embedded English and numbers in order")
+        function _()
+            ' "<a b> iPhone 15" in a right-to-left paragraph -> "iPhone 15 <b a>"
+            text = m.Cps([&h0627, &h0628]) + " iPhone 15"
+            m.assertEqual(ArabicShaping.ToVisualLine(text), "iPhone 15 " + m.Cps([&h0628, &h0627]))
+        end function
+
+        @it("Keeps Persian digit order")
+        function _()
+            ' "<a b> ۱۴۰۳" -> "۱۴۰۳ <b a>"
+            digits = m.Cps([&h06F1, &h06F4, &h06F0, &h06F3])
+            text = m.Cps([&h0627, &h0628]) + " " + digits
+            m.assertEqual(ArabicShaping.ToVisualLine(text), digits + " " + m.Cps([&h0628, &h0627]))
+        end function
+
+        @it("Keeps number separators inside numbers")
+        function _()
+            text = m.Cps([&h0627]) + " 12:30"
+            m.assertEqual(ArabicShaping.ToVisualLine(text), "12:30 " + m.Cps([&h0627]))
+        end function
+
+        @it("Keeps a number with the English words of its segment")
+        function _()
+            ' "<a b>   2,986 views   14 hours ago" -> the English segments stay in reading order, left of <b a>
+            text = m.Cps([&h0627, &h0628]) + "   2,986 views   14 hours ago"
+            m.assertEqual(ArabicShaping.ToVisualLine(text), "2,986 views   14 hours ago   " + m.Cps([&h0628, &h0627]))
+        end function
+
+        @it("Mirrors brackets in right-to-left runs")
+        function _()
+            ' "(<a b>)" -> "(<b a>)" after mirroring
+            text = "(" + m.Cps([&h0627, &h0628]) + ")"
+            m.assertEqual(ArabicShaping.ToVisualLine(text), "(" + m.Cps([&h0628, &h0627]) + ")")
+        end function
+
+        @it("Reorders right-to-left words inside left-to-right text")
+        function _()
+            text = "Hi " + m.Cps([&h0627, &h0628]) + " " + m.Cps([&h062A, &h062B]) + " end"
+            expected = "Hi " + m.Cps([&h062B, &h062A]) + " " + m.Cps([&h0628, &h0627]) + " end"
+            m.assertEqual(ArabicShaping.ToVisualLine(text), expected)
+        end function
+
+        ' Measures 10px per character and counts measurements
+        function FakeMeasurer() as object
+            return {
+                calls: 0
+                GetOneLineWidth: function(text as string, _maxWidth as integer) as float
+                    m.calls += 1
+                    return Len(text) * 10
+                end function
+            }
+        end function
+
+        function Cps(cps as object) as string
+            return ArabicShaping.FromCodePoints(cps)
+        end function
+
+    end class
+
+end namespace

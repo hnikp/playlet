@@ -16,7 +16,8 @@ function OnContentSet() as void
         return
     end if
 
-    RtlText.ApplyToLabel(m.titleLabel, content.title, "font:SmallestBoldSystemFont", true, 18)
+    ' Persian/Arabic text was prepared off the render thread (InvidiousContent.ToPlaylistContentNode)
+    RtlText.SetLabelText(m.titleLabel, content.title, content.titlePrepared, "font:SmallestBoldSystemFont")
     lines = content.lines
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     author = content._author
@@ -25,7 +26,7 @@ function OnContentSet() as void
             author = lines[0]
         end if
     end if
-    RtlText.ApplyToLabel(m.authorLabel, author, "font:SmallestSystemFont", false, 18)
+    RtlText.SetLabelText(m.authorLabel, author, content.authorPrepared, "font:SmallestSystemFont")
 
     updatedText = content.updatedText
     if StringUtils.IsNullOrEmpty(updatedText)
