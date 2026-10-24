@@ -1,6 +1,6 @@
 <!-- A root screen with a header and rows from a yaml layout (feedFile), like HomeScreen but without the
      home layout preference. With dynamicTopic (e.g. "music"), the topic's shelves from the built-in
-     backend (TopicShelvesJob) are shown before the layout's rows. Used by MusicScreen and ChessScreen. -->
+     backend (TopicShelvesJob) are shown before the layout's rows. Used by MusicScreen, ChessScreen and SportScreen. -->
 <component name="FeedScreen" extends="Group" includes="AutoBind,Focus,ContextMenuProvider">
     <interface>
         <field id="navBar" type="node" bind="/NavBar" />

@@ -1,4 +1,5 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/Comments/CommentsPanelUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
@@ -177,14 +178,7 @@ end function
 
 function OnChannelButtonSelected() as void
     content = m.top.content
-    if StringUtils.IsNullOrEmpty(content.authorId)
-        return
-    end if
-    channel = InvidiousContent.ToChannelContentNode(invalid, {
-        authorId: content.authorId
-        author: content._author
-    })
-    ChannelUtils.Open(channel, m.appController)
+    ChannelUtils.OpenByAuthorId(content.authorId, content._author, m.appController)
 end function
 
 ' Context menu (ContextMenuProvider): no page-specific options for the related videos
@@ -198,12 +192,7 @@ function OnCommentsButtonSelected() as void
         return
     end if
 
-    m.commentsPanel = m.top.createChild("CommentsPanel")
-    m.commentsPanel.translation = [720, 0]
-    m.commentsPanel@.BindNode()
-    m.commentsPanel.videoId = videoId
-    m.commentsPanel.ObserveFieldScoped("closed", FuncName(OnCommentsPanelClosed))
-    NodeSetFocus(m.commentsPanel, true)
+    m.commentsPanel = CommentsPanelUtils.Open(m.top, videoId, FuncName(OnCommentsPanelClosed), { translation: [720, 0] })
 end function
 
 function OnCommentsPanelClosed()
@@ -212,12 +201,7 @@ function OnCommentsPanelClosed()
 end function
 
 function CloseCommentsPanel() as void
-    if m.commentsPanel = invalid
-        return
-    end if
-    m.commentsPanel.UnobserveFieldScoped("closed")
-    m.commentsPanel.dispose = true
-    m.top.removeChild(m.commentsPanel)
+    CommentsPanelUtils.Close(m.top, m.commentsPanel)
     m.commentsPanel = invalid
 end function
 

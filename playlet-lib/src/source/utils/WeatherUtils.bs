@@ -20,7 +20,7 @@ namespace WeatherUtils
         if fahrenheit
             unit = "F"
         end if
-        ' Cint rounds half away from zero; Int would floor -0.4 to -1
+        ' Cint rounds to the nearest degree (-0.4 to 0, -2.6 to -3); Int would floor -0.4 to -1
         parts = [`${Cint(temperature)}°${unit}`]
 
         condition = ConditionText(forecast.current.weather_code)
@@ -81,7 +81,7 @@ namespace WeatherUtils
             return Tr(Locale.Weather.Showers)
         else if code = 85 or code = 86
             return Tr(Locale.Weather.SnowShowers)
-        else if code >= 95
+        else if code >= 95 and code <= 99
             return Tr(Locale.Weather.Thunderstorm)
         end if
         return ""

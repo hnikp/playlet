@@ -45,7 +45,6 @@ namespace Tests
             metadata = m.Metadata([{ itag: "18", url: invalid }], [{ itag: "134", url: "https://v.example/134" }])
             stream = PreviewStreamUtils.PickPreviewStream(metadata, "", 8888, "load1")
             m.assertEqual(stream.streamFormat, "dash")
-            m.assertTrue(stream.needsMetadata)
             m.assertTrue(stream.url.StartsWith("http://127.0.0.1:8888/api/dash?"), stream.url)
             m.assertTrue(stream.url.InStr("v=abc") <> -1, stream.url)
             m.assertTrue(stream.url.InStr("videoLoadId=load1") <> -1, stream.url)

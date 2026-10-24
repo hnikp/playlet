@@ -21,8 +21,8 @@ namespace PreviewStreamUtils
     const PREVIEW_HLS_QUALITY = "144p,240p,360p"
 
     ' Returns { url, streamFormat: "mp4" } for the lowest resolution muxed stream (preferring itag 18),
-    ' else { url, streamFormat: "dash", needsMetadata: true } for a DASH manifest from Playlet's local
-    ' web server (which reads the metadata back by videoLoadId), else invalid (no stream, DRM).
+    ' else { url, streamFormat: "dash" } for a DASH manifest from Playlet's local web server (which reads
+    ' the metadata back by videoLoadId), else invalid (no stream, DRM).
     ' Live streams (live: true): the HLS manifest when the backend has one (LivePreviewStream), else the
     ' live DASH manifest the local web server generates from adaptiveFormats, as for the main player.
     function PickPreviewStream(metadata as dynamic, instance as string, playletServerPort as integer, videoLoadId as string) as object
@@ -76,7 +76,6 @@ namespace PreviewStreamUtils
         return {
             url: dashUrl
             streamFormat: "dash"
-            needsMetadata: true
             live: isLive
         }
     end function

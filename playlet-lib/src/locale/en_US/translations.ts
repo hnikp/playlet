@@ -1565,10 +1565,6 @@
         <translation>Picture-in-picture</translation>
     </message>
     <message>
-        <source>Live chat</source>
-        <translation>Live chat</translation>
-    </message>
-    <message>
         <source>Thumbnail preview</source>
         <translation>Thumbnail preview</translation>
     </message>
@@ -1895,6 +1891,54 @@
     <message>
         <source>Suggested searches</source>
         <translation>Suggested searches</translation>
+    </message>
+    <message>
+        <source>Set the Server URL for the Custom AI provider in Settings</source>
+        <translation>Set the Server URL for the Custom AI provider in Settings</translation>
+    </message>
+    <message>
+        <source>Set the Model for the Custom AI provider in Settings</source>
+        <translation>Set the Model for the Custom AI provider in Settings</translation>
+    </message>
+    <message>
+        <source>Unknown AI provider: %1</source>
+        <translation>Unknown AI provider: %1</translation>
+    </message>
+    <message>
+        <source>Describe the video you are looking for</source>
+        <translation>Describe the video you are looking for</translation>
+    </message>
+    <message>
+        <source>The AI service sent an invalid response</source>
+        <translation>The AI service sent an invalid response</translation>
+    </message>
+    <message>
+        <source>The AI declined to answer this request</source>
+        <translation>The AI declined to answer this request</translation>
+    </message>
+    <message>
+        <source>The AI sent an empty answer</source>
+        <translation>The AI sent an empty answer</translation>
+    </message>
+    <message>
+        <source>The AI service returned an error</source>
+        <translation>The AI service returned an error</translation>
+    </message>
+    <message>
+        <source>The AI&apos;s answer had no recommendations</source>
+        <translation>The AI&apos;s answer had no recommendations</translation>
+    </message>
+    <message>
+        <source>The AI&apos;s answer could not be read</source>
+        <translation>The AI&apos;s answer could not be read</translation>
+    </message>
+    <message>
+        <source>The AI service took too long to answer</source>
+        <translation>The AI service took too long to answer</translation>
+    </message>
+    <message>
+        <source>The AI service failed (status %1)</source>
+        <translation>The AI service failed (status %1)</translation>
     </message>
 </context>
 </TS>

@@ -40,6 +40,11 @@ namespace TimeUtils
         return this
     end function
 
+    ' The current time, in seconds since the epoch (UTC)
+    function NowSeconds() as integer
+        return CreateObject("roDateTime").AsSeconds()
+    end function
+
     function RFC1123_Date(when as object) as string
         wd = when.getWeekday().left(3)
         dom = when.getDayOfMonth()

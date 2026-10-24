@@ -1,6 +1,7 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
-import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/Comments/CommentsPanelUtils.bs"
 import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerMenuItems.bs"
+import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerTracks.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/components/VideoQueue/VideoQueueViewUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
@@ -39,37 +40,6 @@ end function
 function OnAvailableAudioTracks() as void
     PreferOriginalAudio()
     RefreshPlayerMenuState()
-end function
-
-' The device starts on the track in its own language, so a Spanish video with an English auto-dub plays the dub.
-' Unless playback.audio_track is "device", switch to the original audio (the "main" track, see GetAudioTracks) once per stream;
-' a track picked later in the menu is left alone.
-function PreferOriginalAudio() as void
-    if not m.originalAudioPending
-        return
-    end if
-    tracks = GetAudioTracks()
-    if tracks.Count() = 0
-        return
-    end if
-    m.originalAudioPending = false
-    if m.top.preferences["playback.audio_track"] = "device"
-        return
-    end if
-    original = tracks[0]
-    if original.id.InStr("~main~") = -1
-        ' no track is marked original (e.g. a single-language video)
-        return
-    end if
-    current = ""
-    if m.top.hasField("currentAudioTrack")
-        current = ValidString(m.top.currentAudioTrack)
-    end if
-    if current = "" or current = original.id
-        return
-    end if
-    LogInfo("Switching to the original audio from", current)
-    SetAudioTrack(original.id)
 end function
 
 function BindPlayerMenu() as void
@@ -217,7 +187,6 @@ function GetPlayerMenuState() as object
         audioTrack: audioTrack
         autoplay: preferences["playback.autoplay"] = true
         sponsorblock: preferences["sponsorblock.enabled"] = true
-        liveChat: false
     }
 end function
 
@@ -278,14 +247,10 @@ function OpenChannelFromPlayer() as void
     if authorId = ""
         return
     end if
-    channel = InvidiousContent.ToChannelContentNode(invalid, {
-        authorId: authorId
-        author: ValidString(content.metadata.author)
-    })
     if m.container.fullscreen
         VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
     end if
-    ChannelUtils.Open(channel, m.top.appController)
+    ChannelUtils.OpenByAuthorId(authorId, ValidString(content.metadata.author), m.top.appController)
 end function
 
 ' The video keeps playing under the comments panel
@@ -298,14 +263,11 @@ function OpenPlayerComments() as void
     if videoId = ""
         return
     end if
-    m.playerComments = m.top.createChild("CommentsPanel")
     ' the player isn't scaled for overscan: the text (24..536 in the panel) ends at x 1212, the background at the edge
-    m.playerComments.translation = [676, 0]
-    m.playerComments.backgroundWidth = 604
-    m.playerComments@.BindNode()
-    m.playerComments.videoId = videoId
-    m.playerComments.ObserveField("closed", FuncName(OnPlayerCommentsClosed))
-    NodeSetFocus(m.playerComments, true)
+    m.playerComments = CommentsPanelUtils.Open(m.top, videoId, FuncName(OnPlayerCommentsClosed), {
+        translation: [676, 0]
+        backgroundWidth: 604
+    })
     ' the SponsorBlock notice sits under the panel: hide it (and its OK/Back prompt) until the panel closes
     if m.sponsorblock <> invalid
         m.sponsorblock.SetCommentsOpen(true)
@@ -320,9 +282,7 @@ function ClosePlayerComments(refocus as boolean) as void
     if m.playerComments = invalid
         return
     end if
-    m.playerComments.unobserveField("closed")
-    m.playerComments.dispose = true
-    m.top.removeChild(m.playerComments)
+    CommentsPanelUtils.Close(m.top, m.playerComments)
     m.playerComments = invalid
     if m.sponsorblock <> invalid
         m.sponsorblock.SetCommentsOpen(false)
@@ -375,77 +335,4 @@ function SetPlaybackSpeed(speed as float) as void
     if wasPlaying
         m.top.control = "resume"
     end if
-end function
-
-' The stream's audio tracks, as the device lists them (one per language/variant in the DASH manifest; the name is
-' the manifest Label, i.e. YouTube's track name, e.g. "English (original)" or "Spanish (auto-dubbed)").
-function GetAudioTracks() as object
-    tracks = []
-    if not m.top.hasField("availableAudioTracks")
-        return tracks
-    end if
-    originals = []
-    for each track in ValidArray(m.top.availableAudioTracks)
-        id = ValidString(track.Track)
-        if id = ""
-            continue for
-        end if
-        name = ValidString(track.Name)
-        if name = ""
-            name = ValidString(track.Language)
-        end if
-        if name = ""
-            ' single-language videos: the regular mix has neither (its re-mixes are labelled by DashManifest)
-            name = Tr(Locale.PlayerMenu.OriginalAudio)
-        end if
-        ' The device's track ids carry the DASH roles (DashManifest.GetTrackRoles), e.g.
-        ' "dash/a~AAC~es~alternate_dub~~0~Spanish" or "dash/a~AAC~en-US~main~~0~English (US) original"
-        if id.InStr("_dub") <> -1 and LCase(name).InStr("dub") = -1
-            name = Tr(Locale.PlayerMenu.Dubbed).Replace("%1", name)
-        end if
-        ' the original audio first, so it's easy to switch back to it from a dub
-        if id.InStr("~main~") <> -1
-            originals.Push({ id: id, name: name })
-        else
-            tracks.Push({ id: id, name: name })
-        end if
-    end for
-    originals.Append(tracks)
-    return originals
-end function
-
-function SetAudioTrack(trackId as string) as void
-    if trackId = "" or not m.top.hasField("audioTrack")
-        return
-    end if
-    LogInfo("Switching audio track to", trackId)
-    if not m.audioTrackObserved and m.top.hasField("currentAudioTrack")
-        m.audioTrackObserved = true
-        m.top.ObserveField("currentAudioTrack", FuncName(OnCurrentAudioTrackChange))
-    end if
-    m.top.audioTrack = trackId
-end function
-
-' The switch is applied asynchronously: refresh the menu when it lands
-function OnCurrentAudioTrackChange() as void
-    RefreshPlayerMenuState()
-end function
-
-' trackName "" turns captions off. globalCaptionMode is the device-wide captions setting (it may be e.g.
-' "Instant replay"): turning captions off restores the mode the device had before they were turned on here.
-function SetCaptionTrack(trackName as string) as void
-    if trackName = ""
-        mode = m.savedCaptionMode
-        if mode = "" or mode = "On"
-            mode = "Off"
-        end if
-        m.top.globalCaptionMode = mode
-        m.savedCaptionMode = ""
-        return
-    end if
-    if m.savedCaptionMode = "" and m.top.globalCaptionMode <> "On"
-        m.savedCaptionMode = m.top.globalCaptionMode
-    end if
-    m.top.subtitleTrack = trackName
-    m.top.globalCaptionMode = "On"
 end function

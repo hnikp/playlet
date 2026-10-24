@@ -59,11 +59,7 @@ namespace InvidiousContent
         ' Shape Persian/Arabic text here (usually a task thread) rather than in VideoRowCell (render thread).
         ' Sizes match VideoRowCell's labels.
         node.titlePrepared = RtlText.PrepareForLabel(node.title, 18, true, 350, 2)
-        author = node._author
-        if author = "" and IsArray(node.lines) and node.lines.Count() > 0
-            author = node.lines[0]
-        end if
-        node.authorPrepared = RtlText.PrepareForLabel(author, 18, false, 350, 1)
+        node.authorPrepared = RtlText.PrepareForLabel(GetAuthor(node), 18, false, 350, 1)
 
         return node
     end function
@@ -145,13 +141,19 @@ namespace InvidiousContent
 
         ' Sizes match PlaylistRowCell's labels (see ToVideoContentNode)
         node.titlePrepared = RtlText.PrepareForLabel(node.title, 18, true, 350, 2)
+        node.authorPrepared = RtlText.PrepareForLabel(GetAuthor(node), 18, false, 350, 1)
+
+        return node
+    end function
+
+    ' The author (channel name) of a video or playlist content node: _author, else the first of its lines
+    ' (the built-in backend's items only have lines, see VideoRowCell)
+    function GetAuthor(node as object) as string
         author = node._author
         if author = "" and IsArray(node.lines) and node.lines.Count() > 0
             author = node.lines[0]
         end if
-        node.authorPrepared = RtlText.PrepareForLabel(author, 18, false, 350, 1)
-
-        return node
+        return author
     end function
 
     function ToChannelContentNode(node as object, item as object) as object

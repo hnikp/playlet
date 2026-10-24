@@ -2,9 +2,9 @@
 # any channel, live chess streams, the top recent videos
 # of all the channels below, then the latest uploads of each well-known chess
 # channel. Channel names are not translated.
-# "Hot this week" (ChessHotHandler) and "Live now" (ChessLiveHandler) use (instead of the search endpoint's handler) to
+# "Hot this week" and "Live now" use ChessHandler (instead of the search endpoint's handler) to
 # drop non-chess games and shows (Auto Chess, Magic Chess, magnetic chess...), shorts and
-# repeated titles.
+# repeated titles; liveOnly keeps only the live videos.
 # "Top recent" (ranked_channel_videos, RankedChannelVideosHandler) fetches the
 # latest videos of each channel in "channels" and ranks them with FeedRanking:
 # views relative to the channel's usual reach, decayed by age. Keep its channel
@@ -16,7 +16,7 @@
       title: Hot this week
       apiType: Invidious
       endpoint: search
-      responseHandler: ChessHotHandler
+      responseHandler: ChessHandler
       queryParams:
         q: chess
         date: week
@@ -30,7 +30,8 @@
       title: Live now
       apiType: Invidious
       endpoint: search
-      responseHandler: ChessLiveHandler
+      responseHandler: ChessHandler
+      liveOnly: true
       queryParams:
         q: chess
         features: live

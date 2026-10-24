@@ -1,0 +1,109 @@
+import "pkg:/source/utils/Types.bs"
+
+' Filters of Invidious API items (search results, feeds) for the topic pages (Chess, Sport), used by
+' InvidiousService's response handlers. They only look at the items, so they work on both backends.
+namespace ContentFilters
+
+    ' Whether an Invidious API item is a video (items without a type are videos).
+    function IsVideoItem(item as object) as boolean
+        return item.type = invalid or item.type = "video"
+    end function
+
+    ' Keeps the videos of a chess search (only live ones if liveOnly), dropping shorts, repeated titles,
+    ' and games or shows that aren't chess but have it in their name (matched in the title or the author,
+    ' case-insensitive).
+    function FilterChessItems(items as object, liveOnly as boolean) as object
+        notChessRegex = CreateObject("roRegex", "auto ?chess|magic ?chess|chess ?rush|dota underlords|teamfight|\btft\b|bouncing chess|magnetic chess|analy[sz]ed like chess", "i")
+        shortsRegex = CreateObject("roRegex", "#shorts?\b", "i")
+
+        filtered = []
+        seenTitles = {}
+        for each item in ValidArray(items)
+            if not IsAssociativeArray(item) or (liveOnly and not ValidBool(item.liveNow))
+                continue for
+            end if
+            if not IsVideoItem(item)
+                continue for
+            end if
+
+            title = ValidString(item.title)
+            author = ValidString(item.author)
+            if notChessRegex.IsMatch(title) or notChessRegex.IsMatch(author)
+                continue for
+            end if
+            if ValidBool(item.isShort) or shortsRegex.IsMatch(title)
+                continue for
+            end if
+            titleKey = LCase(title.Trim())
+            if titleKey <> "" and seenTitles.DoesExist(titleKey)
+                continue for
+            end if
+            seenTitles[titleKey] = true
+
+            filtered.Push(item)
+        end for
+        return filtered
+    end function
+
+    ' Keeps the football videos of a feed: from one of channelIds (ucids, optional), or
+    ' matching a football keyword. Specific keywords match the title or the author (channel
+    ' name); loose ones ("united", "goal", "highlights", "fc", Persian "گل") also appear in
+    ' unrelated titles, so they only match the author. Case-insensitive.
+    function FilterFootballItems(items as object, channelIds = invalid as object) as object
+        channelSet = {}
+        ' Entries are ucids, or { ucid, name } like ranked_channel_videos' channels
+        for each channelId in ValidArray(channelIds)
+            if IsAssociativeArray(channelId)
+                channelId = channelId.ucid
+            end if
+            if IsString(channelId)
+                channelSet[channelId] = true
+            end if
+        end for
+
+        specificKeywords = ["football", "soccer", "futbol", "premier league", "champions league", "la liga", "serie a", "bundesliga", "uefa", "fifa", "world cup", "فوتبال", "لیگ", "پرسپولیس", "استقلال", "سپاهان", "خلاصه بازی", "تیم ملی"]
+        authorKeywords = ["united", "goal", "highlights", "گل"]
+        fcRegex = CreateObject("roRegex", "\bfc\b", "i")
+
+        filtered = []
+        for each item in ValidArray(items)
+            if not IsAssociativeArray(item)
+                continue for
+            end if
+            if not IsVideoItem(item)
+                continue for
+            end if
+
+            authorId = ValidString(item.authorId)
+            if authorId <> "" and channelSet.DoesExist(authorId)
+                filtered.Push(item)
+                continue for
+            end if
+
+            title = LCase(ValidString(item.title))
+            author = LCase(ValidString(item.author))
+            if ContainsAnyKeyword(title, specificKeywords) or ContainsAnyKeyword(author, specificKeywords)
+                filtered.Push(item)
+                continue for
+            end if
+            if ContainsAnyKeyword(author, authorKeywords) or fcRegex.IsMatch(author)
+                filtered.Push(item)
+            end if
+        end for
+        return filtered
+    end function
+
+    ' Whether text contains one of keywords (both expected lower case).
+    function ContainsAnyKeyword(text as string, keywords as object) as boolean
+        if text = ""
+            return false
+        end if
+        for each keyword in keywords
+            if Instr(1, text, keyword) > 0
+                return true
+            end if
+        end for
+        return false
+    end function
+
+end namespace

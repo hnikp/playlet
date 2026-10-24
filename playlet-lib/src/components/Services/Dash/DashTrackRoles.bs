@@ -1,0 +1,16 @@
+' The device's audio track ids carry the DASH roles DashManifest.GetTrackRoles writes, e.g.
+' "dash/a~AAC~es~alternate_dub~~0~Spanish" or "dash/a~AAC~en-US~main~~0~English (US) original".
+' Kept apart from DashManifest so the player can use them without the manifest builder.
+namespace DashTrackRoles
+
+    ' Whether a device audio track id is the original audio (role "main")
+    function IsOriginalAudioTrackId(id as string) as boolean
+        return id.InStr("~main~") <> -1
+    end function
+
+    ' Whether a device audio track id is a dub or an auto-dub (role "dub")
+    function IsDubAudioTrackId(id as string) as boolean
+        return id.InStr("_dub") <> -1
+    end function
+
+end namespace

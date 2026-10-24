@@ -570,7 +570,6 @@ namespace Locale
         On = "On"
         VideoQueue = "Video queue"
         PictureInPicture = "Picture-in-picture"
-        LiveChat = "Live chat"
     end enum
 
     @locale
@@ -605,5 +604,17 @@ namespace Locale
         SentToTv = "Sent to the TV"
         Describe = "Describe a video"
         SuggestedSearches = "Suggested searches"
+        CustomNoServerUrl = "Set the Server URL for the Custom AI provider in Settings"
+        CustomNoModel = "Set the Model for the Custom AI provider in Settings"
+        UnknownProvider = "Unknown AI provider: %1"
+        NoQuery = "Describe the video you are looking for"
+        InvalidResponse = "The AI service sent an invalid response"
+        Declined = "The AI declined to answer this request"
+        EmptyAnswer = "The AI sent an empty answer"
+        ServiceError = "The AI service returned an error"
+        AnswerNoRecommendations = "The AI's answer had no recommendations"
+        AnswerUnreadable = "The AI's answer could not be read"
+        TimedOut = "The AI service took too long to answer"
+        ServiceFailed = "The AI service failed (status %1)"
     end enum
 end namespace

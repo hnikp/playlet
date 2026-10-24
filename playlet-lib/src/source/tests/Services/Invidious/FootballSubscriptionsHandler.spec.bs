@@ -1,5 +1,6 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/utils/ContentFilters.bs"
 
 namespace Tests
 
@@ -40,7 +41,7 @@ namespace Tests
             })
         end function
 
-        @describe("Invidious.FilterFootballItems")
+        @describe("ContentFilters.FilterFootballItems")
 
         @it("keeps any video of the given channels")
         function _()
@@ -48,7 +49,7 @@ namespace Tests
                 m.Video("a", "Behind the scenes at Carrington", "Man Utd", "UC6yW44UGJJBvYTlfC7CRg2Q")
                 m.Video("b", "Cooking pasta", "Chef", "UCchef")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items, ["UC6yW44UGJJBvYTlfC7CRg2Q"])), ["a"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterFootballItems(items, ["UC6yW44UGJJBvYTlfC7CRg2Q"])), ["a"])
         end function
 
         @it("keeps videos with a football keyword in the title, Persian included, case-insensitive")
@@ -59,7 +60,7 @@ namespace Tests
                 m.Video("fa2", "اخبار فوتبال امروز")
                 m.Video("author", "Episode 12", "The Rest Is Football")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items)), ["en", "fa", "fa2", "author"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterFootballItems(items)), ["en", "fa", "fa2", "author"])
         end function
 
         @it("drops videos that aren't football, and items that aren't videos")
@@ -70,7 +71,7 @@ namespace Tests
                 { type: "channel", videoId: "channel", title: "Football" }
                 invalid
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items)), [])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterFootballItems(items)), [])
         end function
 
         @it("matches loose keywords only in the author")
@@ -84,7 +85,7 @@ namespace Tests
                 m.Video("authorFc", "Training session", "Chelsea FC")
                 m.Video("authorGol", "بهترین ها", "گل گل")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterFootballItems(items)), ["authorUnited", "authorFc", "authorGol"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterFootballItems(items)), ["authorUnited", "authorFc", "authorGol"])
         end function
 
         @describe("Invidious.InvidiousService.FootballSubscriptionsHandler")

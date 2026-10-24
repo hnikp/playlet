@@ -1,3 +1,4 @@
+import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' Ranks the recent videos of several channels into a single "Top recent" feed.
@@ -165,7 +166,7 @@ namespace FeedRanking
         options = ValidAssociativeArray(options)
         nowSeconds = options.nowSeconds
         if not IsNumber(nowSeconds)
-            nowSeconds = CreateObject("roDateTime").AsSeconds()
+            nowSeconds = TimeUtils.NowSeconds()
         end if
         maxAgeHours = NumberOption(options, "maxAgeHours", FeedRanking.DEFAULT_MAX_AGE_HOURS)
         perChannel = NumberOption(options, "perChannel", FeedRanking.DEFAULT_PER_CHANNEL)

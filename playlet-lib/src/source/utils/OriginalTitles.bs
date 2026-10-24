@@ -1,6 +1,8 @@
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/ContentFilters.bs"
 import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' YouTube auto-translates video titles into the request's language (a Spanish video shows up in English) and its
@@ -26,7 +28,7 @@ namespace OriginalTitles
     function Apply(items as object, storeNode as object, cancellation = invalid as dynamic) as void
         videos = []
         for each item in ValidArray(items)
-            if IsAssociativeArray(item) and (item.type = invalid or item.type = "video") and IsString(item.videoId) and item.videoId <> ""
+            if IsAssociativeArray(item) and ContentFilters.IsVideoItem(item) and IsString(item.videoId) and item.videoId <> ""
                 videos.Push(item)
             end if
         end for
@@ -35,7 +37,7 @@ namespace OriginalTitles
         end if
 
         store = LoadStore(storeNode)
-        nowSeconds = CreateObject("roDateTime").AsSeconds()
+        nowSeconds = TimeUtils.NowSeconds()
         missingIds = []
         missingDict = {}
         for each video in videos

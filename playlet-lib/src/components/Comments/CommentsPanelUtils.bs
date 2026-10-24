@@ -1,0 +1,28 @@
+import "pkg:/source/utils/FocusManagement.bs"
+
+' Opens and closes a CommentsPanel (used by VideoView and the player's PlayerMenuController).
+namespace CommentsPanelUtils
+
+    ' Appends a CommentsPanel with the comments of videoId to parent and focuses it. fields (e.g. translation)
+    ' are set before it binds. onClosed: the function (FuncName) called when the user closes the panel.
+    function Open(parent as object, videoId as string, onClosed as string, fields = {} as object) as object
+        panel = parent.createChild("CommentsPanel")
+        panel.setFields(fields)
+        panel@.BindNode()
+        panel.videoId = videoId
+        panel.ObserveFieldScoped("closed", onClosed)
+        NodeSetFocus(panel, true)
+        return panel
+    end function
+
+    ' Removes a panel opened with Open (no-op for invalid)
+    function Close(parent as object, panel as dynamic) as void
+        if panel = invalid
+            return
+        end if
+        panel.UnobserveFieldScoped("closed")
+        panel.dispose = true
+        parent.removeChild(panel)
+    end function
+
+end namespace

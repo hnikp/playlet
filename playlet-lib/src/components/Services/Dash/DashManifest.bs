@@ -780,6 +780,7 @@ class DashManifest
         return firstValue
     end function
 
+    ' The player tells the roles apart in the device's track ids with DashTrackRoles
     function GetTrackRoles(format as object) as object
         roles = []
         ' Within the preferred language, the device defaults to a "main" track (a set

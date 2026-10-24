@@ -1,0 +1,39 @@
+import "pkg:/components/VideoQueue/PreviewResume.bs"
+
+namespace Tests
+
+    @suite
+    class PreviewResumeTests extends Rooibos.BaseTestSuite
+
+        @describe("PreviewResume.GetStartSeconds")
+
+        @it("continues a few seconds before the preview's position")
+        function _()
+            resume = { videoId: "abc", seconds: 42, atSeconds: 1000 }
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", -1, 1010), 42 - PreviewResume.REWIND_SECONDS)
+        end function
+
+        @it("only within the window after the selection")
+        function _()
+            resume = { videoId: "abc", seconds: 42, atSeconds: 1000 }
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", -1, 1000 + PreviewResume.WINDOW_SECONDS), 37)
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", -1, 1001 + PreviewResume.WINDOW_SECONDS), -1)
+            ' a clock that went back
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", -1, 999), -1)
+        end function
+
+        @it("doesn't apply to another video, an explicit start or a position within the rewind")
+        function _()
+            resume = { videoId: "abc", seconds: 42, atSeconds: 1000 }
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "other", -1, 1010), -1)
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", 120, 1010), -1)
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", 0, 1010), -1)
+            resume.seconds = PreviewResume.REWIND_SECONDS
+            m.assertEqual(PreviewResume.GetStartSeconds(resume, "abc", -1, 1010), -1)
+            m.assertEqual(PreviewResume.GetStartSeconds({}, "abc", -1, 1010), -1)
+            m.assertEqual(PreviewResume.GetStartSeconds(invalid, "abc", -1, 1010), -1)
+        end function
+
+    end class
+
+end namespace

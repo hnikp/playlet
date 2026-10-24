@@ -256,6 +256,21 @@ namespace Tests
             m.assertEqual(AiSearchUtils.GetProviderConfig("openrouter", "", "").model, "openrouter/free")
         end function
 
+        @describe("AiSearchUtils.RedactKey")
+
+        @it("Replaces every copy of the API key in a message")
+        function _()
+            message = "invalid key sk-abc123, check sk-abc123"
+            m.assertEqual(AiSearchUtils.RedactKey(message, " sk-abc123 "), "invalid key ***, check ***")
+        end function
+
+        @it("Leaves the message alone for an empty or very short key")
+        function _()
+            m.assertEqual(AiSearchUtils.RedactKey("status 401", ""), "status 401")
+            m.assertEqual(AiSearchUtils.RedactKey("status 401", "401"), "status 401")
+            m.assertEqual(AiSearchUtils.RedactKey("no key here", "sk-abc123"), "no key here")
+        end function
+
     end class
 
 end namespace

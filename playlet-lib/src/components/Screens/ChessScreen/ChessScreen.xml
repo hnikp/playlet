@@ -1,4 +1,5 @@
-<!-- The Chess page: live chess streams, then the latest uploads of chess channels (chess_layout.yaml).
+<!-- The Chess page: this week's most viewed and live chess videos, the top recent videos of chess channels,
+     then the latest uploads of each channel (chess_layout.yaml).
      A separate component because the nav bar creates one screen per component name. -->
 <component name="ChessScreen" extends="FeedScreen">
 </component>

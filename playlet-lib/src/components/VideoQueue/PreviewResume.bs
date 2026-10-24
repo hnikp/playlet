@@ -1,0 +1,31 @@
+import "pkg:/source/utils/Types.bs"
+
+' Selecting a video while its thumbnail preview plays, then playing it within WINDOW_SECONDS
+' (directly, or from the video page it opened), continues from the preview, a few seconds back.
+' Playing it later starts as usual. Pure logic of VideoQueue.ApplyPreviewResume.
+namespace PreviewResume
+    const WINDOW_SECONDS = 60
+    const REWIND_SECONDS = 5
+
+    ' The position (seconds) to start videoId at, or -1 to start as usual.
+    ' resume: { videoId, seconds, atSeconds } (VideoRowList.RememberPreviewPosition), timestamp: the
+    ' video's explicit start (-1 if none), nowSeconds: the current time.
+    function GetStartSeconds(resume as object, videoId as dynamic, timestamp as integer, nowSeconds as integer) as integer
+        if not IsAssociativeArray(resume) or not IsString(resume.videoId) or resume.videoId <> videoId
+            return -1
+        end if
+        ' an explicit start (a link with a time, a cast) wins
+        if timestamp <> -1
+            return -1
+        end if
+        elapsed = nowSeconds - ValidInt(resume.atSeconds)
+        if elapsed < 0 or elapsed > WINDOW_SECONDS
+            return -1
+        end if
+        seconds = ValidInt(resume.seconds) - REWIND_SECONDS
+        if seconds <= 0
+            return -1
+        end if
+        return seconds
+    end function
+end namespace

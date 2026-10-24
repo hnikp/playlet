@@ -1,3 +1,4 @@
+import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' A short-lived cache of the current profile's subscribed channel ids, stored on the Invidious node
@@ -17,7 +18,7 @@ namespace SubscriptionCache
     function Set(invidiousNode as object, profile as object, ucids as object) as void
         invidiousNode.subscriptionsCache = {
             key: GetProfileKey(profile)
-            timestamp: NowSeconds()
+            timestamp: TimeUtils.NowSeconds()
             ucids: ucids
         }
     end function
@@ -46,7 +47,7 @@ namespace SubscriptionCache
         if cache.key <> GetProfileKey(profile)
             return invalid
         end if
-        if NowSeconds() - ValidInt(cache.timestamp) > CACHE_SECONDS
+        if TimeUtils.NowSeconds() - ValidInt(cache.timestamp) > CACHE_SECONDS
             return invalid
         end if
         return cache
@@ -54,9 +55,5 @@ namespace SubscriptionCache
 
     function GetProfileKey(profile as object) as string
         return ValidString(profile.type) + "|" + ValidString(profile.serverUrl) + "|" + ValidString(profile.username)
-    end function
-
-    function NowSeconds() as integer
-        return CreateObject("roDateTime").AsSeconds()
     end function
 end namespace

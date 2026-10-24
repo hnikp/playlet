@@ -5,10 +5,10 @@ import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/VideoFeed/PaginationType.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/ContentFilters.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/FeedRanking.bs"
 import "pkg:/source/utils/Logging.bs"
-import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/OriginalTitles.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
@@ -18,7 +18,8 @@ import "pkg:/source/utils/TimeUtils.bs"
 namespace Invidious
     const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
 
-    const PLAYLET_BUILT_IN_INSTANCE = "http://127.0.0.1:8888/playlet-invidious-backend"
+    const PLAYLET_BUILT_IN_SERVER = "http://127.0.0.1:8888"
+    const PLAYLET_BUILT_IN_INSTANCE = PLAYLET_BUILT_IN_SERVER + "/playlet-invidious-backend"
     const INSTANCE_EXAMPLE = "https://invidious.example.com"
 
     const TOKEN_CALLBACK = "/invidious/token_callback"
@@ -81,12 +82,15 @@ namespace Invidious
             return m.profilesService.currentProfile
         end function
 
-        function GetInstance() as string
+        function GetPreferences() as object
             if m.preferences = invalid
                 m.preferences = m.invidiousNode.preferences
             end if
+            return m.preferences
+        end function
 
-            backend = m.preferences["backend.selected"]
+        function GetInstance() as string
+            backend = m.GetPreferences()["backend.selected"]
             if backend = "invidious"
                 instance = m.GetInvidiousInstance()
                 if not StringUtils.IsNullOrEmpty(instance)
@@ -98,11 +102,7 @@ namespace Invidious
         end function
 
         function GetInvidiousInstance() as string
-            if m.preferences = invalid
-                m.preferences = m.invidiousNode.preferences
-            end if
-
-            return m.preferences["invidious.instance"]
+            return m.GetPreferences()["invidious.instance"]
         end function
 
         function MarkVideoWatched(auth as ProfileContentAuthTokenUtils.AccessTokenResult, videoId as dynamic, cancellation = invalid as object) as void
@@ -192,10 +192,7 @@ namespace Invidious
         ' Video titles in their original language instead of YouTube's translation (pref browsing.original_titles,
         ' see OriginalTitles.Apply). Blocks: task threads only.
         function ApplyOriginalTitles(items as object, cancellation = invalid as dynamic) as void
-            if m.preferences = invalid
-                m.preferences = m.invidiousNode.preferences
-            end if
-            if m.preferences["browsing.original_titles"] = false
+            if m.GetPreferences()["browsing.original_titles"] = false
                 return
             end if
             OriginalTitles.Apply(items, m.invidiousNode, cancellation)
@@ -348,20 +345,7 @@ namespace Invidious
                     profile: invalid
                     options: options
                 })
-                if result <> invalid
-                    if IsArray(result.items)
-                        m.ApplyOriginalTitles(result.items, cancellation)
-                    end if
-                    return {
-                        success: true
-                        result: result
-                    }
-                end if
-                return {
-                    success: false
-                    error: `Handler of endpoint ${feedSource.endpoint} failed`
-                    cancelled: CancellationUtils.IsCancelled(cancellation)
-                }
+                return m.ToRequestResult(result, invalid, feedSource, cancellation)
             end if
 
             profile = invalid
@@ -441,25 +425,38 @@ namespace Invidious
                 options: options
             })
 
-            if result <> invalid
-                if IsArray(result.items)
-                    m.ApplyOriginalTitles(result.items, cancellation)
+            return m.ToRequestResult(result, response, feedSource, cancellation)
+        end function
+
+        ' MakeRequest's result for what a response handler returned (invalid when it failed). response is
+        ' invalid for handler-only endpoints.
+        function ToRequestResult(result as object, response as dynamic, feedSource as object, cancellation as dynamic) as object
+            if result = invalid
+                if response = invalid
+                    return {
+                        success: false
+                        error: `Handler of endpoint ${feedSource.endpoint} failed`
+                        cancelled: CancellationUtils.IsCancelled(cancellation)
+                    }
                 end if
-                return {
-                    success: true
-                    result: result
-                }
-            else
                 return {
                     success: false
                     error: response.ErrorMessage()
                     cancelled: response.IsCancelled()
                 }
             end if
+
+            if IsArray(result.items)
+                m.ApplyOriginalTitles(result.items, cancellation)
+            end if
+            return {
+                success: true
+                result: result
+            }
         end function
 
         ' A feed source (e.g. a row in a layout yaml) can override its endpoint's handler,
-        ' e.g. to filter a search ("ChessLiveHandler").
+        ' e.g. to filter a search ("ChessHandler").
         function GetResponseHandlerName(feedSource as object, endpoint as object) as string
             if IsString(feedSource.responseHandler) and feedSource.responseHandler.EndsWith("Handler") and m.DoesExist(feedSource.responseHandler)
                 return feedSource.responseHandler
@@ -472,7 +469,7 @@ namespace Invidious
         ' Requests to the built-in backend (local web server) are processed in-task
         ' by SendRequest when an httpServer is given.
         function IsLocalServerUrl(url as string) as boolean
-            return url.StartsWith("http://127.0.0.1:8888") or url.StartsWith(m.invidiousNode.webServer@.GetServerAddress())
+            return url.StartsWith(PLAYLET_BUILT_IN_SERVER) or url.StartsWith(m.invidiousNode.webServer@.GetServerAddress())
         end function
 
         function SendRequest(request as HttpClient.Request, httpServer as dynamic) as HttpClient.Response
@@ -748,28 +745,21 @@ namespace Invidious
             })
         end function
 
-        ' Live chess streams, from a search for live "chess" videos: keeps the live videos, without
-        ' the games that only have "chess" in their name (Auto Chess, Magic Chess...) and shorts.
-        ' It only filters the response, so it works on both backends.
-        function ChessLiveHandler(context as object) as object
+        ' The Chess page's searches ("Hot this week", "Live now"): keeps the chess videos, without the games
+        ' and shows that only have "chess" in their name (Auto Chess, Magic Chess...), shorts and repeated
+        ' titles. feedSource.liveOnly keeps only the live ones. It only filters the response, so it works
+        ' on both backends.
+        function ChessHandler(context as object) as object
             result = m.DefaultHandler(context)
             if result = invalid or not IsArray(result.items)
                 return result
             end if
 
-            result.items = Invidious.FilterChessLiveItems(result.items)
-            return result
-        end function
-
-        ' The Chess page's "Hot this week" row: a search for this week's most viewed chess videos, with the
-        ' same filter as ChessLiveHandler but keeping videos that aren't live.
-        function ChessHotHandler(context as object) as object
-            result = m.DefaultHandler(context)
-            if result = invalid or not IsArray(result.items)
-                return result
+            liveOnly = false
+            if IsAssociativeArray(context.feedSource)
+                liveOnly = ValidBool(context.feedSource.liveOnly)
             end if
-
-            result.items = Invidious.FilterChessItems(result.items, false)
+            result.items = ContentFilters.FilterChessItems(result.items, liveOnly)
             return result
         end function
 
@@ -798,7 +788,7 @@ namespace Invidious
                 if not IsAssociativeArray(item)
                     continue for
                 end if
-                if item.type <> invalid and item.type <> "video"
+                if not ContentFilters.IsVideoItem(item)
                     continue for
                 end if
                 if StringUtils.IsNullOrEmpty(item.videoId)
@@ -970,7 +960,7 @@ namespace Invidious
         end function
 
         ' Football videos from the user's subscriptions: the auth feed (with its reauth check),
-        ' filtered by Invidious.FilterFootballItems. The feed source's optional "channels" (ucids)
+        ' filtered by ContentFilters.FilterFootballItems. The feed source's optional "channels" (ucids)
         ' are always kept. Keeps the continuation, so a page can come back empty and still paginate.
         function FootballSubscriptionsHandler(context as object) as object
             result = m.AuthFeedHandler(context)
@@ -982,7 +972,7 @@ namespace Invidious
             if IsAssociativeArray(context.feedSource)
                 channelIds = context.feedSource.channels
             end if
-            result.items = Invidious.FilterFootballItems(result.items, channelIds)
+            result.items = ContentFilters.FilterFootballItems(result.items, channelIds)
             return result
         end function
 
@@ -1156,108 +1146,6 @@ namespace Invidious
 
     ' Whether a /videos response is a live video still missing the live timeline the
     ' innertube path gets: the built-in instance's responses carry it already.
-    ' Keeps the live videos of a chess search (see FilterChessItems).
-    function FilterChessLiveItems(items as object) as object
-        return FilterChessItems(items, true)
-    end function
-
-    ' Keeps the videos of a chess search (only live ones if liveOnly), dropping shorts, repeated titles,
-    ' and games or shows that aren't chess but have it in their name (matched in the title or the author,
-    ' case-insensitive).
-    function FilterChessItems(items as object, liveOnly as boolean) as object
-        notChessRegex = CreateObject("roRegex", "auto ?chess|magic ?chess|chess ?rush|dota underlords|teamfight|\btft\b|bouncing chess|magnetic chess|analy[sz]ed like chess", "i")
-        shortsRegex = CreateObject("roRegex", "#shorts?\b", "i")
-
-        filtered = []
-        seenTitles = {}
-        for each item in ValidArray(items)
-            if not IsAssociativeArray(item) or (liveOnly and not ValidBool(item.liveNow))
-                continue for
-            end if
-            if item.type <> invalid and item.type <> "video"
-                continue for
-            end if
-
-            title = ValidString(item.title)
-            author = ValidString(item.author)
-            if notChessRegex.IsMatch(title) or notChessRegex.IsMatch(author)
-                continue for
-            end if
-            if ValidBool(item.isShort) or shortsRegex.IsMatch(title)
-                continue for
-            end if
-            titleKey = LCase(title.Trim())
-            if titleKey <> "" and seenTitles.DoesExist(titleKey)
-                continue for
-            end if
-            seenTitles[titleKey] = true
-
-            filtered.Push(item)
-        end for
-        return filtered
-    end function
-
-    ' Keeps the football videos of a feed: from one of channelIds (ucids, optional), or
-    ' matching a football keyword. Specific keywords match the title or the author (channel
-    ' name); loose ones ("united", "goal", "highlights", "fc", Persian "گل") also appear in
-    ' unrelated titles, so they only match the author. Case-insensitive.
-    function FilterFootballItems(items as object, channelIds = invalid as object) as object
-        channelSet = {}
-        ' Entries are ucids, or { ucid, name } like ranked_channel_videos' channels
-        for each channelId in ValidArray(channelIds)
-            if IsAssociativeArray(channelId)
-                channelId = channelId.ucid
-            end if
-            if IsString(channelId)
-                channelSet[channelId] = true
-            end if
-        end for
-
-        specificKeywords = ["football", "soccer", "futbol", "premier league", "champions league", "la liga", "serie a", "bundesliga", "uefa", "fifa", "world cup", "فوتبال", "لیگ", "پرسپولیس", "استقلال", "سپاهان", "خلاصه بازی", "تیم ملی"]
-        authorKeywords = ["united", "goal", "highlights", "گل"]
-        fcRegex = CreateObject("roRegex", "\bfc\b", "i")
-
-        filtered = []
-        for each item in ValidArray(items)
-            if not IsAssociativeArray(item)
-                continue for
-            end if
-            if item.type <> invalid and item.type <> "video"
-                continue for
-            end if
-
-            authorId = ValidString(item.authorId)
-            if authorId <> "" and channelSet.DoesExist(authorId)
-                filtered.Push(item)
-                continue for
-            end if
-
-            title = LCase(ValidString(item.title))
-            author = LCase(ValidString(item.author))
-            if Invidious.ContainsAnyKeyword(title, specificKeywords) or Invidious.ContainsAnyKeyword(author, specificKeywords)
-                filtered.Push(item)
-                continue for
-            end if
-            if Invidious.ContainsAnyKeyword(author, authorKeywords) or fcRegex.IsMatch(author)
-                filtered.Push(item)
-            end if
-        end for
-        return filtered
-    end function
-
-    ' Whether text contains one of keywords (both expected lower case).
-    function ContainsAnyKeyword(text as string, keywords as object) as boolean
-        if text = ""
-            return false
-        end if
-        for each keyword in keywords
-            if Instr(1, text, keyword) > 0
-                return true
-            end if
-        end for
-        return false
-    end function
-
     function NeedsLiveStreamInfo(metadata as object) as boolean
         return ValidBool(metadata.liveNow) and IsArray(metadata.adaptiveFormats) and StringUtils.IsNullOrEmpty(metadata.liveHeadUrl)
     end function

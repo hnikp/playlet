@@ -1,0 +1,77 @@
+import "pkg:/source/utils/WeatherUtils.bs"
+
+namespace Tests
+
+    @suite
+    class WeatherUtilsTests extends Rooibos.BaseTestSuite
+
+        @describe("WeatherUtils.Format")
+
+        @it("formats the temperature, condition and rain chance")
+        function _()
+            forecast = {
+                current: { temperature_2m: 12.4, weather_code: 3 }
+                hourly: { precipitation_probability: [10, 40, 25] }
+            }
+            rain = Tr(Locale.Weather.RainChance).Replace("%1", "40")
+            m.assertEqual(WeatherUtils.Format(forecast, false), "12°C · " + Tr(Locale.Weather.Cloudy) + " · " + rain)
+        end function
+
+        @it("uses °F, rounds to the nearest degree, and leaves out a missing condition or rain chance")
+        function _()
+            m.assertEqual(WeatherUtils.Format({ current: { temperature_2m: 71.5 } }, true), "72°F")
+            m.assertEqual(WeatherUtils.Format({ current: { temperature_2m: -0.4, weather_code: 999 } }, false), "0°C")
+            m.assertEqual(WeatherUtils.Format({ current: { temperature_2m: -2.6 } }, false), "-3°C")
+        end function
+
+        @it("returns an empty string for an unusable response")
+        function _()
+            m.assertEqual(WeatherUtils.Format(invalid, false), "")
+            m.assertEqual(WeatherUtils.Format({}, false), "")
+            m.assertEqual(WeatherUtils.Format({ current: { weather_code: 3 } }, false), "")
+            m.assertEqual(WeatherUtils.Format({ current: { temperature_2m: "12" } }, false), "")
+        end function
+
+        @describe("WeatherUtils.MaxRainChance")
+
+        @it("returns the highest chance, ignoring values that aren't numbers")
+        function _()
+            m.assertEqual(WeatherUtils.MaxRainChance({ precipitation_probability: [5, invalid, 30, "90", 20] }), 30)
+            m.assertEqual(WeatherUtils.MaxRainChance({ precipitation_probability: [0] }), 0)
+        end function
+
+        @it("returns -1 without chances")
+        function _()
+            m.assertEqual(WeatherUtils.MaxRainChance(invalid), -1)
+            m.assertEqual(WeatherUtils.MaxRainChance({}), -1)
+            m.assertEqual(WeatherUtils.MaxRainChance({ precipitation_probability: [] }), -1)
+            m.assertEqual(WeatherUtils.MaxRainChance({ precipitation_probability: [invalid] }), -1)
+        end function
+
+        @describe("WeatherUtils.ConditionText")
+
+        @it("maps WMO weather codes")
+        function _()
+            m.assertEqual(WeatherUtils.ConditionText(0), Tr(Locale.Weather.ClearSky))
+            m.assertEqual(WeatherUtils.ConditionText(2), Tr(Locale.Weather.PartlyCloudy))
+            m.assertEqual(WeatherUtils.ConditionText(48), Tr(Locale.Weather.Fog))
+            m.assertEqual(WeatherUtils.ConditionText(53), Tr(Locale.Weather.Drizzle))
+            m.assertEqual(WeatherUtils.ConditionText(66), Tr(Locale.Weather.FreezingRain))
+            m.assertEqual(WeatherUtils.ConditionText(65), Tr(Locale.Weather.HeavyRain))
+            m.assertEqual(WeatherUtils.ConditionText(75), Tr(Locale.Weather.Snow))
+            m.assertEqual(WeatherUtils.ConditionText(81), Tr(Locale.Weather.Showers))
+            m.assertEqual(WeatherUtils.ConditionText(86), Tr(Locale.Weather.SnowShowers))
+            m.assertEqual(WeatherUtils.ConditionText(99), Tr(Locale.Weather.Thunderstorm))
+            m.assertEqual(WeatherUtils.ConditionText(3.0), Tr(Locale.Weather.Cloudy))
+        end function
+
+        @it("returns an empty string for unknown codes")
+        function _()
+            m.assertEqual(WeatherUtils.ConditionText(4), "")
+            m.assertEqual(WeatherUtils.ConditionText(invalid), "")
+            m.assertEqual(WeatherUtils.ConditionText("3"), "")
+        end function
+
+    end class
+
+end namespace

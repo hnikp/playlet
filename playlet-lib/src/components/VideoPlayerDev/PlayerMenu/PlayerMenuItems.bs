@@ -2,12 +2,12 @@ import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' Pure functions building the player menu pages from the player state, so they can be unit tested.
-' Each item is { id, title, value? }. The state (built by the player, see VideoPlayerDev.GetPlayerMenuState):
+' Each item is { id, title, value? }. The state (built by the player, see PlayerMenuController.GetPlayerMenuState):
 '   author, authorId, isLive, loggedIn, isSubscribed (true/false, or invalid while unknown),
 '   qualities (["1080p", "720p", ...]), quality ("auto" or "720p"),
 '   supportsSpeed, speed (float), captions ([{ description, trackName }]), captionTrack ("" when off),
 '   audioTracks ([{ id, name }], from the Video node's availableAudioTracks), audioTrack (current id),
-'   autoplay, sponsorblock, liveChat
+'   autoplay, sponsorblock
 namespace PlayerMenuItems
     const SELECTED_MARK = "• "
     const SPEEDS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
@@ -54,8 +54,6 @@ namespace PlayerMenuItems
 
         if state.isLive <> true
             items.Push({ id: "comments", title: Tr(Locale.Buttons.Comments) })
-        else if state.liveChat = true
-            items.Push({ id: "livechat", title: Tr(Locale.PlayerMenu.LiveChat) })
         end if
 
         items.Push({ id: "queue", title: Tr(Locale.PlayerMenu.VideoQueue) })

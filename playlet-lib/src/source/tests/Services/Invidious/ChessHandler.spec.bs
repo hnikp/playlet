@@ -1,10 +1,11 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/utils/ContentFilters.bs"
 
 namespace Tests
 
     @suite
-    class ChessLiveHandlerTests extends Rooibos.BaseTestSuite
+    class ChessHandlerTests extends Rooibos.BaseTestSuite
 
         protected override function beforeEach()
             Tests.SetUpLoggingGlobals()
@@ -40,7 +41,7 @@ namespace Tests
             })
         end function
 
-        @describe("Invidious.FilterChessLiveItems")
+        @describe("ContentFilters.FilterChessItems (liveOnly)")
 
         @it("keeps live chess videos")
         function _()
@@ -48,7 +49,7 @@ namespace Tests
                 m.LiveVideo("a", "Titled Tuesday LIVE", "GMHikaru")
                 m.LiveVideo("b", "Candidates 2026 Round 5", "FIDE")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["a", "b"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, true)), ["a", "b"])
         end function
 
         @it("drops games that only have chess in their name, in the title or the author")
@@ -63,13 +64,13 @@ namespace Tests
                 m.LiveVideo("teamfight", "Teamfight Tactics set 15")
                 m.LiveVideo("ok", "Chess960 blitz")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, true)), ["ok"])
         end function
 
         @it("doesn't drop a title where tft is only part of a word")
         function _()
             items = [m.LiveVideo("a", "Giftft chess giveaway")]
-            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["a"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, true)), ["a"])
         end function
 
         @it("drops videos that aren't live, shorts, and items that aren't videos")
@@ -83,7 +84,7 @@ namespace Tests
                 invalid
                 m.LiveVideo("ok", "Chess live")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, true)), ["ok"])
         end function
 
         @it("drops shows that only have chess in their name and repeated titles")
@@ -94,10 +95,10 @@ namespace Tests
                 m.LiveVideo("ok", "Candidates 2026 Round 5")
                 m.LiveVideo("again", "Candidates 2026 round 5 ")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterChessLiveItems(items)), ["ok"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, true)), ["ok"])
         end function
 
-        @describe("Invidious.FilterChessItems")
+        @describe("ContentFilters.FilterChessItems")
 
         @it("keeps videos that aren't live unless liveOnly")
         function _()
@@ -106,11 +107,11 @@ namespace Tests
                 { type: "video", videoId: "magic", title: "Magic Chess tier list" }
                 m.LiveVideo("live", "Chess live")
             ]
-            m.assertEqual(m.VideoIds(Invidious.FilterChessItems(items, false)), ["past", "live"])
-            m.assertEqual(m.VideoIds(Invidious.FilterChessItems(items, true)), ["live"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, false)), ["past", "live"])
+            m.assertEqual(m.VideoIds(ContentFilters.FilterChessItems(items, true)), ["live"])
         end function
 
-        @describe("Invidious.InvidiousService.ChessLiveHandler")
+        @describe("Invidious.InvidiousService.ChessHandler")
 
         @it("filters an Invidious search response (an array)")
         function _()
@@ -118,14 +119,25 @@ namespace Tests
                 m.LiveVideo("a", "Chess live")
                 m.LiveVideo("b", "Magic Chess live")
             ])
-            result = m.CreateService().ChessLiveHandler({ response: response })
+            result = m.CreateService().ChessHandler({ response: response, feedSource: { liveOnly: true } })
             m.assertEqual(m.VideoIds(result.items), ["a"])
+        end function
+
+        @it("keeps videos that aren't live without liveOnly")
+        function _()
+            response = m.JsonResponse([
+                { type: "video", videoId: "past", title: "Chess recap" }
+                m.LiveVideo("live", "Chess live")
+                m.LiveVideo("magic", "Magic Chess live")
+            ])
+            result = m.CreateService().ChessHandler({ response: response, feedSource: {} })
+            m.assertEqual(m.VideoIds(result.items), ["past", "live"])
         end function
 
         @it("fails like the default handler for a failed response")
         function _()
             response = new HttpClient.Response({ statusCode: 500, headers: {}, text: "" })
-            m.assertInvalid(m.CreateService().ChessLiveHandler({ response: response }))
+            m.assertInvalid(m.CreateService().ChessHandler({ response: response, feedSource: {} }))
         end function
 
         @describe("Invidious.InvidiousService.MakeRequest")
@@ -142,7 +154,7 @@ namespace Tests
                     return { http_code: 200, headers: {}, body: responseBody }
                 end function
             }
-            result = m.CreateService().MakeRequest({ endpoint: "search", responseHandler: "ChessLiveHandler" }, { httpServer: httpServer })
+            result = m.CreateService().MakeRequest({ endpoint: "search", responseHandler: "ChessHandler", liveOnly: true }, { httpServer: httpServer })
             m.assertTrue(result.success)
             m.assertEqual(m.VideoIds(result.result.items), ["a"])
         end function

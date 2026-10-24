@@ -1,3 +1,6 @@
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
 namespace ChannelUtils
     function Open(contentNode as object, appController = invalid as object)
         channelView = CreateObject("roSGNode", "ChannelView")
@@ -7,5 +10,17 @@ namespace ChannelUtils
         appController@.PushScreen(channelView)
         channelView@.BindNode()
         channelView.content = contentNode
+    end function
+
+    ' Opens the channel page of authorId (no-op if empty); author: the channel name shown while it loads
+    function OpenByAuthorId(authorId as dynamic, author as dynamic, appController = invalid as object) as void
+        if StringUtils.IsNullOrEmpty(authorId)
+            return
+        end if
+        channel = InvidiousContent.ToChannelContentNode(invalid, {
+            authorId: authorId
+            author: author
+        })
+        Open(channel, appController)
     end function
 end namespace

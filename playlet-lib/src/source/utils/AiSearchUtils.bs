@@ -36,14 +36,14 @@ namespace AiSearchUtils
                 baseUrl = Left(baseUrl, Len(baseUrl) - 1)
             end while
             if baseUrl = ""
-                return { error: "Set the Server URL for the Custom AI provider in Settings" }
+                return { error: Tr(Locale.AiSearch.CustomNoServerUrl) }
             end if
             if model = ""
-                return { error: "Set the Model for the Custom AI provider in Settings" }
+                return { error: Tr(Locale.AiSearch.CustomNoModel) }
             end if
             config = { format: "openai", url: baseUrl + "/chat/completions", model: "" }
         else
-            return { error: `Unknown AI provider: ${provider}` }
+            return { error: Tr(Locale.AiSearch.UnknownProvider).Replace("%1", provider) }
         end if
         if model <> ""
             config.model = model
@@ -68,7 +68,7 @@ namespace AiSearchUtils
         end if
         query = query.Trim()
         if query = ""
-            return { error: "Describe the video you are looking for" }
+            return { error: Tr(Locale.AiSearch.NoQuery) }
         end if
 
         if config.format = "anthropic"
@@ -155,13 +155,13 @@ namespace AiSearchUtils
             return { error: apiError }
         end if
         if not IsAssociativeArray(responseJson)
-            return { error: "The AI service sent an invalid response" }
+            return { error: Tr(Locale.AiSearch.InvalidResponse) }
         end if
 
         text = ""
         if format = "anthropic"
             if ValidString(responseJson.stop_reason) = "refusal"
-                return { error: "The AI declined to answer this request" }
+                return { error: Tr(Locale.AiSearch.Declined) }
             end if
             for each block in ValidArray(responseJson.content)
                 if IsAssociativeArray(block) and ValidString(block.type) = "text" and IsString(block.text)
@@ -176,7 +176,7 @@ namespace AiSearchUtils
             end if
         end if
         if text.Trim() = ""
-            return { error: "The AI sent an empty answer" }
+            return { error: Tr(Locale.AiSearch.EmptyAnswer) }
         end if
         return ParseRecommendations(text)
     end function
@@ -204,7 +204,7 @@ namespace AiSearchUtils
             message = ValidString(apiError.type).Trim()
         end if
         if message = ""
-            message = "The AI service returned an error"
+            message = Tr(Locale.AiSearch.ServiceError)
         end if
         return message
     end function
@@ -223,12 +223,12 @@ namespace AiSearchUtils
             index -= 1
         end while
         if startIndex < 0 or endIndex < 0
-            return { error: "The AI's answer had no recommendations" }
+            return { error: Tr(Locale.AiSearch.AnswerNoRecommendations) }
         end if
 
         json = StringUtils.ParseJsonSafe(text.Mid(startIndex, endIndex - startIndex + 1))
         if not IsAssociativeArray(json)
-            return { error: "The AI's answer could not be read" }
+            return { error: Tr(Locale.AiSearch.AnswerUnreadable) }
         end if
 
         picks = []
@@ -262,5 +262,14 @@ namespace AiSearchUtils
             return { error: Tr(Locale.AiSearch.NoRecommendations) }
         end if
         return { summary: ValidString(json.summary).Trim(), picks: picks, queries: queries }
+    end function
+
+    ' Some APIs echo the key they rejected: replaces it in an error message
+    function RedactKey(message as string, apiKey as string) as string
+        apiKey = apiKey.Trim()
+        if Len(apiKey) < 4
+            return message
+        end if
+        return message.Replace(apiKey, "***")
     end function
 end namespace

@@ -3,7 +3,8 @@
 # then the latest uploads of each channel. Channel names are not translated.
 # "Top recent" uses the ranked_channel_videos endpoint over the channels' ucids.
 # "Football from your subscriptions" uses FootballSubscriptionsHandler (instead of the
-# auth feed's handler) to keep only football videos; its channels are always kept.
+# auth feed's handler) to keep only football videos; its channels (the same list as "Top recent",
+# a YAML alias) are always kept.
 - title: Top recent
   id: sport_top_recent
   feedSources:
@@ -11,7 +12,7 @@
       title: Top recent
       apiType: Invidious
       endpoint: ranked_channel_videos
-      channels:
+      channels: &football_channels
         - ucid: UC6yW44UGJJBvYTlfC7CRg2Q
           name: "Manchester United"
         - ucid: UC_myQ7G7yD82dVO13BP1hlg
@@ -57,17 +58,7 @@
       apiType: Invidious
       endpoint: auth_feed
       responseHandler: FootballSubscriptionsHandler
-      channels:
-        - ucid: UC6yW44UGJJBvYTlfC7CRg2Q
-          name: "Manchester United"
-        - ucid: UC_myQ7G7yD82dVO13BP1hlg
-          name: "Persepolis F.C."
-        - ucid: UCuSS7Q8O6Wv1SGQVAs1Uvgg
-          name: "Football360"
-        - ucid: UCAQeufREQCf7V0wf8M8NISw
-          name: "Alefball"
-        - ucid: UCkgsrOXWQNZRS_Cj8-_7sPw
-          name: "The Rest Is Football"
+      channels: *football_channels
 
 - title: Manchester United
   id: sport_channel_UC6yW44UGJJBvYTlfC7CRg2Q
