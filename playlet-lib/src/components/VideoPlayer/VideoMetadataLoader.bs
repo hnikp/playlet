@@ -58,6 +58,10 @@ namespace VideoMetadataLoader
             "profilesService": profilesService
         })
 
+        if IsAssociativeArray(metadata)
+            service.ApplyOriginalTitles([metadata], cancellation)
+        end if
+
         playletFields = invalid
         if IsAssociativeArray(metadata)
             playletFields = {

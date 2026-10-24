@@ -28,6 +28,13 @@
         svelteComponent: "EditQualityControl",
       },
       {
+        displayText: "Original audio",
+        key: "playback.original_audio",
+        description: "Start videos in their original language, not in a dubbed audio track in the device's language",
+        type: "boolean",
+        defaultValue: true,
+      },
+      {
         displayText: "Disable auto-dubbed audio",
         key: "playback.disable_auto_dubbed",
         description: "Remove AI-generated dubbed audio tracks.",
@@ -173,6 +180,13 @@
         description: "Show the Info page (app version and details) in the menu",
         type: "boolean",
         defaultValue: false,
+      },
+      {
+        displayText: "Original video titles",
+        key: "browsing.original_titles",
+        description: "Show video titles in their original language instead of YouTube's automatic translation",
+        type: "boolean",
+        defaultValue: true,
       },
     ],
   },

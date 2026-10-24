@@ -50,6 +50,13 @@ function ExecuteJob() as void
         liveNow: metadata.liveNow = true
     }
 
+    ' the details are up: the related row's titles can take the extra requests
+    service.ApplyOriginalTitles(metadata.recommendedVideos, JobGetCancellation())
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
     instance = service.GetInstance()
     related = CreateObject("roSGNode", "ContentNode")
     row = CreateObject("roSGNode", "FeedContentNode")

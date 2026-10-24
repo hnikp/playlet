@@ -1829,6 +1829,22 @@
         <translation>Show the AI Search page in the menu</translation>
     </message>
     <message>
+        <source>Original audio</source>
+        <translation>Original audio</translation>
+    </message>
+    <message>
+        <source>Start videos in their original language, not in a dubbed audio track in the device&apos;s language</source>
+        <translation>Start videos in their original language, not in a dubbed audio track in the device&apos;s language</translation>
+    </message>
+    <message>
+        <source>Original video titles</source>
+        <translation>Original video titles</translation>
+    </message>
+    <message>
+        <source>Show video titles in their original language instead of YouTube&apos;s automatic translation</source>
+        <translation>Show video titles in their original language instead of YouTube&apos;s automatic translation</translation>
+    </message>
+    <message>
         <source>AI Search</source>
         <translation>AI Search</translation>
     </message>

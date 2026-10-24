@@ -273,6 +273,8 @@ namespace Locale
 
         DisableAutoDubbedAudio = "Disable auto-dubbed audio"
         DisableAutoDubbedAudioDescription = "Remove AI-generated dubbed audio tracks."
+        OriginalAudio = "Original audio"
+        OriginalAudioDescription = "Start videos in their original language, not in a dubbed audio track in the device's language"
 
         Backend = "Backend"
         BackendPreferences = "Backend preferences"
@@ -366,6 +368,8 @@ namespace Locale
         AiServerUrlDescription = "Only for Custom: an OpenAI-compatible server, for example http://192.168.0.10:11434/v1 for Ollama"
         ShowAiSearchPage = "Show AI Search page"
         ShowAiSearchPageDescription = "Show the AI Search page in the menu"
+        OriginalVideoTitles = "Original video titles"
+        OriginalVideoTitlesDescription = "Show video titles in their original language instead of YouTube's automatic translation"
 
         Developer = "Developer"
         DeveloperPreferences = "Developer preferences"

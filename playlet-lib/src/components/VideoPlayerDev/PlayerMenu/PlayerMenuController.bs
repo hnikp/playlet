@@ -17,6 +17,8 @@ function InitializePlayerMenu() as void
     m.playerComments = invalid
     m.qualityOverride = ""
     m.audioTrackObserved = false
+    ' set for each stream (StartVideoContentJob): PreferOriginalAudio runs once its audio tracks are listed
+    m.originalAudioPending = false
     ' the device's caption mode before the menu turned captions on, restored when they're turned off
     m.savedCaptionMode = ""
     if m.playerMenu = invalid
@@ -26,11 +28,48 @@ function InitializePlayerMenu() as void
     m.playerMenu.ObserveField("closed", FuncName(OnPlayerMenuClosed))
     m.top.ObserveField("showMenu", FuncName(OnShowMenuRequested))
     ' the device lists the audio and caption tracks a moment after playback starts: keep an open menu up to date
-    for each field in ["availableAudioTracks", "availableSubtitleTracks"]
-        if m.top.hasField(field)
-            m.top.ObserveField(field, FuncName(RefreshPlayerMenuState))
-        end if
-    end for
+    if m.top.hasField("availableAudioTracks")
+        m.top.ObserveField("availableAudioTracks", FuncName(OnAvailableAudioTracks))
+    end if
+    if m.top.hasField("availableSubtitleTracks")
+        m.top.ObserveField("availableSubtitleTracks", FuncName(RefreshPlayerMenuState))
+    end if
+end function
+
+function OnAvailableAudioTracks() as void
+    PreferOriginalAudio()
+    RefreshPlayerMenuState()
+end function
+
+' The device starts on the track in its own language, so a Spanish video with an English auto-dub plays the dub.
+' With playback.original_audio, switch to the original audio (the "main" track, see GetAudioTracks) once per stream;
+' a track picked later in the menu is left alone.
+function PreferOriginalAudio() as void
+    if not m.originalAudioPending
+        return
+    end if
+    tracks = GetAudioTracks()
+    if tracks.Count() = 0
+        return
+    end if
+    m.originalAudioPending = false
+    if m.top.preferences["playback.original_audio"] = false
+        return
+    end if
+    original = tracks[0]
+    if original.id.InStr("~main~") = -1
+        ' no track is marked original (e.g. a single-language video)
+        return
+    end if
+    current = ""
+    if m.top.hasField("currentAudioTrack")
+        current = ValidString(m.top.currentAudioTrack)
+    end if
+    if current = "" or current = original.id
+        return
+    end if
+    LogInfo("Switching to the original audio from", current)
+    SetAudioTrack(original.id)
 end function
 
 function BindPlayerMenu() as void

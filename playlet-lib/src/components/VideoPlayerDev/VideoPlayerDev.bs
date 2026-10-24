@@ -1196,6 +1196,7 @@ function StartVideoContentJob(videoContentNode as object)
     end if
 
     m.top.content = videoContentNode
+    m.originalAudioPending = true
     m.top.content.ObserveField("title", FuncName(OnContentMetaChange))
     m.top.content.ObserveField("secondaryTitle", FuncName(OnContentMetaChange))
     UpdateOverlayMeta()

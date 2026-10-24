@@ -10,6 +10,7 @@ import "pkg:/source/utils/FeedRanking.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
+import "pkg:/source/utils/OriginalTitles.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
@@ -179,8 +180,21 @@ namespace Invidious
             if Invidious.NeedsLiveStreamInfo(metadata)
                 Innertube.GetLiveStreamInfo(metadata, metadata.adaptiveFormats, 0, invalid, cancellation)
             end if
+            m.ApplyOriginalTitles([metadata], cancellation)
 
             return metadata
+        end function
+
+        ' Video titles in their original language instead of YouTube's translation (pref browsing.original_titles,
+        ' see OriginalTitles.Apply). Blocks: task threads only.
+        function ApplyOriginalTitles(items as object, cancellation = invalid as dynamic) as void
+            if m.preferences = invalid
+                m.preferences = m.invidiousNode.preferences
+            end if
+            if m.preferences["browsing.original_titles"] = false
+                return
+            end if
+            OriginalTitles.Apply(items, cancellation)
         end function
 
         ' Comments (or replies, with a replies continuation) of a video. sortBy is "top" or "new".
@@ -331,6 +345,9 @@ namespace Invidious
                     options: options
                 })
                 if result <> invalid
+                    if IsArray(result.items)
+                        m.ApplyOriginalTitles(result.items, cancellation)
+                    end if
                     return {
                         success: true
                         result: result
@@ -421,6 +438,9 @@ namespace Invidious
             })
 
             if result <> invalid
+                if IsArray(result.items)
+                    m.ApplyOriginalTitles(result.items, cancellation)
+                end if
                 return {
                     success: true
                     result: result

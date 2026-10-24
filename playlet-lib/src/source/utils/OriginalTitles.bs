@@ -1,0 +1,79 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' YouTube auto-translates video titles into the request's language (a Spanish video shows up in English) and its
+' API has no flag against it: feed and search results only carry the translated title. The oEmbed endpoint
+' answers with the original one, a small request per video, sent in parallel and cached on disk.
+namespace OriginalTitles
+    const OEMBED_URL = "https://www.youtube.com/oembed"
+    const PARALLEL_REQUESTS = 10
+    const ATTEMPT_TIMEOUT_MS = 4000
+    ' titles rarely change
+    const CACHE_SECONDS = 604800
+
+    ' Replaces the title of each video in items (Invidious API items, or a video's metadata) with its original
+    ' title. Videos without an answer (private, embedding disabled, a timeout) keep theirs. Blocks: task threads only.
+    function Apply(items as object, cancellation = invalid as dynamic) as void
+        videos = []
+        for each item in ValidArray(items)
+            if IsAssociativeArray(item) and (item.type = invalid or item.type = "video") and IsString(item.videoId) and item.videoId <> ""
+                videos.Push(item)
+            end if
+        end for
+
+        count = videos.Count()
+        startIndex = 0
+        while startIndex < count
+            if CancellationUtils.IsCancelled(cancellation)
+                return
+            end if
+            endIndex = startIndex + PARALLEL_REQUESTS - 1
+            if endIndex >= count
+                endIndex = count - 1
+            end if
+
+            pending = []
+            for i = startIndex to endIndex
+                pending.Push({
+                    item: videos[i]
+                    fetch: CreateRequest(videos[i].videoId, cancellation).Send()
+                })
+            end for
+            for each entry in pending
+                title = ParseTitle(entry.fetch.Await())
+                if title <> ""
+                    entry.item.title = title
+                end if
+            end for
+
+            startIndex = endIndex + 1
+        end while
+    end function
+
+    function CreateRequest(videoId as string, cancellation as dynamic) as object
+        request = HttpClient.Get(OEMBED_URL)
+        request.QueryParam("format", "json")
+        request.QueryParam("url", "https://www.youtube.com/watch?v=" + videoId)
+        request.AttemptTimeoutMs(ATTEMPT_TIMEOUT_MS)
+        request.RetryCount(0)
+        request.CacheForSeconds(CACHE_SECONDS)
+        ' 401/404 for videos that can't be embedded or are private: expected, not worth reporting
+        request.NoTelemetry()
+        if cancellation <> invalid
+            request.Cancellation(cancellation)
+        end if
+        return request
+    end function
+
+    function ParseTitle(response as object) as string
+        if response = invalid or not response.IsSuccess()
+            return ""
+        end if
+        json = response.Json()
+        if not IsAssociativeArray(json) or not IsString(json.title)
+            return ""
+        end if
+        return json.title.Trim()
+    end function
+end namespace
