@@ -7,7 +7,7 @@
         <field id="closed" type="boolean" alwaysNotify="true" />
         <field id="invidious" type="node" bind="/Invidious" />
         <field id="jobQueue" type="node" bind="/JobQueue" />
-        <!-- the player (not scaled for overscan) moves the panel left and widens the background to the screen edge -->
+        <!-- the player moves the panel left (its text ends at the trackbar's x 1212) and widens the background to the screen edge -->
         <field id="backgroundWidth" type="float" alias="background.width" />
     </interface>
     <children>

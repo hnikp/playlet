@@ -14,12 +14,9 @@
         <field id="bookmarksService" type="node" bind="/BookmarksService" />
     </interface>
     <children>
-        <!-- Larger than the screen: the stack is scaled to 0.92 for overscan, and a 1280x720 background would let
-             the screen below show through around the edges -->
         <Rectangle
-            translation="[-60,-40]"
-            width="1400"
-            height="800"
+            width="1280"
+            height="720"
             color="0x242424" />
 
         <Group id="container">

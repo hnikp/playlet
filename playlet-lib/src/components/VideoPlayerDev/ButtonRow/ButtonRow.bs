@@ -93,7 +93,7 @@ function Repaint() as void
 end function
 
 ' Centre the focused button's caption over it, kept inside the trackbar's span (the right cluster ends at the
-' track's right edge, so a long caption there shifts left instead of running into the overscan).
+' track's right edge, so a long caption there shifts left instead of running off the edge).
 function UpdateCaption() as void
     index = m.top.focusedIndex
     button = m.buttons[index]

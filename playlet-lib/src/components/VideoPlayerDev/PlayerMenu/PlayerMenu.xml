@@ -17,7 +17,7 @@
         <field id="jobQueue" type="node" bind="/JobQueue" />
     </interface>
     <children>
-        <!-- the player isn't scaled for overscan: the panel reaches the screen edge, its text ends at x 1212 -->
+        <!-- the panel reaches the screen edge, its text ends at x 1212 like the trackbar -->
         <Rectangle
             translation="[762,0]"
             width="518"
