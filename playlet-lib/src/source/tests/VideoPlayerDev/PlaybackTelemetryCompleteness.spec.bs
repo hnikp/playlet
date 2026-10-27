@@ -46,6 +46,7 @@ namespace Tests
                 { kind: "finished" } ' 19
                 { kind: "metadata" } ' 20
                 { kind: "status", status: { isUnderrun: "true" } } ' 21: a non-boolean isUnderrun
+                { kind: "liveEnded" } ' 22
             ]
         end function
 
@@ -102,6 +103,8 @@ namespace Tests
                 r.OnErrorDialog()
             else if kind = "finished"
                 r.OnFinished()
+            else if kind = "liveEnded"
+                r.OnLiveEnded()
             else if kind = "metadata"
                 r.OnMetadataDone()
             end if
@@ -200,6 +203,8 @@ namespace Tests
                     outcome = "error"
                 else if kind = "finished"
                     outcome = "finished"
+                else if kind = "liveEnded"
+                    outcome = "live_ended"
                 else if kind = "metadata"
                     metadataDoneAtMs = entry.at
                 else if kind = "start" and token.info <> invalid

@@ -745,6 +745,32 @@ namespace InnertubeService
         return result
     end function
 
+    ' Whether the video is live right now: { liveNow }, or { error } when the answer couldn't be read. An ended
+    ' broadcast answers with videoDetails.isLive gone, or a playability status other than OK (LIVE_STREAM_OFFLINE).
+    function GetLiveStatus(videoId as string, options = invalid as object) as object
+        playerRequest = Innertube.CreatePlayerRequest(Innertube.ClientType.Tv, { videoId: videoId })
+        playerRequest.Cancellation(OptionUtils.Get(options, "cancellation"))
+        playerResponse = playerRequest.Await()
+        if not playerResponse.IsSuccess()
+            return {
+                error: playerResponse.ErrorMessage()
+            }
+        end if
+
+        json = playerResponse.Json()
+        if not IsAssociativeArray(json) or not IsAssociativeArray(json["playabilityStatus"])
+            return {
+                error: "Player response has no playabilityStatus"
+            }
+        end if
+
+        isLive = ValidBool(ObjectUtils.Dig(json, ["videoDetails", "isLive"]))
+        isPlayable = ValidString(json["playabilityStatus"]["status"]) = "OK"
+        return {
+            liveNow: isLive and isPlayable
+        }
+    end function
+
     function AuthGetPlaybackTrackingUrls(videoId as string, options as object) as object
         cancellation = invalid
         accessToken = options.accessToken

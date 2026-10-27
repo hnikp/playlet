@@ -51,6 +51,8 @@
         <field id="nudgeCount" type="integer" />
         <!-- test-only probe: how many SponsorBlock viewed-segment reports the coordinator queued. -->
         <field id="sponsorViewedCount" type="integer" />
+        <!-- test-only probe: how many live status checks the coordinator queued. -->
+        <field id="liveStatusJobCount" type="integer" />
         <!-- test-only probe: the seek the device held when the coordinator last wrote control=play. -->
         <field id="seekAtPlay" type="float" />
         <!-- the Video-only method Initialize calls, plus the spec's drivers (callFunc reaches only interface funcs). -->
@@ -73,6 +75,9 @@
         <function name="TestPlaybackErrorDialog" />
         <function name="TestCoordinatorFields" />
         <function name="TestContentJobFailed" />
+        <function name="TestLiveHeartbeat" />
+        <function name="TestLiveErrorAfterPlay" />
+        <function name="TestLiveStatusAnswer" />
     </interface>
     <children>
         <Timer id="autoHide" duration="5" repeat="false" />

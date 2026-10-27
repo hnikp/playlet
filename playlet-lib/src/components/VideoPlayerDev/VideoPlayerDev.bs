@@ -5,6 +5,7 @@ import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/VideoPlayer/Lounge.bs"
 import "pkg:/components/VideoPlayerDev/ErrorDialogController.bs"
+import "pkg:/components/VideoPlayerDev/LiveEndWatch.bs"
 import "pkg:/components/VideoPlayerDev/PlaybackTelemetry.bs"
 import "pkg:/components/VideoPlayerDev/PlayerCoordinatorLogic.bs"
 import "pkg:/components/VideoPlayerDev/PlayerMenu/PlayerMenuController.bs"
@@ -54,6 +55,13 @@ function Initialize()
     m.videoContentJob = invalid
     m.sponsorBlockSegmentsJob = invalid
     m.markVideoWatchedJob = invalid
+    m.liveStatusJob = invalid
+    ' a live stall: asks whether the broadcast ended (LiveEndWatch), on the 1s live heartbeat's clock.
+    m.liveEndWatch = new LiveEndWatch.Watch()
+    m.liveEndClock = CreateObject("roTimespan")
+    ' an error on a live stream that played, held until the live status answers: { errorData, errorInfo,
+    ' failedUrl, failedUrlIndex }, invalid = none.
+    m.pendingLiveError = invalid
     m.watchTimeMarker = -1
     m.reportWatchTime = false
     m.onCloseCalled = false
@@ -800,6 +808,8 @@ function OnVideoState(event as object) as void
         end if
         ' the stream actually played -> any later error is not a 403; stop retrying stream URLs.
         m.videoPlayedSuccessfully = true
+        ' playing again: an error held for the live status is over.
+        m.pendingLiveError = invalid
         ' recovered after an error dialog -> dismiss it.
         DismissErrorDialog()
         ' a mid-stream buffer cleared while idle -> drop the buffering spinner.
@@ -910,7 +920,26 @@ function OnVideoError() as void
         return
     end if
 
-    ' a retry isn't possible: report it and show the error dialog (swallowing the trailing finished edge).
+    ' a live stream that played and then failed may just have ended (a stall at the end of the listed
+    ' timeline): hold the dialog until YouTube answers whether it is still live.
+    if m.transport.isLive and m.videoPlayedSuccessfully
+        if m.liveEndWatch.IsEnded()
+            FinishEndedLive()
+            return
+        end if
+        m.pendingLiveError = { errorData: errorData, errorInfo: errorInfo, failedUrl: failedUrl, failedUrlIndex: failedUrlIndex }
+        m.ignoreNextFinished = true
+        if m.liveEndWatch.StartCheck(m.liveEndClock.TotalMilliseconds())
+            StartLiveStatusJob()
+        end if
+        return
+    end if
+
+    ShowVideoErrorDialog(errorData, errorInfo, failedUrl, failedUrlIndex)
+end function
+
+' a retry isn't possible: report it and show the error dialog (swallowing the trailing finished edge).
+function ShowVideoErrorDialog(errorData as object, errorInfo as object, failedUrl as dynamic, failedUrlIndex as dynamic) as void
     m.playbackTelemetry.ReportVideoError(errorData, errorInfo, failedUrl, failedUrlIndex, true)
     m.ignoreNextFinished = true
     ShowErrorDialog({ title: errorData.title, message: errorData.body })
@@ -1038,6 +1067,71 @@ function OnLiveEdgeClockFire() as void
     end if
     PushLiveEdge()
     ApplyTransport()
+    ' the startup buffering is not a stall.
+    if m.firstFrameSeen and m.liveEndWatch.OnHeartbeat(m.liveEndClock.TotalMilliseconds(), m.top.state, Int(m.top.position * 1000))
+        StartLiveStatusJob()
+    end if
+end function
+
+'-------------------------------------------------------------------------------
+' Live end — a broadcast that ended leaves the player frozen at the end of the listed timeline (LiveEndWatch).
+' Once YouTube says the video is no longer live, the playback finishes like an ended video: play next or close.
+'-------------------------------------------------------------------------------
+function StartLiveStatusJob() as void
+    content = m.top.content
+    if content = invalid or StringUtils.IsNullOrEmpty(content.videoId)
+        ApplyLiveStatus(invalid)
+        return
+    end if
+    LogInfo("live position frozen -> checking whether the broadcast ended, check", m.liveEndWatch.checkCount)
+    m.liveStatusJob = JobSystem.CreateCallback(OnLiveStatusJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.LiveStatusJob, { videoId: content.videoId }, m.liveStatusJob)
+end function
+
+function OnLiveStatusJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.liveStatusJob = invalid
+
+    info = event.getInfo()
+    if info.cancel = true or m.onCloseCalled = true
+        return
+    end if
+
+    liveNow = invalid
+    if info.success and IsAssociativeArray(info.data) and IsBool(info.data.liveNow)
+        liveNow = info.data.liveNow
+    end if
+    LogInfo("live status:", liveNow)
+    ApplyLiveStatus(liveNow)
+end function
+
+' liveNow: invalid when the check failed.
+function ApplyLiveStatus(liveNow as dynamic) as void
+    m.liveEndWatch.OnCheckResult(liveNow)
+
+    if m.liveEndWatch.IsEnded()
+        FinishEndedLive()
+        return
+    end if
+
+    ' still live, or no answer: the held error is a real one.
+    pending = m.pendingLiveError
+    if pending <> invalid
+        m.pendingLiveError = invalid
+        ShowVideoErrorDialog(pending.errorData, pending.errorInfo, pending.failedUrl, pending.failedUrlIndex)
+    end if
+end function
+
+function FinishEndedLive() as void
+    m.pendingLiveError = invalid
+    if m.transport.transportMode <> TransportController.Mode.Idle
+        m.transport.ResetTransport()
+        ApplyTransport()
+    end if
+    ' before PlayNextOrClose: either can close this player, and send its summary, synchronously.
+    m.playbackTelemetry.OnLiveEnded()
+    LogInfo("live broadcast ended -> PlayNext or close")
+    PlayNextOrClose()
 end function
 
 ' the single transport timer fired -> Tick the module with the currently-armed timer id, then drain it.
@@ -1284,6 +1378,8 @@ function OnVideoContentJobDone(event as object) as void
             end if
         end if
         PushLiveEdge()
+        m.liveEndWatch = new LiveEndWatch.Watch()
+        m.liveEndClock.Mark()
         m.liveEdgeClock.control = "start"
     else
         m.liveEdgeClock.control = "stop"
@@ -1491,6 +1587,10 @@ function OnPlaybackFinished() as void
     ' before PlayNext/ClosePlayer: either can close this player, and send its summary, synchronously.
     m.playbackTelemetry.OnFinished()
     LogDebug("playback finished -> PlayNext or close")
+    PlayNextOrClose()
+end function
+
+function PlayNextOrClose() as void
     if not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
         ClosePlayer()
     end if
@@ -1623,6 +1723,12 @@ function OnClose() as void
         m.sponsorBlockSegmentsJob.cancel = true
         m.sponsorBlockSegmentsJob = invalid
     end if
+
+    if m.liveStatusJob <> invalid
+        m.liveStatusJob.cancel = true
+        m.liveStatusJob = invalid
+    end if
+    m.pendingLiveError = invalid
     if m.sponsorblock <> invalid
         m.sponsorblock.Dispose()
         m.sponsorblock = invalid

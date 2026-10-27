@@ -18,6 +18,8 @@ namespace PlaybackTelemetry
         Closed = "closed"
         Finished = "finished"
         Error = "error"
+        ' the live stream's broadcast ended (LiveEndWatch).
+        LiveEnded = "live_ended"
     end enum
 
     enum Span
@@ -194,6 +196,10 @@ namespace PlaybackTelemetry
 
         function OnFinished() as void
             m.outcome = PlaybackTelemetry.Outcome.Finished
+        end function
+
+        function OnLiveEnded() as void
+            m.outcome = PlaybackTelemetry.Outcome.LiveEnded
         end function
 
         function RecordHeal(source as string) as void

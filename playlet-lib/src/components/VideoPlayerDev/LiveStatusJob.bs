@@ -1,0 +1,18 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+
+' Asks YouTube whether a live video is still live (LiveEndWatch). A failure is expected now and then (the
+' watch asks again later), so it is not telemetered.
+@job("LiveStatusJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    status = InnertubeService.GetLiveStatus(input.videoId, { cancellation: JobGetCancellation() })
+    if status.error <> invalid
+        JobErrorNoTelemetry(`Live status check failed: ${status.error}`)
+        return
+    end if
+
+    JobSuccessData({
+        liveNow: status.liveNow
+    })
+end function

@@ -1,0 +1,78 @@
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+
+' Notices a live broadcast that ended. googlevideo keeps answering head checks with the last segment, so the
+' listed timeline stops growing and Roku holds at its end in state "playing", the position frozen, until it
+' raises a stall error minutes later (measured: 3.7 min, Sentry PLAYLET-FORK-C). A position frozen while
+' playing or buffering asks whether the video is still live (LiveStatusJob); the coordinator finishes the
+' playback once the answer is no.
+'
+' Pure: the coordinator feeds it the 1s live heartbeat and the check answers, and runs the checks it asks for.
+
+namespace LiveEndWatch
+
+    ' The position frozen this long asks: past the manifest cushion the player has run dry.
+    const STALL_MS = 15000
+    ' A stall that is still live (a network stall, or YouTube not yet flipping isLive) asks again this often.
+    const RECHECK_MS = 30000
+    ' Position changes smaller than this are jitter, not playback.
+    const MOVE_MS = 500
+
+    class Watch
+        public checkCount as integer = 0
+
+        private ended as boolean = false
+        private checking as boolean = false
+        private lastPositionMs as integer = -1
+        private stallSinceMs as integer = -1
+        private lastCheckAtMs as integer = -1
+
+        function IsEnded() as boolean
+            return m.ended
+        end function
+
+        function IsChecking() as boolean
+            return m.checking
+        end function
+
+        ' True when a check should be sent now; the coordinator then runs one and calls OnCheckResult.
+        function OnHeartbeat(nowMs as integer, state as string, positionMs as integer) as boolean
+            moved = m.lastPositionMs < 0 or Abs(positionMs - m.lastPositionMs) >= LiveEndWatch.MOVE_MS
+            if moved
+                m.lastPositionMs = positionMs
+            end if
+            ' paused, a DVR transport (it pauses the video), stopped: not a stall.
+            if moved or (state <> VideoState.Playing and state <> VideoState.Buffering)
+                m.stallSinceMs = nowMs
+                return false
+            end if
+            if nowMs - m.stallSinceMs < LiveEndWatch.STALL_MS
+                return false
+            end if
+            if m.lastCheckAtMs >= 0 and nowMs - m.lastCheckAtMs < LiveEndWatch.RECHECK_MS
+                return false
+            end if
+            return m.StartCheck(nowMs)
+        end function
+
+        ' A check now, whatever the position (the video errored). False when one is already out or the
+        ' broadcast is known to have ended.
+        function StartCheck(nowMs as integer) as boolean
+            if m.ended or m.checking
+                return false
+            end if
+            m.checking = true
+            m.lastCheckAtMs = nowMs
+            m.checkCount += 1
+            return true
+        end function
+
+        ' liveNow: the answer, invalid when the check failed (asked again on the next stall).
+        function OnCheckResult(liveNow as dynamic) as void
+            m.checking = false
+            if liveNow = false
+                m.ended = true
+            end if
+        end function
+    end class
+
+end namespace

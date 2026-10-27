@@ -2,6 +2,7 @@
 ' inert and spec-driven) through scripted device-state sequences the real Roku Video won't produce on command.
 ' This is the harness that would have caught the reported wedge: the existing INV-D* are blind to it (during the
 ' wedge state="buffering", so "transport => state<>playing" was SATISFIED). The NEW property is P-seam.
+import "pkg:/components/VideoPlayerDev/LiveEndWatch.bs"
 import "pkg:/components/VideoPlayerDev/PlayerCoordinatorLogic.bs"
 import "pkg:/components/VideoPlayerDev/TransportController.bs"
 import "pkg:/components/VideoPlayerDev/VideoNode.bs"
@@ -452,6 +453,50 @@ namespace Tests
 
             reported = m.global.telemetry.LogEvent
             m.assertTrue(reported.message.Instr("backend: unknown") > 0, "got: " + reported.message)
+        end function
+
+        ' A broadcast that ended freezes the live position (LiveEndWatch): the player asks YouTube, and finishes
+        ' instead of showing the stall error.
+        @it("a live position frozen for STALL_MS queues one live status check")
+        function _()
+            for nowMs = 0 to LiveEndWatch.STALL_MS step 1000
+                m.top.callFunc("TestLiveHeartbeat", nowMs, 11869000, VideoState.Playing)
+            end for
+            m.assertEqual(m.top.liveStatusJobCount, 1)
+            m.top.callFunc("TestLiveHeartbeat", LiveEndWatch.STALL_MS + 1000, 11869000, VideoState.Playing)
+            m.assertEqual(m.top.liveStatusJobCount, 1, "no second check while one is out")
+        end function
+
+        @it("a stall error on a live stream that ended finishes it, no dialog")
+        function _()
+            held = m.top.callFunc("TestLiveErrorAfterPlay")
+            m.assertFalse(held.dialog, "the dialog waits for the live status")
+            m.assertTrue(held.held)
+            m.assertEqual(m.top.liveStatusJobCount, 1)
+
+            answered = m.top.callFunc("TestLiveStatusAnswer", false)
+            m.assertTrue(answered.ended)
+            m.assertFalse(answered.dialog)
+            m.assertFalse(answered.held)
+            m.assertTrue(answered.closePlayer, "no next video -> close")
+        end function
+
+        @it("a stall error on a live stream that is still live shows the error dialog")
+        function _()
+            m.top.callFunc("TestLiveErrorAfterPlay")
+            answered = m.top.callFunc("TestLiveStatusAnswer", true)
+            m.assertFalse(answered.ended)
+            m.assertTrue(answered.dialog)
+            m.assertFalse(answered.held)
+            m.assertFalse(answered.closePlayer)
+        end function
+
+        @it("a failed live status check shows the held error dialog")
+        function _()
+            m.top.callFunc("TestLiveErrorAfterPlay")
+            answered = m.top.callFunc("TestLiveStatusAnswer", invalid)
+            m.assertTrue(answered.dialog)
+            m.assertFalse(answered.closePlayer)
         end function
 
         ' Up/Down reveal the chrome when it is hidden in idle (they otherwise do nothing).
@@ -1086,15 +1131,15 @@ namespace Tests
                 classified[name] = "dep"
             end for
             ' controllers (plain .bs class instances).
-            for each name in ["transport", "sponsorblock", "playbackTelemetry"]
+            for each name in ["transport", "sponsorblock", "playbackTelemetry", "liveEndWatch"]
                 classified[name] = "controller"
             end for
             ' cached child nodes / timers / animations / reusable helpers (structure, not state).
-            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "weatherLabel", "weatherCityLabel", "endsAtText", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime", "titleFont", "secondaryTitleFont", "playerMenu"]
+            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "weatherLabel", "weatherCityLabel", "endsAtText", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime", "liveEndClock", "titleFont", "secondaryTitleFont", "playerMenu"]
                 classified[name] = "node"
             end for
             ' in-flight job handles.
-            for each name in ["videoContentJob", "sponsorBlockSegmentsJob", "markVideoWatchedJob"]
+            for each name in ["videoContentJob", "sponsorBlockSegmentsJob", "markVideoWatchedJob", "liveStatusJob"]
                 classified[name] = "job"
             end for
             ' STATE AXES — discrete coordinator state; each needs its transitions covered by a seam test.
@@ -1102,7 +1147,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "loadingSetSeekMs", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "playerComments", "qualityOverride", "savedCaptionMode", "originalAudioPending", "userAudioTrack", "userAudioVideoId", "endTimeMinute"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "loadingSetSeekMs", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "playerComments", "qualityOverride", "savedCaptionMode", "originalAudioPending", "userAudioTrack", "userAudioVideoId", "endTimeMinute", "pendingLiveError"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden

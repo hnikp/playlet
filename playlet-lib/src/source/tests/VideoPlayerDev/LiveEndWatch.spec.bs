@@ -1,0 +1,127 @@
+' Unit tests for LiveEndWatch: when a frozen live position asks whether the broadcast ended, and what the
+' answers do. Pure class, fed a fake clock in ms.
+
+import "pkg:/components/VideoPlayerDev/LiveEndWatch.bs"
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+
+namespace Tests
+
+    @suite
+    class LiveEndWatchTests extends Rooibos.BaseTestSuite
+
+        ' Heartbeats once a second from `fromMs` to `toMs` (inclusive) at a fixed position: the ms of the first
+        ' that asked for a check, -1 if none did.
+        function FrozenUntilCheck(watch as object, fromMs as integer, toMs as integer, state as string, positionMs as integer) as integer
+            for nowMs = fromMs to toMs step 1000
+                if watch.OnHeartbeat(nowMs, state, positionMs)
+                    return nowMs
+                end if
+            end for
+            return -1
+        end function
+
+        @describe("stall detection")
+
+        @it("asks once the position has been frozen while playing for STALL_MS")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            m.assertEqual(m.FrozenUntilCheck(watch, 0, 60000, VideoState.Playing, 11869000), LiveEndWatch.STALL_MS)
+            m.assertTrue(watch.IsChecking())
+            m.assertEqual(watch.checkCount, 1)
+        end function
+
+        @it("a frozen buffering position asks too")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            m.assertEqual(m.FrozenUntilCheck(watch, 0, 60000, VideoState.Buffering, 5000), LiveEndWatch.STALL_MS)
+        end function
+
+        @it("a moving position never asks")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            for nowMs = 0 to 120000 step 1000
+                m.assertFalse(watch.OnHeartbeat(nowMs, VideoState.Playing, nowMs))
+            end for
+            m.assertEqual(watch.checkCount, 0)
+        end function
+
+        @it("position jitter under MOVE_MS does not count as playback")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            asked = -1
+            for nowMs = 0 to 60000 step 1000
+                if watch.OnHeartbeat(nowMs, VideoState.Playing, 1000 + (nowMs \ 1000) mod 2 * 100)
+                    asked = nowMs
+                    exit for
+                end if
+            end for
+            m.assertEqual(asked, LiveEndWatch.STALL_MS)
+        end function
+
+        @it("a paused video never asks, and the stall restarts on resume")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            m.assertEqual(m.FrozenUntilCheck(watch, 0, 60000, VideoState.Paused, 1000), -1)
+            ' resumed at 61 s with the same frozen position: a full STALL_MS from the last paused heartbeat.
+            m.assertEqual(m.FrozenUntilCheck(watch, 61000, 120000, VideoState.Playing, 1000), 60000 + LiveEndWatch.STALL_MS)
+        end function
+
+        @it("movement resets the stall")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            m.assertEqual(m.FrozenUntilCheck(watch, 0, 10000, VideoState.Playing, 1000), -1)
+            m.assertFalse(watch.OnHeartbeat(11000, VideoState.Playing, 9000))
+            m.assertEqual(m.FrozenUntilCheck(watch, 12000, 60000, VideoState.Playing, 9000), 11000 + LiveEndWatch.STALL_MS)
+        end function
+
+        @describe("answers")
+
+        @it("still live: asks again RECHECK_MS after the last check, not before")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            firstMs = m.FrozenUntilCheck(watch, 0, 60000, VideoState.Playing, 1000)
+            watch.OnCheckResult(true)
+            m.assertFalse(watch.IsEnded())
+            m.assertFalse(watch.IsChecking())
+            m.assertEqual(m.FrozenUntilCheck(watch, firstMs + 1000, firstMs + 120000, VideoState.Playing, 1000), firstMs + LiveEndWatch.RECHECK_MS)
+            m.assertEqual(watch.checkCount, 2)
+        end function
+
+        @it("no second check while one is out")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            firstMs = m.FrozenUntilCheck(watch, 0, 60000, VideoState.Playing, 1000)
+            m.assertEqual(m.FrozenUntilCheck(watch, firstMs + 1000, firstMs + 120000, VideoState.Playing, 1000), -1)
+            m.assertFalse(watch.StartCheck(firstMs + 120000))
+            m.assertEqual(watch.checkCount, 1)
+        end function
+
+        @it("not live: ended, and no more checks")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            m.FrozenUntilCheck(watch, 0, 60000, VideoState.Playing, 1000)
+            watch.OnCheckResult(false)
+            m.assertTrue(watch.IsEnded())
+            m.assertEqual(m.FrozenUntilCheck(watch, 61000, 200000, VideoState.Playing, 1000), -1)
+            m.assertFalse(watch.StartCheck(200000))
+        end function
+
+        @it("a failed check is not an answer: asked again after RECHECK_MS")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            firstMs = m.FrozenUntilCheck(watch, 0, 60000, VideoState.Playing, 1000)
+            watch.OnCheckResult(invalid)
+            m.assertFalse(watch.IsEnded())
+            m.assertEqual(m.FrozenUntilCheck(watch, firstMs + 1000, firstMs + 120000, VideoState.Playing, 1000), firstMs + LiveEndWatch.RECHECK_MS)
+        end function
+
+        @it("StartCheck asks at once, whatever the position")
+        function _()
+            watch = new LiveEndWatch.Watch()
+            m.assertTrue(watch.StartCheck(0))
+            m.assertTrue(watch.IsChecking())
+        end function
+
+    end class
+
+end namespace

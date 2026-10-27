@@ -41,6 +41,7 @@ function TestSetup() as void
     jobQueue = createObject("roSGNode", "Node")
     jobQueue.addField("request", "assocarray", true)
     m.top.sponsorViewedCount = 0
+    m.top.liveStatusJobCount = 0
     jobQueue.observeFieldScoped("request", FuncName(OnTestJobRequest))
     m.top.jobQueue = jobQueue
     m.top.notifications = createObject("roSGNode", "Node")
@@ -110,8 +111,11 @@ function OnTestControl() as void
 end function
 
 function OnTestJobRequest(event as object) as void
-    if event.getData().jobName = Jobs.SponsorBlockSegmentViewedJob
+    jobName = event.getData().jobName
+    if jobName = Jobs.SponsorBlockSegmentViewedJob
         m.top.sponsorViewedCount += 1
+    else if jobName = Jobs.LiveStatusJob
+        m.top.liveStatusJobCount += 1
     end if
 end function
 
@@ -192,6 +196,69 @@ end function
 function TestFinishChromeFadeOut() as void
     m.chromeFadeOut.control = "stop"
     OnChromeFadeOutState()
+end function
+
+' Live content that already played, minus the content job: TestSetLive plus what LiveEndWatch needs (a videoId,
+' the first frame, a fresh watch on a fake clock the spec moves). Once per test: TestSetup's Initialize puts the
+' real roTimespan back.
+function SetUpPlayedLive() as void
+    if type(m.liveEndClock) <> "roAssociativeArray"
+        content = CreateObject("roSGNode", "ContentNode")
+        content.addField("videoId", "string", false)
+        content.addField("playletStreamUrls", "array", false)
+        content.addField("playletStreamUrlIndex", "integer", false)
+        content.setFields({ videoId: "liveVid", url: "http://stream", playletStreamUrls: [], playletStreamUrlIndex: 0 })
+        m.top.content = content
+        TestSetLive(43200000)
+        m.firstFrameSeen = true
+        m.videoPlayedSuccessfully = true
+        m.liveEndWatch = new LiveEndWatch.Watch()
+        m.liveEndClock = {
+            ms: 0
+            TotalMilliseconds: function() as integer
+                return m.ms
+            end function
+        }
+    end if
+end function
+
+' TestLiveHeartbeat — the REAL 1s live heartbeat at `nowMs` on the fake clock, the device at `positionMs`.
+function TestLiveHeartbeat(nowMs as integer, positionMs as integer, state as string) as void
+    SetUpPlayedLive()
+    m.liveEndClock.ms = nowMs
+    m.top.unobserveField("position")
+    m.top.unobserveField("state")
+    m.top.position = positionMs / 1000
+    m.top.state = state
+    m.top.observeField("position", FuncName(OnPosition))
+    m.top.observeField("state", FuncName(OnVideoState))
+    OnLiveEdgeClockFire()
+end function
+
+' TestLiveErrorAfterPlay — the REAL OnVideoError on a live stream that played; returns whether a dialog is up
+' and whether the error is held for the live status.
+function TestLiveErrorAfterPlay() as object
+    SetUpPlayedLive()
+    m.top.errorMsg = "malformed data"
+    m.top.errorCode = -5
+    m.top.errorStr = "buffering is stalled"
+    m.top.errorInfo = { category: "mediaerror", source: "preroll.stall", ignored: false }
+    OnVideoError()
+    return { dialog: m.errorDialogNode <> invalid, held: m.pendingLiveError <> invalid }
+end function
+
+' TestLiveStatusAnswer — the live status job's answer (liveNow, invalid = failed), minus the job: the REAL
+' ApplyLiveStatus. Returns the dialog state and whether the player asked the queue to close.
+function TestLiveStatusAnswer(liveNow as dynamic) as object
+    ApplyLiveStatus(liveNow)
+    result = { dialog: m.errorDialogNode <> invalid, held: m.pendingLiveError <> invalid, closePlayer: m.videoQueue.closePlayer, ended: m.liveEndWatch.IsEnded() }
+    dialog = m.errorDialogNode
+    if dialog <> invalid
+        dialog.unobserveFieldScoped("wasClosed")
+        m.top.getScene().dialog = invalid
+        m.errorDialogNode = invalid
+    end if
+    return result
 end function
 
 ' TestPlaybackErrorDialog — seed the error fields, drive OnVideoError down the dialog path, return the dialog's
